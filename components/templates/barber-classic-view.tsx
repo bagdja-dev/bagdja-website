@@ -275,15 +275,16 @@ function FaqSection({ title, items }: { title: string; items: FaqItem[] }) {
 function RichTextSection({ title, html }: { title?: string; html: string }) {
   if (!html.trim()) return null;
   return (
-    <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <div className="rounded-2xl bg-white p-6 text-gray-800 shadow-sm sm:p-8">
+    <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+      <div className="rounded-2xl p-6 text-gray-800 shadow-sm sm:p-8">
         {title && (
-          <h2 className="mb-4 text-center text-xl font-semibold text-gray-900 sm:text-2xl">
+          <h2 className="mb-4 text-center text-xl font-semibold sm:text-2xl" style={{ color: 'var(--brand-on-accent)', fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
             {title}
           </h2>
         )}
         <div
           className="overflow-x-auto text-sm leading-relaxed sm:text-base [&_a]:text-blue-600 [&_a]:underline [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 [&_td]:p-2 [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold [&_ul]:list-disc"
+          style={{ color: 'var(--brand-muted)' }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </div>
