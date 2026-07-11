@@ -15,6 +15,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --include=dev --no-audit --no-fund
 COPY . .
+# public/ ada di repo tapi kosong — git tidak melacak direktori kosong, jadi
+# di beberapa checkout foldernya bisa benar-benar tidak ada. Pastikan selalu
+# ada supaya COPY --from=builder di stage production tidak gagal.
+RUN mkdir -p public
 RUN npm run build
 
 FROM node:22-alpine AS production
