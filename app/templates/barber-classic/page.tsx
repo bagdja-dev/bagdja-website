@@ -1,61 +1,71 @@
 /**
- * Template: Barber Classic (placeholder Phase 1).
- *
- * Phase 7 akan:
- *   - Menerima data tenant via props/searchParams
- *   - Section: Hero, Product/Service Grid, Location, FAQ
- *   - CTA WhatsApp
- *   - Tema dark premium (zinc-950 + amber)
- *
- * Untuk Phase 1 kita hanya render shell HTML5 semantik + Tailwind supaya
- * routing terverifikasi dan tim design bisa mulai mengisi konten.
+ * Dev preview: /templates/barber-classic?preview=1&name=...&c_accent=f59e0b&tf_head=Inter&...
+ * Dipakai oleh admin (iframe live preview) & untuk browsing template secara manual.
+ * Data katalog memakai sample statis — tenant sungguhan dirender via [website_slug].
  */
-export default function BarberClassicTemplate() {
+
+import { BarberClassicView } from '../../../components/templates/barber-classic-view';
+import { BARBER_SAMPLE_PRODUCTS, BARBER_SAMPLE_SERVICES } from '../../../lib/barber-classic-samples';
+import type { CatalogItem, SectionEntry } from '../../../lib/template-data';
+import { parseThemeFromSearchParams } from '../../../lib/website-theme';
+
+type SearchParams = Record<string, string | undefined>;
+
+const PREVIEW_SECTIONS: SectionEntry[] = [
+  { type: 'hero', content: { subtitle: 'Premium Barbershop', show_whatsapp_cta: true } },
+  { type: 'services_grid', content: { title: 'Layanan Kami', filter_type: 'service' } },
+  { type: 'products_grid', content: { title: 'Produk Kami', filter_type: 'product' } },
+];
+
+function toPreviewCatalog(
+  items: typeof BARBER_SAMPLE_SERVICES,
+  type: 'service' | 'product',
+): CatalogItem[] {
+  return items.map((item, index) => ({
+    id: `${type}-${index}`,
+    type,
+    name: item.name,
+    slug: `${type}-${index}`,
+    description: item.description,
+    priceLabel: item.price,
+    image: item.image,
+  }));
+}
+
+export default function BarberClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
+  const isPreview = searchParams.preview === '1';
+  const websiteTheme = parseThemeFromSearchParams(searchParams);
+  const products: CatalogItem[] = [
+    ...toPreviewCatalog(BARBER_SAMPLE_SERVICES, 'service'),
+    ...toPreviewCatalog(BARBER_SAMPLE_PRODUCTS, 'product'),
+  ];
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800/60">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <span className="text-lg font-semibold tracking-widest text-amber-400">
-            BAGDJA · BARBER
-          </span>
-          <span className="text-xs uppercase tracking-wider text-zinc-500">
-            Template Preview
-          </span>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <p className="text-xs uppercase tracking-[0.3em] text-amber-500">
-          Barber Classic
-        </p>
-        <h1 className="mt-4 text-4xl font-semibold sm:text-6xl">
-          Premium Barbershop Template
-        </h1>
-        <p className="mx-auto mt-6 max-w-xl text-zinc-400">
-          Section Hero, layanan, lokasi, dan FAQ akan diisi otomatis dari data
-          tenant pada Phase 7. Halaman ini berfungsi sebagai shell untuk
-          memverifikasi routing dan tema.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <a
-            href="#"
-            aria-disabled
-            className="rounded-full bg-amber-500 px-6 py-3 text-sm font-medium text-zinc-950 opacity-70"
-          >
-            Booking via WhatsApp
-          </a>
-          <a
-            href="/"
-            className="rounded-full border border-zinc-700 px-6 py-3 text-sm text-zinc-300 hover:border-amber-500 hover:text-amber-400"
-          >
-            ← Kembali
-          </a>
-        </div>
-      </section>
-
-      <footer className="border-t border-zinc-800/60 py-6 text-center text-xs text-zinc-600">
-        © Bagdja Website Builder — placeholder template
-      </footer>
-    </div>
+    <>
+      {!isPreview && (
+        <a
+          href="/"
+          className="fixed left-4 top-4 z-20 rounded-full bg-black/60 px-4 py-2 text-xs font-medium text-white backdrop-blur transition-colors hover:bg-black/80"
+        >
+          ← Kembali ke index
+        </a>
+      )}
+      <BarberClassicView
+        isPreview={isPreview}
+        profile={{
+          name: searchParams.name,
+          tagline: searchParams.tagline,
+          logoUrl: searchParams.logo ?? searchParams.logo_url,
+          whatsapp: searchParams.whatsapp,
+          phone: searchParams.phone,
+          email: searchParams.email,
+        }}
+        websiteTheme={websiteTheme}
+        sections={PREVIEW_SECTIONS}
+        products={products}
+        locations={[]}
+        faqs={[]}
+      />
+    </>
   );
 }

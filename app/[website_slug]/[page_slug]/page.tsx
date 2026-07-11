@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getWebsiteBySlug } from '../../lib/api-client';
-import { loadTenant } from '../../lib/tenant-loader';
+import { getWebsiteBySlug } from '../../../lib/api-client';
+import { loadTenant } from '../../../lib/tenant-loader';
 import {
   resolveSections,
   toBlogPostItem,
@@ -10,29 +10,30 @@ import {
   toFaqItem,
   toLocationItem,
   toNavPage,
-} from '../../lib/template-data';
-import { getTemplateRenderer } from '../../lib/template-registry';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../lib/website-theme';
+} from '../../../lib/template-data';
+import { getTemplateRenderer } from '../../../lib/template-registry';
+import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
 
 export const revalidate = 60;
 
-interface TenantPageProps {
-  params: { website_slug: string };
+interface TenantSubPageProps {
+  params: { website_slug: string; page_slug: string };
 }
 
-export async function generateMetadata({ params }: TenantPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: TenantSubPageProps): Promise<Metadata> {
   const website = await getWebsiteBySlug(params.website_slug);
   if (!website) return {};
 
+  const page = website.pages.find((p) => p.slug === params.page_slug);
   return {
-    title: website.name,
+    title: page ? `${page.title} · ${website.name}` : website.name,
     description: website.tagline ?? undefined,
   };
 }
 
-export default async function TenantPage({ params }: TenantPageProps) {
-  const tenant = await loadTenant(params.website_slug);
-  if (!tenant) notFound();
+export default async function TenantSubPage({ params }: TenantSubPageProps) {
+  const tenant = await loadTenant(params.website_slug, params.page_slug);
+  if (!tenant || !tenant.page) notFound();
 
   const { website, page, products, locations, faqs, blogPosts } = tenant;
 
@@ -53,7 +54,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       }}
       templateTheme={extractTemplateTheme(website.template?.structure)}
       websiteTheme={sanitizeWebsiteTheme(website.theme)}
-      sections={resolveSections(page, website.template)}
+      sections={resolveSections(page, website.template, false)}
       products={products.map(toCatalogItem)}
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}

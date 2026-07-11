@@ -1,43 +1,49 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getWebsiteBySlug } from '../../lib/api-client';
-import { loadTenant } from '../../lib/tenant-loader';
+import { loadTenant } from '../../../../lib/tenant-loader';
 import {
-  resolveSections,
   toBlogPostItem,
   toCatalogItem,
   toFaqItem,
   toLocationItem,
   toNavPage,
-} from '../../lib/template-data';
-import { getTemplateRenderer } from '../../lib/template-registry';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../lib/website-theme';
+  type SectionEntry,
+} from '../../../../lib/template-data';
+import { getTemplateRenderer } from '../../../../lib/template-registry';
+import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../../lib/website-theme';
 
 export const revalidate = 60;
 
-interface TenantPageProps {
-  params: { website_slug: string };
+interface ProductDetailPageProps {
+  params: { website_slug: string; product_slug: string };
 }
 
-export async function generateMetadata({ params }: TenantPageProps): Promise<Metadata> {
-  const website = await getWebsiteBySlug(params.website_slug);
-  if (!website) return {};
+export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
+  const tenant = await loadTenant(params.website_slug);
+  const product = tenant?.products.find((p) => p.slug === params.product_slug);
+  if (!product) return {};
 
   return {
-    title: website.name,
-    description: website.tagline ?? undefined,
+    title: product.name,
+    description: product.description ?? undefined,
   };
 }
 
-export default async function TenantPage({ params }: TenantPageProps) {
+export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
 
-  const { website, page, products, locations, faqs, blogPosts } = tenant;
+  const { website, products, locations, faqs, blogPosts } = tenant;
+  const product = products.find((p) => p.slug === params.product_slug);
+  if (!product) notFound();
 
   const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
   if (!Renderer) notFound();
+
+  const sections: SectionEntry[] = [
+    { type: 'product_detail', content: { product: toCatalogItem(product) } },
+  ];
 
   return (
     <Renderer
@@ -53,7 +59,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       }}
       templateTheme={extractTemplateTheme(website.template?.structure)}
       websiteTheme={sanitizeWebsiteTheme(website.theme)}
-      sections={resolveSections(page, website.template)}
+      sections={sections}
       products={products.map(toCatalogItem)}
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
