@@ -1,8 +1,12 @@
 /**
- * Resolusi tenant berdasarkan Host header, 3 kasus (lihat plan Phase 8a):
- *  1. Host = apex platform (`website.bagdja.com`) + path /{slug}/...
- *     -> redirect permanen ke subdomain https://{slug}.website.bagdja.com/...
- *  2. Host = {slug}.website.bagdja.com (wildcard subdomain)
+ * Resolusi tenant berdasarkan Host header, 3 kasus (lihat plan Phase 8a).
+ * Platform host untuk web renderer publik = NEXT_PUBLIC_PLATFORM_URL (default
+ * sites.bagdja.com) — SENGAJA beda dari website.bagdja.com yang dipakai admin
+ * CMS, supaya subdomain tenant tidak nempel di domain admin.
+ *
+ *  1. Host = apex platform (`sites.bagdja.com`) + path /{slug}/...
+ *     -> redirect permanen ke subdomain https://{slug}.sites.bagdja.com/...
+ *  2. Host = {slug}.sites.bagdja.com (wildcard subdomain)
  *     -> rewrite ke /{slug}/... (slug diambil langsung dari hostname, tanpa panggilan API)
  *  3. Host lain (kandidat custom domain)
  *     -> tanya API GET /api/public/resolve-domain?host=..., rewrite kalau ketemu
