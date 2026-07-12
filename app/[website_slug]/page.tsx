@@ -12,6 +12,7 @@ import {
   toNavPage,
 } from '../../lib/template-data';
 import { getTemplateRenderer } from '../../lib/template-registry';
+import { resolveTenantLinkBase } from '../../lib/tenant-link-base';
 import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../lib/website-theme';
 
 export const revalidate = 60;
@@ -57,7 +58,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       products={products.map(toCatalogItem)}
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
-      websiteSlug={website.slug}
+      websiteSlug={resolveTenantLinkBase(website.slug)}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
     />

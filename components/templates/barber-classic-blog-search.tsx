@@ -106,7 +106,7 @@ export function BarberClassicBlogSearch({
                 results.map((post) => (
                   <a
                     key={post.id}
-                    href={websiteSlug ? buildBlogPostHref(websiteSlug, post.slug) : '#'}
+                    href={websiteSlug !== undefined ? buildBlogPostHref(websiteSlug, post.slug) : '#'}
                     onClick={close}
                     className="block rounded-xl p-3 transition-colors hover:opacity-80"
                   >

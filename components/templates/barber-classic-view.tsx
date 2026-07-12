@@ -52,7 +52,15 @@ export interface BarberClassicViewProps {
   products: CatalogItem[];
   locations: LocationItem[];
   faqs: FaqItem[];
-  /** slug tenant — dipakai membangun link antar-halaman (header/footer nav) */
+  /**
+   * BUKAN raw slug — ini base path yang sudah di-resolve caller lewat
+   * `resolveTenantLinkBase()` ('' untuk subdomain/custom domain, `/{slug}`
+   * untuk path-based/local dev). Dipakai membangun link antar-halaman
+   * (header/footer nav, kartu produk/blog). `undefined` = belum siap
+   * (preview tanpa tenant nyata), string kosong `''` tetap valid (bukan
+   * "belum siap") — jangan pakai truthy check `websiteSlug ? ... : ...`,
+   * pakai `websiteSlug !== undefined`.
+   */
   websiteSlug?: string;
   /** semua halaman website, dipakai untuk nav header/footer (filter by placement) */
   pages?: NavPage[];
@@ -61,7 +69,7 @@ export interface BarberClassicViewProps {
 }
 
 function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: string }) {
-  const href = websiteSlug ? buildProductHref(websiteSlug, item.slug) : undefined;
+  const href = websiteSlug !== undefined ? buildProductHref(websiteSlug, item.slug) : undefined;
   const Wrapper = href ? 'a' : 'div';
   return (
     <Wrapper
@@ -547,7 +555,7 @@ function MailIcon() {
 }
 
 function BlogPostCard({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?: string }) {
-  const href = websiteSlug ? buildBlogPostHref(websiteSlug, post.slug) : '#';
+  const href = websiteSlug !== undefined ? buildBlogPostHref(websiteSlug, post.slug) : '#';
   return (
     <a
       href={href}
@@ -751,13 +759,13 @@ export function BarberClassicView({
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
   const toLink = (page: NavPage): HeaderNavLink => ({
-    href: websiteSlug ? buildPageHref(websiteSlug, page) : '#',
+    href: websiteSlug !== undefined ? buildPageHref(websiteSlug, page) : '#',
     label: page.title,
   });
   const regularNavLinks = pages.filter((p) => p.placement === 'regular').map(toLink);
   const headerNavLinks = pages.filter((p) => p.placement === 'header').map(toLink);
   const footerNavLinks = pages.filter((p) => p.placement === 'footer').map(toLink);
-  const homeHref = websiteSlug ? `/${websiteSlug}` : '#';
+  const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
 
   const socialLinks = parseSocialLinks(profile.socialLinks);
   const primaryLocation = locations.find((l) => l.isPrimary) ?? locations[0];

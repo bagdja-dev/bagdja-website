@@ -83,8 +83,15 @@ export function toNavPage(page: ApiWebsitePage): NavPage {
   };
 }
 
-export function buildPageHref(websiteSlug: string, page: NavPage): string {
-  return page.isHome ? `/${websiteSlug}` : `/${websiteSlug}/${page.slug}`;
+/**
+ * `basePath` sudah pre-computed oleh caller (lihat `resolveTenantLinkBase`) —
+ * kosong ('') untuk subdomain/custom domain, `/{slug}` untuk path-based
+ * (local dev). Jangan diisi raw slug tanpa lewat situ, supaya tidak dobel
+ * slug di URL (`{slug}.sites.bagdja.com/{slug}/...`).
+ */
+export function buildPageHref(basePath: string, page: NavPage): string {
+  if (page.isHome) return basePath || '/';
+  return `${basePath}/${page.slug}`;
 }
 
 export function formatIDR(value: number | string | null | undefined): string {
@@ -111,8 +118,9 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
   };
 }
 
-export function buildProductHref(websiteSlug: string, productSlug: string): string {
-  return `/${websiteSlug}/products/${productSlug}`;
+/** `basePath` — lihat catatan di `buildPageHref`. */
+export function buildProductHref(basePath: string, productSlug: string): string {
+  return `${basePath}/products/${productSlug}`;
 }
 
 export function toLocationItem(location: ApiWebsiteLocation): LocationItem {
@@ -174,8 +182,9 @@ export function toBlogPostItem(post: ApiWebsiteBlogPost): BlogPostItem {
   };
 }
 
-export function buildBlogPostHref(websiteSlug: string, postSlug: string): string {
-  return `/${websiteSlug}/blog/${postSlug}`;
+/** `basePath` — lihat catatan di `buildPageHref`. */
+export function buildBlogPostHref(basePath: string, postSlug: string): string {
+  return `${basePath}/blog/${postSlug}`;
 }
 
 export function digitsOnly(value: string): string {
