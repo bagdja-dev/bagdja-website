@@ -34,6 +34,13 @@ COPY --from=builder /app/.next/static ./.next/static
 ENV PORT=5005
 EXPOSE 5005
 
+# WAJIB: server.js hasil `output: standalone` default listen di localhost
+# (127.0.0.1) kalau HOSTNAME tidak di-set eksplisit — jadi tidak reachable
+# dari container lain (mis. Traefik) di network Docker yang sama, walau
+# EXPOSE-nya benar. Tanpa ini muncul "Connection refused"/502 Bad Gateway
+# dari proxy meski container-nya sendiri sehat.
+ENV HOSTNAME="0.0.0.0"
+
 # Next.js standalone server sudah termasuk middleware.ts (host-based tenant
 # resolution untuk custom domain/subdomain) — tidak butuh proses terpisah.
 CMD ["node", "server.js"]
