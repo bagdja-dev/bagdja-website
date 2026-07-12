@@ -29,10 +29,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Default; bisa dioverride lewat env var Coolify. Harus cocok dengan
-# core/docs/port.md (bagdja-website-web = 5005).
-ENV PORT=5005
-EXPOSE 5005
+# CATATAN: port.md (5003/5004/5005/dst) itu konvensi untuk LOCAL DEV saja
+# (menghindari bentrok port antar proses di satu host yang sama). Di Coolify
+# tiap app punya container/network sendiri jadi tidak ada risiko bentrok —
+# pakai default Coolify (3000) untuk Next.js, bukan 5005. Coolify juga
+# meng-override env var PORT saat runtime apapun yang di-set di sini, jadi
+# ENV PORT di bawah ini cuma dokumentasi/fallback kalau image dijalankan
+# di luar Coolify.
+ENV PORT=3000
+EXPOSE 3000
 
 # WAJIB: server.js hasil `output: standalone` default listen di localhost
 # (127.0.0.1) kalau HOSTNAME tidak di-set eksplisit — jadi tidak reachable
