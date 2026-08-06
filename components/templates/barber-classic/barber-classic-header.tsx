@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import type { SocialLink } from '../../lib/template-data';
+import type { SocialLink } from '../../../lib/template-data';
 import { SocialIcon } from './barber-classic-icons';
 
 const DRAWER_TRANSITION_MS = 300;

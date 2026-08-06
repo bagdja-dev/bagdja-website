@@ -7,6 +7,7 @@ import {
   resolveSections,
   toBlogPostItem,
   toCatalogItem,
+  toCategoryItem,
   toFaqItem,
   toLocationItem,
   toNavPage,
@@ -36,7 +37,7 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
   const tenant = await loadTenant(params.website_slug, params.page_slug);
   if (!tenant || !tenant.page) notFound();
 
-  const { website, page, products, locations, faqs, blogPosts } = tenant;
+  const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
 
   const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
   if (!Renderer) notFound();
@@ -57,9 +58,11 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
       websiteTheme={sanitizeWebsiteTheme(website.theme)}
       sections={resolveSections(page, website.template, false)}
       products={products.map(toCatalogItem)}
+      categories={categories.map(toCategoryItem)}
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
       websiteSlug={resolveTenantLinkBase(website.slug)}
+      tenantSlug={website.slug}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
     />

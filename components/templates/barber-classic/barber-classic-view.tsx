@@ -7,6 +7,7 @@
 
 import {
   buildBlogPostHref,
+  buildCategoryHref,
   buildMapEmbedUrl,
   buildPageHref,
   buildProductHref,
@@ -15,19 +16,21 @@ import {
   parseSocialLinks,
   type BlogPostItem,
   type CatalogItem,
+  type CategoryItem,
   type FaqItem,
   type GalleryImageItem,
   type LocationItem,
   type NavPage,
   type SectionEntry,
-} from '../../lib/template-data';
+} from '../../../lib/template-data';
 import {
   getGoogleFontsUrl,
   resolveTheme,
   themeToCssVariables,
   type WebsiteTheme,
-} from '../../lib/website-theme';
+} from '../../../lib/website-theme';
 import { BarberClassicBlogSearch } from './barber-classic-blog-search';
+import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from './barber-classic-catalog';
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
 import { SocialIcon } from './barber-classic-icons';
@@ -50,8 +53,11 @@ export interface BarberClassicViewProps {
   websiteTheme?: WebsiteTheme;
   sections: SectionEntry[];
   products: CatalogItem[];
+  categories?: CategoryItem[];
   locations: LocationItem[];
   faqs: FaqItem[];
+  /** Slug asli tenant (bukan basePath) — dipakai fetch client-side (pagination/filter) ke API publik. */
+  tenantSlug?: string;
   /**
    * BUKAN raw slug — ini base path yang sudah di-resolve caller lewat
    * `resolveTenantLinkBase()` ('' untuk subdomain/custom domain, `/{slug}`
@@ -68,7 +74,7 @@ export interface BarberClassicViewProps {
   blogPosts?: BlogPostItem[];
 }
 
-function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: string }) {
+export function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: string }) {
   const href = websiteSlug !== undefined ? buildProductHref(websiteSlug, item.slug) : undefined;
   const Wrapper = href ? 'a' : 'div';
   return (
@@ -105,33 +111,151 @@ function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: s
   );
 }
 
-function CatalogGrid({
+interface CategoryEntry {
+  image?: string;
+  count: number;
+}
+
+function CategoryTile({
+  category,
+  entry,
+  featured = false,
+  className = '',
+  href,
+}: {
+  category: string;
+  entry: CategoryEntry;
+  featured?: boolean;
+  className?: string;
+  href: string;
+}) {
+  return (
+    <a
+      href={href}
+      className={`group relative block aspect-square w-full overflow-hidden rounded-xl sm:aspect-auto sm:h-full ${className}`}
+      style={{ backgroundColor: 'var(--brand-surface)' }}
+    >
+      {entry.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={entry.image}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : null}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className={`absolute inset-x-0 bottom-0 p-4 text-white ${featured ? 'sm:p-6' : ''}`}>
+        <p
+          className={`font-bold uppercase tracking-wide ${featured ? 'text-xl sm:text-2xl' : 'text-sm sm:text-base'}`}
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
+          {category}
+        </p>
+        {featured && <p className="mt-1 text-sm text-white/70">{entry.count} item</p>}
+      </div>
+    </a>
+  );
+}
+
+/** Hero khusus halaman listing kategori — background foto kategori, judul = nama kategori. */
+function CategoryHeroSection({ label, imageUrl }: { label: string; imageUrl?: string }) {
+  return (
+    <section
+      className="relative flex items-center justify-center overflow-hidden px-4 py-16 text-center sm:py-20"
+      style={imageUrl ? undefined : { backgroundColor: 'var(--brand-accent)' }}
+    >
+      {imageUrl && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-black/60" />
+        </>
+      )}
+      <h1
+        className="relative z-10 text-3xl font-semibold sm:text-5xl"
+        style={{
+          fontFamily: 'var(--font-heading)',
+          fontWeight: 'var(--font-heading-weight)',
+          color: imageUrl ? '#fff' : 'var(--brand-on-accent)',
+        }}
+      >
+        {label}
+      </h1>
+    </section>
+  );
+}
+
+function CategoryGridSection({
   title,
-  items,
+  products,
+  categories,
   websiteSlug,
 }: {
-  title: string;
-  items: CatalogItem[];
+  title?: string;
+  products: CatalogItem[];
+  categories: CategoryItem[];
   websiteSlug?: string;
 }) {
-  if (!items.length) return null;
+  const byCategory = new Map<string, CategoryEntry>();
+  for (const p of products) {
+    const cat = p.category;
+    if (!cat) continue;
+    const entry = byCategory.get(cat) ?? { image: p.image, count: 0 };
+    entry.count += 1;
+    if (!entry.image) entry.image = p.image;
+    byCategory.set(cat, entry);
+  }
+  for (const [label, entry] of byCategory) {
+    const cover = categories.find((c) => c.label === label)?.images[0];
+    if (cover) entry.image = cover;
+  }
+
+  const groupedEntries = [...byCategory.entries()];
+  if (groupedEntries.length === 0) return null;
+
+  const basePath = websiteSlug ?? '';
+  const [[featuredCategory, featuredEntry], ...rest] = groupedEntries;
+
   return (
     <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-      <div
-        className="flex px-3 py-2 items-center mb-6 text-left text-xl font-semibold sm:text-2xl radius-lg"
-        style={{ backgroundImage: 'linear-gradient(to right, var(--brand-accent), transparent)', borderRadius: 'var(--radius-lg)', color: 'var(--brand-on-accent)', borderColor: 'var(--brand-accent)' }}
-      >
-        <h2
-          className="text-xl font-semibold sm:text-2xl"
-          style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+      {title?.trim() && (
+        <div
+          className="mb-6 flex justify-center px-3 py-2 items-center text-center text-xl font-semibold sm:text-2xl radius-lg"
+          style={{
+            backgroundImage: 'radial-gradient(circle at center, var(--brand-accent), transparent)',
+            borderRadius: 'var(--radius-lg)',
+            color: 'var(--brand-on-accent)',
+            borderColor: 'var(--brand-accent)',
+          }}
         >
-          {title}
-        </h2>
-      </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 justify-items-center">
-        {items.map((item) => (
-          <CatalogCard key={item.id} item={item} websiteSlug={websiteSlug} />
-        ))}
+          <h2
+            className="text-xl font-semibold sm:text-2xl"
+            style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+          >
+            {title}
+          </h2>
+        </div>
+      )}
+      <div className="grid gap-4 sm:aspect-[2/1] sm:grid-cols-2 sm:grid-rows-1">
+        <CategoryTile
+          category={featuredCategory}
+          entry={featuredEntry}
+          featured
+          href={buildCategoryHref(basePath, featuredCategory)}
+        />
+        {rest.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 sm:h-full sm:grid-rows-2">
+            {rest.map(([category, entry], i) => (
+              <CategoryTile
+                key={category}
+                category={category}
+                entry={entry}
+                href={buildCategoryHref(basePath, category)}
+                className={i === rest.length - 1 && rest.length % 2 === 1 ? 'col-span-2' : ''}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -680,8 +804,21 @@ function BlogArticleSection({ post }: { post: BlogPostItem }) {
   );
 }
 
-function ProductDetailSection({ item, waHref }: { item: CatalogItem; waHref?: string }) {
+/** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
+function ProductDetailSection({
+  item,
+  allProducts,
+  waHref,
+  websiteSlug,
+}: {
+  item: CatalogItem;
+  allProducts: CatalogItem[];
+  waHref?: string;
+  websiteSlug?: string;
+}) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
+  const familyId = item.parentProductId ?? item.id;
+  const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       {images.length > 0 && (
@@ -703,6 +840,9 @@ function ProductDetailSection({ item, waHref }: { item: CatalogItem; waHref?: st
           {item.description}
         </p>
       )}
+
+      <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
+
       {item.detail && (
         <div
           className="mt-8 text-sm leading-relaxed sm:text-base [&_a]:underline [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_img]:my-4 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-4 [&_ul]:list-disc"
@@ -737,9 +877,11 @@ export function BarberClassicView({
   websiteTheme = {},
   sections,
   products,
+  categories = [],
   locations,
   faqs,
   websiteSlug,
+  tenantSlug,
   pages = [],
   blogPosts = [],
 }: BarberClassicViewProps) {
@@ -758,6 +900,13 @@ export function BarberClassicView({
     typeof heroContent.subtitle === 'string' ? heroContent.subtitle : 'Premium Barbershop';
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
+  const categoryListingContent = sections.find((s) => s.type === 'category_listing')?.content;
+  const categoryListingLabel =
+    typeof categoryListingContent?.category_label === 'string' ? categoryListingContent.category_label : undefined;
+  const categoryListingImage = categoryListingLabel
+    ? categories.find((c) => c.label === categoryListingLabel)?.images[0]
+    : undefined;
+
   const toLink = (page: NavPage): HeaderNavLink => ({
     href: websiteSlug !== undefined ? buildPageHref(websiteSlug, page) : '#',
     label: page.title,
@@ -772,6 +921,11 @@ export function BarberClassicView({
   const footerAddress = primaryLocation
     ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ')
     : undefined;
+
+  // Sembunyikan row varian (warna/ukuran) dari grid/listing — 1 keluarga
+  // varian cuma tampil 1 kartu (produk induk). Halaman detail tetap pakai
+  // `products` penuh supaya varian bisa diakses via slug-nya.
+  const topLevelProducts = products.filter((p) => !p.parentProductId);
 
   return (
     <>
@@ -796,6 +950,10 @@ export function BarberClassicView({
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
         />
+
+        {categoryListingLabel && (
+          <CategoryHeroSection label={categoryListingLabel} imageUrl={categoryListingImage} />
+        )}
 
         {/* <section className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
           <p className="text-xs uppercase tracking-[0.3em]" style={{ color: 'var(--brand-accent)' }}>
@@ -857,17 +1015,49 @@ export function BarberClassicView({
           .map((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
+              case 'category_grid': {
+                const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
+                return (
+                  <CategoryGridSection
+                    key={key}
+                    title={heading}
+                    products={topLevelProducts}
+                    categories={categories}
+                    websiteSlug={websiteSlug}
+                  />
+                );
+              }
               case 'services_grid':
               case 'products_grid': {
-                const filterType =
-                  typeof section.content.filter_type === 'string'
-                    ? section.content.filter_type
-                    : undefined;
-                const items = products.filter((p) => !filterType || p.type === filterType);
+                const filterType = typeof section.content.filter_type === 'string' ? section.content.filter_type : undefined;
                 const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
-                const heading =
-                  typeof section.content.title === 'string' ? section.content.title : defaultTitle;
-                return <CatalogGrid key={key} title={heading} items={items} websiteSlug={websiteSlug} />;
+                const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
+                return (
+                  <CatalogGridSection
+                    key={key}
+                    title={heading}
+                    filterType={filterType}
+                    initialProducts={topLevelProducts}
+                    tenantSlug={tenantSlug}
+                    websiteSlug={websiteSlug}
+                  />
+                );
+              }
+              case 'category_listing': {
+                const categoryId = typeof section.content.category_id === 'string' ? section.content.category_id : '';
+                const categoryLabel = typeof section.content.category_label === 'string' ? section.content.category_label : '';
+                const initialItems = topLevelProducts.filter((p) => p.category === categoryLabel);
+                return (
+                  <CategoryListingSection
+                    key={key}
+                    categoryId={categoryId}
+                    categoryLabel={categoryLabel}
+                    initialProducts={initialItems}
+                    tenantSlug={tenantSlug}
+                    websiteSlug={websiteSlug}
+                    homeHref={homeHref}
+                  />
+                );
               }
               case 'locations_list': {
                 const filterTypes = Array.isArray(section.content.filter_types)
@@ -1003,7 +1193,9 @@ export function BarberClassicView({
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} waHref={waHref} />;
+                return (
+                  <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} />
+                );
               }
               default:
                 return null;

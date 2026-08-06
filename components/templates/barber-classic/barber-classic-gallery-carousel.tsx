@@ -2,7 +2,7 @@
 
 import { useRef, useState, type TouchEvent } from 'react';
 
-import type { GalleryImageItem } from '../../lib/template-data';
+import type { GalleryImageItem } from '../../../lib/template-data';
 
 const SWIPE_THRESHOLD_PX = 40;
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { buildBlogPostHref, type BlogPostItem } from '../../lib/template-data';
+import { buildBlogPostHref, type BlogPostItem } from '../../../lib/template-data';
 
 function SearchIcon() {
   return (

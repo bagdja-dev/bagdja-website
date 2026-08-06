@@ -1,21 +1,21 @@
 /**
- * Dev preview: /templates/barber-classic?preview=1&name=...&c_accent=f59e0b&tf_head=Inter&...
+ * Dev preview: /templates/store-classic?preview=1&name=...&c_accent=f59e0b&tf_head=Inter&...
  * Dipakai oleh admin (iframe live preview) & untuk browsing template secara manual.
  * Data katalog diambil dari master_defaults template sungguhan (lihat
  * `buildTemplateDefaultsPreview`) — tenant sungguhan dirender via [website_slug].
  */
 
-import { BarberClassicView } from '../../../components/templates/barber-classic/barber-classic-view';
+import { StoreClassicView } from '../../../components/templates/store-classic/store-classic-view';
 import { getTemplateBySlug } from '../../../lib/api-client';
 import { buildTemplateDefaultsPreview } from '../../../lib/template-data';
 import { parseThemeFromSearchParams } from '../../../lib/website-theme';
 
 type SearchParams = Record<string, string | undefined>;
 
-export default async function BarberClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
+export default async function StoreClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
   const isPreview = searchParams.preview === '1';
   const websiteTheme = parseThemeFromSearchParams(searchParams);
-  const template = await getTemplateBySlug('barber-classic');
+  const template = await getTemplateBySlug('store-classic');
   const { sections, products, categories, faqs } = buildTemplateDefaultsPreview(template?.structure);
 
   return (
@@ -28,7 +28,7 @@ export default async function BarberClassicTemplate({ searchParams }: { searchPa
           ← Kembali ke index
         </a>
       )}
-      <BarberClassicView
+      <StoreClassicView
         isPreview={isPreview}
         profile={{
           name: searchParams.name,

@@ -2,6 +2,7 @@
 
 import type {
   ApiWebsiteBlogPost,
+  ApiWebsiteCategory,
   ApiWebsiteFaq,
   ApiWebsiteLocation,
   ApiWebsitePage,
@@ -12,6 +13,7 @@ import type {
 export interface CatalogItem {
   id: string;
   type: string;
+  category?: string;
   name: string;
   slug: string;
   description?: string;
@@ -19,6 +21,20 @@ export interface CatalogItem {
   priceLabel: string;
   image?: string;
   images?: string[];
+  /** Kalau diisi, produk ini adalah varian (warna/ukuran) dari produk lain. */
+  parentProductId?: string;
+  /** Tag pembeda varian, mis. `{ Warna: "Oil Green", Ukuran: "38" }` — dari `metadata.variant_attributes`. */
+  variantAttributes?: Record<string, string>;
+}
+
+export interface CategoryItem {
+  id: string;
+  label: string;
+  images: string[];
+}
+
+export function toCategoryItem(category: ApiWebsiteCategory): CategoryItem {
+  return { id: category.id, label: category.label, images: category.images };
 }
 
 export interface LocationItem {
@@ -104,10 +120,61 @@ export function formatIDR(value: number | string | null | undefined): string {
   }).format(n);
 }
 
+/**
+ * Sinonim label axis varian yang umum ketik beda-beda antar produk (beda
+ * bahasa/kapitalisasi) — supaya "Size"/"SIZE"/"Ukuran" dianggap 1 axis yang
+ * sama, bukan pecah jadi baris terpisah di VariantSwitcher. Dicek via
+ * lowercase-trim, jadi tidak case-sensitive.
+ */
+const AXIS_LABEL_ALIASES: Record<string, string> = {
+  warna: 'Warna',
+  color: 'Warna',
+  colour: 'Warna',
+  ukuran: 'Ukuran',
+  size: 'Ukuran',
+  bahan: 'Bahan',
+  material: 'Bahan',
+};
+
+/** Satukan variasi kapitalisasi ("size" vs "Size" vs "SIZE", "MERAH" vs "Merah") jadi 1 bentuk baku, per kata. */
+function toTitleCase(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word))
+    .join(' ');
+}
+
+function normalizeAxisLabel(label: string): string {
+  const trimmed = label.trim();
+  if (!trimmed) return trimmed;
+  const alias = AXIS_LABEL_ALIASES[trimmed.toLowerCase()];
+  return alias ?? toTitleCase(trimmed);
+}
+
+/**
+ * Sama seperti label, VALUE atribut (mis. "MERAH" vs "Merah") juga perlu
+ * disatukan biar tidak dianggap 2 pilihan warna/ukuran berbeda di
+ * VariantTreeSelector — cukup normalisasi kapitalisasi, BUKAN terjemahan
+ * sinonim lintas bahasa (mis. "Red" vs "Merah" tetap dianggap beda, karena
+ * itu perlu kamus istilah yang riskan salah kelompok, mis. "Merah Muda").
+ */
+function normalizeAxisValue(value: string): string {
+  return toTitleCase(value.trim());
+}
+
+function parseVariantAttributes(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+    .map(([key, value]): [string, string] => [normalizeAxisLabel(key), normalizeAxisValue(value)]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
   return {
     id: product.id,
     type: product.type,
+    category: product.category ?? undefined,
     name: product.name,
     slug: product.slug,
     description: product.description ?? undefined,
@@ -115,7 +182,112 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     priceLabel: formatIDR(product.price),
     image: product.images?.[0],
     images: product.images,
+    parentProductId: product.parent_product_id ?? undefined,
+    variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
   };
+}
+
+interface MasterDefaultsCatalogItem {
+  key?: string;
+  parent_key?: string;
+  name: string;
+  price: number;
+  category?: string;
+  description?: string;
+  images?: string[];
+  image?: string;
+  variant_attributes?: Record<string, string>;
+  inherit_description?: boolean;
+}
+
+interface MasterDefaultsCategoryItem {
+  label: string;
+  images?: string[];
+}
+
+interface MasterDefaultsFaqItem {
+  question: string;
+  answer: string;
+  category?: string;
+}
+
+export interface TemplateDefaultsPreview {
+  sections: SectionEntry[];
+  products: CatalogItem[];
+  categories: CategoryItem[];
+  faqs: FaqItem[];
+}
+
+function buildCatalogFromSeed(
+  items: MasterDefaultsCatalogItem[] | undefined,
+  type: 'service' | 'product',
+): CatalogItem[] {
+  if (!items?.length) return [];
+  return items.map((item, index) => {
+    const id = item.key ?? `${type}-${index}`;
+    const parent = item.parent_key ? items.find((candidate) => candidate.key === item.parent_key) : undefined;
+    const description = item.inherit_description && parent ? parent.description : item.description;
+    const images = item.images ?? (item.image ? [item.image] : undefined);
+    return {
+      id,
+      type,
+      category: item.category,
+      name: item.name,
+      slug: id,
+      description,
+      priceLabel: formatIDR(item.price),
+      image: images?.[0],
+      images,
+      parentProductId: parent ? (parent.key ?? undefined) : undefined,
+      variantAttributes: parseVariantAttributes(item.variant_attributes),
+    };
+  });
+}
+
+/**
+ * Bangun data preview template (sections + katalog + kategori + faq) langsung dari
+ * `structure.master_defaults`/`structure.sections` template — dipakai halaman
+ * `/templates/[slug]` supaya preview live di admin selalu mengikuti default data
+ * yang sungguhan tersimpan di DB, bukan sample statis yang bisa basi.
+ */
+export function buildTemplateDefaultsPreview(structure: Record<string, unknown> | null | undefined): TemplateDefaultsPreview {
+  const master = (structure?.master_defaults ?? {}) as {
+    services?: MasterDefaultsCatalogItem[];
+    products?: MasterDefaultsCatalogItem[];
+    categories?: MasterDefaultsCategoryItem[];
+    faqs?: MasterDefaultsFaqItem[];
+  };
+  const sectionsDef = (structure?.sections ?? []) as { type: string; defaults?: Record<string, unknown> }[];
+
+  return {
+    sections: sectionsDef.map((s) => ({ type: s.type, content: s.defaults ?? {} })),
+    products: [...buildCatalogFromSeed(master.services, 'service'), ...buildCatalogFromSeed(master.products, 'product')],
+    categories: (master.categories ?? []).map((c, index) => ({
+      id: `cat-${index}`,
+      label: c.label,
+      images: c.images ?? [],
+    })),
+    faqs: (master.faqs ?? []).map((f, index) => ({
+      id: `faq-${index}`,
+      question: f.question,
+      answer: f.answer,
+      category: f.category,
+    })),
+  };
+}
+
+/** Slug URL dari label kategori — tidak disimpan di DB (kategori cuma punya `label`), dihitung on-the-fly di kedua sisi (link & resolve halaman). */
+export function slugifyLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** `basePath` — lihat catatan di `buildPageHref`. */
+export function buildCategoryHref(basePath: string, categoryLabel: string): string {
+  return `${basePath}/kategori/${slugifyLabel(categoryLabel)}`;
 }
 
 /** `basePath` — lihat catatan di `buildPageHref`. */

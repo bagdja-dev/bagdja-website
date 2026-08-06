@@ -59,11 +59,34 @@ export interface ApiWebsiteProduct {
   name: string;
   slug: string;
   type: string;
+  category: string | null;
+  parent_product_id: string | null;
   description: string | null;
   detail: string | null;
   price: number;
   images: string[];
   metadata: Record<string, unknown>;
+  sort_order: number;
+}
+
+export interface GridMeta {
+  totalItems: number;
+  itemCount: number;
+  itemsPerPage: number;
+  totalPages: number;
+  currentPage: number;
+}
+
+export interface GridResult<T> {
+  data: T[];
+  meta: GridMeta;
+}
+
+export interface ApiWebsiteCategory {
+  id: string;
+  website_id: string;
+  label: string;
+  images: string[];
   sort_order: number;
 }
 
@@ -119,6 +142,10 @@ async function fetchPublic<T>(path: string): Promise<T | null> {
   return (await res.json()) as T;
 }
 
+export function getTemplateBySlug(slug: string): Promise<ApiWebsiteTemplate | null> {
+  return fetchPublic<ApiWebsiteTemplate>(`/api/templates/${slug}`);
+}
+
 export function getWebsiteBySlug(slug: string): Promise<ApiWebsite | null> {
   return fetchPublic<ApiWebsite>(`/api/public/sites/${encodeURIComponent(slug)}`);
 }
@@ -133,10 +160,43 @@ export function getPageBySlug(slug: string, pageSlug: string): Promise<ApiWebsit
   );
 }
 
-export async function getProducts(slug: string, type?: string): Promise<ApiWebsiteProduct[]> {
-  const qs = type ? `?type=${encodeURIComponent(type)}` : '';
-  const result = await fetchPublic<ApiWebsiteProduct[]>(
+export interface ProductsQuery {
+  page?: number;
+  size?: number;
+  type?: string;
+  categoryId?: string;
+  /** Format `kolom:asc|desc` — kolom yang didukung: name, price, sort_order, created_at. */
+  sort?: string;
+  /** Kalau true, hanya produk top-level (bukan varian warna/ukuran) — dipakai grid/listing supaya 1 keluarga varian cuma tampil 1 kartu. */
+  topLevel?: boolean;
+}
+
+const EMPTY_GRID_META: GridMeta = { totalItems: 0, itemCount: 0, itemsPerPage: 0, totalPages: 1, currentPage: 1 };
+
+/**
+ * List produk/layanan publik — paginated & filterable (lihat
+ * `common/grid/grid-query.util.ts` di API). Dipakai untuk fetch awal (SSR,
+ * `size` besar) maupun "Muat Lebih Banyak"/filter kategori dari browser.
+ */
+export async function getProducts(slug: string, opts: ProductsQuery = {}): Promise<GridResult<ApiWebsiteProduct>> {
+  const params = new URLSearchParams();
+  if (opts.page) params.set('page', String(opts.page));
+  if (opts.size) params.set('size', String(opts.size));
+  if (opts.type) params.set('filter[type]', opts.type);
+  if (opts.categoryId) params.set('filter[category_id]', opts.categoryId);
+  if (opts.sort) params.set('sort', opts.sort);
+  if (opts.topLevel) params.set('filter[top_level]', 'true');
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  const result = await fetchPublic<GridResult<ApiWebsiteProduct>>(
     `/api/public/sites/${encodeURIComponent(slug)}/products${qs}`,
+  );
+  return result ?? { data: [], meta: EMPTY_GRID_META };
+}
+
+export async function getCategories(slug: string): Promise<ApiWebsiteCategory[]> {
+  const result = await fetchPublic<ApiWebsiteCategory[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/categories`,
   );
   return result ?? [];
 }
