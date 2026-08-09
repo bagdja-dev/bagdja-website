@@ -8,7 +8,10 @@ import type {
   ApiWebsitePage,
   ApiWebsiteProduct,
   ApiWebsiteTemplate,
+  PaymentMetaEntry,
 } from './api-client';
+
+export type { PaymentMetaEntry } from './api-client';
 
 export interface CatalogItem {
   id: string;
@@ -25,6 +28,8 @@ export interface CatalogItem {
   parentProductId?: string;
   /** Tag pembeda varian, mis. `{ Warna: "Oil Green", Ukuran: "38" }` — dari `metadata.variant_attributes`. */
   variantAttributes?: Record<string, string>;
+  /** Daftar cara/link pembayaran checkout (mis. Lynk.id) — dirender sebagai tombol beli di halaman detail. */
+  paymentMeta?: PaymentMetaEntry[];
 }
 
 export interface CategoryItem {
@@ -184,6 +189,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     images: product.images,
     parentProductId: product.parent_product_id ?? undefined,
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
+    paymentMeta: product.payment_meta,
   };
 }
 

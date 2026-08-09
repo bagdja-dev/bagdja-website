@@ -25,6 +25,7 @@ import {
   type GalleryImageItem,
   type LocationItem,
   type NavPage,
+  type PaymentMetaEntry,
   type SectionEntry,
 } from '../../../lib/template-data';
 import {
@@ -754,6 +755,27 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
 }
 
 /** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
+/** Tombol checkout per `payment_mode` — mode baru cukup nambah case, tanpa ubah pemanggilnya (ProductDetailSection). */
+function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
+  switch (entry.payment_mode) {
+    case 'LYNK':
+      if (!entry.payment_link) return null;
+      return (
+        <a
+          href={entry.payment_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex rounded-full border-2 px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+          style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent-muted)' }}
+        >
+          Beli via Lynk
+        </a>
+      );
+    default:
+      return null;
+  }
+}
+
 function ProductDetailSection({ item, allProducts, waHref, websiteSlug }: { item: CatalogItem; allProducts: CatalogItem[]; waHref?: string; websiteSlug?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
@@ -798,6 +820,9 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug }: { item
                 Pesan via WhatsApp
               </a>
             )}
+            {item.paymentMeta?.map((entry, index) => (
+              <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
+            ))}
             {item.detail && (
               <details className="mt-8 rounded-xl border p-4" open style={{ borderColor: 'var(--brand-border)' }}>
                 <summary className="cursor-pointer font-semibold marker:content-none" style={{ fontFamily: 'var(--font-heading)' }}>

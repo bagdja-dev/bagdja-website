@@ -53,6 +53,14 @@ export interface ApiWebsitePage {
   sections?: ApiWebsiteSection[];
 }
 
+/** Satu cara/link pembayaran checkout — polymorphic per `payment_mode`. Mode baru cukup nambah union di sini. */
+export interface LynkPaymentMeta {
+  payment_mode: 'LYNK';
+  payment_link: string;
+}
+
+export type PaymentMetaEntry = LynkPaymentMeta;
+
 export interface ApiWebsiteProduct {
   id: string;
   website_id: string;
@@ -66,6 +74,7 @@ export interface ApiWebsiteProduct {
   price: number;
   images: string[];
   metadata: Record<string, unknown>;
+  payment_meta?: PaymentMetaEntry[];
   sort_order: number;
 }
 
