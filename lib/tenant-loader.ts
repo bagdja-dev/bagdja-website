@@ -26,6 +26,8 @@ export interface TenantData {
   locations: ApiWebsiteLocation[];
   faqs: ApiWebsiteFaq[];
   blogPosts: ApiWebsiteBlogPost[];
+  /** Fase 5 paywall: true kalau subscription owner tidak aktif. */
+  subscription_inactive: boolean;
 }
 
 export async function loadTenant(slug: string, pageSlug?: string): Promise<TenantData | null> {
@@ -44,5 +46,14 @@ export async function loadTenant(slug: string, pageSlug?: string): Promise<Tenan
     getBlogPosts(slug),
   ]);
 
-  return { website, page, products: productsResult.data, categories, locations, faqs, blogPosts };
+  return {
+    website,
+    page,
+    products: productsResult.data,
+    categories,
+    locations,
+    faqs,
+    blogPosts,
+    subscription_inactive: website.subscription_inactive ?? false,
+  };
 }

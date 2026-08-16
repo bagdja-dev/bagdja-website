@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { loadTenant } from '../../../../lib/tenant-loader';
+import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
   toBlogPostItem,
   toCatalogItem,
@@ -34,6 +35,7 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
+  if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
 
   const { website, products, locations, faqs, blogPosts } = tenant;
   const product = products.find((p) => p.slug === params.product_slug);

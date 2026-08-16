@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { loadTenant } from '../../../../lib/tenant-loader';
+import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
   slugifyLabel,
   toBlogPostItem,
@@ -37,6 +38,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
+  if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
 
   const category = tenant.categories.find((c) => slugifyLabel(c.label) === params.category_slug);
   if (!category) notFound();

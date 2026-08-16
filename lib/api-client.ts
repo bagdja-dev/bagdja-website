@@ -28,6 +28,8 @@ export interface ApiWebsite {
   theme: Record<string, unknown>;
   is_active: boolean;
   pages: ApiWebsitePage[];
+  /** Fase 5 paywall: true kalau website milik owner yang subscription-nya tidak aktif. */
+  subscription_inactive?: boolean;
 }
 
 export interface ApiWebsiteSection {

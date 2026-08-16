@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getBlogPostBySlug } from '../../../../lib/api-client';
 import { loadTenant } from '../../../../lib/tenant-loader';
+import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
   toBlogPostItem,
   toCatalogItem,
@@ -37,6 +38,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
     getBlogPostBySlug(params.website_slug, params.post_slug),
   ]);
   if (!tenant || !post) notFound();
+  if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
 
   const { website, products, locations, faqs, blogPosts } = tenant;
 

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getWebsiteBySlug } from '../../lib/api-client';
 import { loadTenant } from '../../lib/tenant-loader';
+import WebsiteInactiveNotice from '../../components/website-inactive-notice';
 import {
   resolveSections,
   toBlogPostItem,
@@ -35,6 +36,7 @@ export async function generateMetadata({ params }: TenantPageProps): Promise<Met
 export default async function TenantPage({ params }: TenantPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
+  if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
 
   const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
 
