@@ -43,6 +43,18 @@ export interface TemplateRenderProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  /** W1 auth renderer: state login buyer (dibaca server-side dari cookie). */
+  auth?: {
+    isLoggedIn: boolean;
+    username?: string;
+    email?: string;
+    avatar?: string;
+    loginHref?: string;
+    logoutHref?: string;
+    cartHref?: string;
+    ordersHref?: string;
+    profileHref?: string;
+  };
 }
 
 const TEMPLATE_REGISTRY: Record<string, ComponentType<TemplateRenderProps>> = {

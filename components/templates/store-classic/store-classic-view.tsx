@@ -64,6 +64,18 @@ export interface StoreClassicViewProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  /** W1 auth renderer: state login buyer. */
+  auth?: {
+    isLoggedIn: boolean;
+    username?: string;
+    email?: string;
+    avatar?: string;
+    loginHref?: string;
+    logoutHref?: string;
+    cartHref?: string;
+    ordersHref?: string;
+    profileHref?: string;
+  };
 }
 
 export function SectionHeading({ title, align = 'left' }: { title?: string; align?: 'left' | 'center' }) {
@@ -866,6 +878,7 @@ export function StoreClassicView({
   tenantSlug,
   pages = [],
   blogPosts = [],
+  auth,
 }: StoreClassicViewProps) {
   const title = profile.name?.trim() || 'Nama Toko Anda';
   const tagline = profile.tagline?.trim() || 'Belanja produk pilihan dengan kualitas terbaik.';
@@ -931,6 +944,7 @@ export function StoreClassicView({
           leftNavLinks={regularNavLinks}
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
+          auth={auth}
         />
 
         {productDetailItem ? (

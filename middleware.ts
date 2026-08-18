@@ -34,6 +34,25 @@ const RESERVED_TOP_LEVEL_PATHS = new Set(['templates']);
 
 const SUBDOMAIN_PATTERN = new RegExp(`^([a-z0-9-]+)\\.${PLATFORM_HOST.replace(/\./g, '\\.')}$`);
 
+// ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
+// Path dalam tenant: `/{slug}/cart`, `/{slug}/checkout`, `/{slug}/order/...`
+const PROTECTED_PATH_PATTERN =
+  /^\/([a-z0-9-]+)\/(cart|checkout)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
+
+function shouldProtect(pathname: string): boolean {
+  return PROTECTED_PATH_PATTERN.test(pathname);
+}
+
+function redirectToLogin(request: NextRequest): NextResponse {
+  const loginUrl = new URL('/auth/login', request.nextUrl.origin);
+  loginUrl.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
+  return NextResponse.redirect(loginUrl);
+}
+
+function hasSession(request: NextRequest): boolean {
+  return Boolean(request.cookies.get('site_token')?.value);
+}
+
 async function resolveSlugForDomain(host: string): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/public/resolve-domain?host=${encodeURIComponent(host)}`, {
@@ -50,6 +69,22 @@ async function resolveSlugForDomain(host: string): Promise<string | null> {
 export async function middleware(request: NextRequest) {
   const hostHeader = request.headers.get('host') ?? '';
   const hostname = hostHeader.split(':')[0];
+
+  // W1: route auth (/auth/*) TIDAK boleh di-rewrite jadi slug tenant —
+  // dilayani di host asal (localhost / custom domain) supaya callback OAuth
+  // dan login jalan di domain tempat user memulai.
+  if (request.nextUrl.pathname.startsWith('/auth/')) {
+    return NextResponse.next();
+  }
+
+  // W1: protect route checkout — cek session SEBELUM tenant resolution,
+  // karena di localhost path langsung `/{slug}/cart` dst.
+  if (shouldProtect(request.nextUrl.pathname)) {
+    if (!hasSession(request)) {
+      return redirectToLogin(request);
+    }
+    return NextResponse.next();
+  }
 
   if (!hostname || LOCAL_HOSTS.has(hostname)) {
     return NextResponse.next();
@@ -74,6 +109,13 @@ export async function middleware(request: NextRequest) {
     const slug = subdomainMatch[1];
     const url = request.nextUrl.clone();
     url.pathname = `/${slug}${request.nextUrl.pathname}`;
+    // W1: setelah rewrite ke `/{slug}/cart|checkout|order`, cek session
+    if (shouldProtect(url.pathname)) {
+      if (!hasSession(request)) {
+        return redirectToLogin(request);
+      }
+      return NextResponse.rewrite(url);
+    }
     return NextResponse.rewrite(url);
   }
 
@@ -82,6 +124,13 @@ export async function middleware(request: NextRequest) {
   if (slug) {
     const url = request.nextUrl.clone();
     url.pathname = `/${slug}${request.nextUrl.pathname}`;
+    // W1: setelah rewrite, cek session untuk route protected
+    if (shouldProtect(url.pathname)) {
+      if (!hasSession(request)) {
+        return redirectToLogin(request);
+      }
+      return NextResponse.rewrite(url);
+    }
     return NextResponse.rewrite(url);
   }
 

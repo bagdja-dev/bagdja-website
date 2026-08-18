@@ -12,6 +12,18 @@ export interface HeaderNavLink {
   label: string;
 }
 
+/** W1 auth renderer: state login buyer (diteruskan dari server component). */
+export interface HeaderAuthState {
+  isLoggedIn: boolean;
+  username?: string;
+  avatar?: string;
+  loginHref?: string;
+  logoutHref?: string;
+  cartHref?: string;
+  ordersHref?: string;
+  profileHref?: string;
+}
+
 interface StoreClassicHeaderProps {
   title: string;
   logoUrl?: string;
@@ -21,6 +33,7 @@ interface StoreClassicHeaderProps {
   leftNavLinks: HeaderNavLink[];
   rightNavLinks: HeaderNavLink[];
   socialLinks?: SocialLink[];
+  auth?: HeaderAuthState;
 }
 
 export function StoreClassicHeader({
@@ -32,9 +45,11 @@ export function StoreClassicHeader({
   leftNavLinks,
   rightNavLinks,
   socialLinks = [],
+  auth,
 }: StoreClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openDrawer = () => {
@@ -102,6 +117,88 @@ export function StoreClassicHeader({
               Hubungi Kami
             </a>
           )}
+          {auth &&
+            (auth.isLoggedIn ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((v) => !v)}
+                  className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 transition-colors hover:opacity-80"
+                  style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  aria-haspopup="menu"
+                  aria-expanded={accountOpen}
+                >
+                  {auth.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={auth.avatar}
+                      alt=""
+                      className="h-7 w-7 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold uppercase"
+                      style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                      aria-hidden="true"
+                    >
+                      {(auth.username ?? 'U').charAt(0)}
+                    </span>
+                  )}
+                  <span className="hidden max-w-[100px] truncate text-xs font-semibold uppercase tracking-wide sm:inline">
+                    {auth.username}
+                  </span>
+                </button>
+
+                {accountOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-40 mt-2 w-52 overflow-hidden rounded-xl border shadow-lg"
+                    style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  >
+                    {[
+                      { href: auth.cartHref, label: 'Cart' },
+                      { href: auth.ordersHref, label: 'Transaction' },
+                      { href: auth.profileHref, label: 'Profile' },
+                    ].map(
+                      (item) =>
+                        item.href && (
+                          <a
+                            key={item.label}
+                            href={item.href}
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                            className="block border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                            style={{ borderColor: 'var(--brand-border)' }}
+                          >
+                            {item.label}
+                          </a>
+                        ),
+                    )}
+                    {auth.logoutHref && (
+                      <a
+                        href={auth.logoutHref}
+                        role="menuitem"
+                        onClick={() => setAccountOpen(false)}
+                        className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                        style={{ color: 'var(--brand-text)' }}
+                      >
+                        Logout
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              auth.loginHref && (
+                <a
+                  href={auth.loginHref}
+                  className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+                  style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                >
+                  Masuk
+                </a>
+              )
+            ))}
           {hasNav && (
             <button
               type="button"
@@ -169,6 +266,68 @@ export function StoreClassicHeader({
                 Hubungi Kami
               </a>
             )}
+
+            {auth &&
+              (auth.isLoggedIn ? (
+                <div className="mx-6 mb-4 rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
+                  <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    {auth.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={auth.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
+                    ) : (
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold uppercase"
+                        style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                        aria-hidden="true"
+                      >
+                        {(auth.username ?? 'U').charAt(0)}
+                      </span>
+                    )}
+                    <span className="truncate text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>
+                      {auth.username}
+                    </span>
+                  </div>
+                  {[
+                    { href: auth.cartHref, label: 'Cart' },
+                    { href: auth.ordersHref, label: 'Transaction' },
+                    { href: auth.profileHref, label: 'Profile' },
+                  ].map(
+                    (item) =>
+                      item.href && (
+                        <a
+                          key={item.label}
+                          href={item.href}
+                          onClick={closeDrawer}
+                          className="block border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                        >
+                          {item.label}
+                        </a>
+                      ),
+                  )}
+                  {auth.logoutHref && (
+                    <a
+                      href={auth.logoutHref}
+                      onClick={closeDrawer}
+                      className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                      style={{ color: 'var(--brand-text)' }}
+                    >
+                      Logout
+                    </a>
+                  )}
+                </div>
+              ) : (
+                auth.loginHref && (
+                  <a
+                    href={auth.loginHref}
+                    onClick={closeDrawer}
+                    className="mx-6 mb-4 block rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
+                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                  >
+                    Masuk
+                  </a>
+                )
+              ))}
 
             {socialLinks.length > 0 && (
               <div

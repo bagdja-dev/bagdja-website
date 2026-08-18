@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getWebsiteBySlug } from '../../../lib/api-client';
+import { getAuthViewState } from '../../../lib/auth-view';
 import { loadTenant } from '../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
 import {
@@ -38,6 +39,7 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
   const tenant = await loadTenant(params.website_slug, params.page_slug);
   if (!tenant || !tenant.page) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
+  const auth = await getAuthViewState(`/${params.website_slug}`);
 
   const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
 
@@ -67,6 +69,7 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
       tenantSlug={website.slug}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
+      auth={auth}
     />
   );
 }

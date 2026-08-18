@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
@@ -39,6 +40,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
+  const auth = await getAuthViewState(`/${params.website_slug}`);
 
   const category = tenant.categories.find((c) => slugifyLabel(c.label) === params.category_slug);
   if (!category) notFound();
@@ -75,6 +77,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       tenantSlug={website.slug}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
+      auth={auth}
     />
   );
 }

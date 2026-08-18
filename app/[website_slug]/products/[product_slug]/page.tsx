@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
@@ -36,6 +37,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
+  const auth = await getAuthViewState(`/${params.website_slug}`);
 
   const { website, products, locations, faqs, blogPosts } = tenant;
   const product = products.find((p) => p.slug === params.product_slug);
@@ -69,6 +71,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       websiteSlug={resolveTenantLinkBase(website.slug)}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
+      auth={auth}
     />
   );
 }
