@@ -39,7 +39,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
-  const auth = await getAuthViewState(`/${params.website_slug}`);
+  const auth = await getAuthViewState(resolveTenantLinkBase(params.website_slug) || '/');
 
   const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
 

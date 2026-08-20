@@ -38,7 +38,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
-  const auth = await getAuthViewState(`/${params.website_slug}`);
+  const auth = await getAuthViewState(
+    `${resolveTenantLinkBase(params.website_slug)}/products/${params.product_slug}`,
+  );
 
   const { website, products, locations, faqs, blogPosts } = tenant;
   const product = products.find((p) => p.slug === params.product_slug);
