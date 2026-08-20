@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { SocialLink } from '../../../lib/template-data';
 import { CloseIcon, HamburgerIcon, SocialIcon } from './store-classic-icons';
+import { CartBadge } from '../../cart-badge';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -34,6 +35,7 @@ interface StoreClassicHeaderProps {
   rightNavLinks: HeaderNavLink[];
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
+  cartHref?: string;
 }
 
 export function StoreClassicHeader({
@@ -46,6 +48,7 @@ export function StoreClassicHeader({
   rightNavLinks,
   socialLinks = [],
   auth,
+  cartHref,
 }: StoreClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -106,6 +109,9 @@ export function StoreClassicHeader({
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">
+          {cartHref && auth?.isLoggedIn && (
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} />
+          )}
           {showWhatsappCta && waHref && (
             <a
               href={waHref}

@@ -151,7 +151,7 @@ export function ProductGridSection({
       <SectionHeading title={title} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => (
-          <ProductCard key={item.id} item={item} websiteSlug={websiteSlug} />
+          <ProductCard key={item.id} item={item} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />
         ))}
       </div>
       {hasMore && tenantSlug && (
@@ -263,7 +263,7 @@ export function CategoryListingSection({
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => (
-            <ProductCard key={item.id} item={item} websiteSlug={websiteSlug} />
+            <ProductCard key={item.id} item={item} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />
           ))}
         </div>
       )}

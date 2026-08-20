@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getBlogPostBySlug } from '../../../../lib/api-client';
+import { CartProvider } from '../../../../lib/cart';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
@@ -50,6 +51,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   const sections: SectionEntry[] = [{ type: 'blog_article', content: { post: toBlogPostItem(post) } }];
 
   return (
+    <CartProvider slug={params.website_slug}>
     <Renderer
       isPreview={false}
       profile={{
@@ -72,5 +74,6 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
       blogPosts={blogPosts.map(toBlogPostItem)}
       auth={auth}
     />
+    </CartProvider>
   );
 }

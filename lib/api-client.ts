@@ -61,7 +61,20 @@ export interface LynkPaymentMeta {
   payment_link: string;
 }
 
-export type PaymentMetaEntry = LynkPaymentMeta;
+/** Flow internal Bagdja (escrow/cart) — tidak ada link eksternal. */
+export interface AddToCartPaymentMeta {
+  payment_mode: 'ADD_TO_CART';
+}
+
+/** Flow internal Bagdja escrow 1 termin — dana di-hold sampai konfirmasi terima. */
+export interface EscrowPaymentMeta {
+  payment_mode: 'ESCROW';
+}
+
+export type PaymentMetaEntry =
+  | LynkPaymentMeta
+  | AddToCartPaymentMeta
+  | EscrowPaymentMeta;
 
 export interface ApiWebsiteProduct {
   id: string;

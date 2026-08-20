@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getAuthViewState } from '../../../../lib/auth-view';
+import { CartProvider } from '../../../../lib/cart';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
 import {
@@ -51,6 +52,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   ];
 
   return (
+    <CartProvider slug={params.website_slug}>
     <Renderer
       isPreview={false}
       profile={{
@@ -69,9 +71,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
       websiteSlug={resolveTenantLinkBase(website.slug)}
+      tenantSlug={website.slug}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
       auth={auth}
     />
+    </CartProvider>
   );
 }

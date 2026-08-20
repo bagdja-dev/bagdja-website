@@ -38,7 +38,14 @@ import { StoreClassicBlogSidebar } from './store-classic-blog-sidebar';
 import { CategoryListingSection, ProductGridSection, VariantTreeSelector } from './store-classic-catalog';
 import { StoreClassicProductGallery } from './store-classic-gallery';
 import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
+import { CartContent } from '../../cart-content';
+import { CheckoutContent } from '../../checkout-content';
+import { OrdersContent } from '../../orders-content';
+import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from './store-classic-icons';
+import { AddToCartButton } from '../../cart-button';
+import { CartBadge } from '../../cart-badge';
+import { PurchaseControls } from '../../purchase-controls';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -318,15 +325,22 @@ function CategoryGridSection({
   );
 }
 
-export function ProductCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: string }) {
+export function ProductCard({
+  item,
+  websiteSlug,
+  tenantSlug,
+}: {
+  item: CatalogItem;
+  websiteSlug?: string;
+  tenantSlug?: string;
+}) {
   const href = websiteSlug !== undefined ? buildProductHref(websiteSlug, item.slug) : undefined;
-  const Wrapper = href ? 'a' : 'div';
-  return (
-    <Wrapper
-      {...(href ? { href } : {})}
-      className="group block overflow-hidden rounded-xl border text-left transition-colors hover:opacity-90"
-      style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
-    >
+  const internalMode = (item.paymentMeta ?? []).find(
+    (m) => m.payment_mode === 'ADD_TO_CART' || m.payment_mode === 'ESCROW',
+  );
+
+  const content = (
+    <>
       {item.image ? (
         <div className="relative aspect-square w-full overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -353,6 +367,48 @@ export function ProductCard({ item, websiteSlug }: { item: CatalogItem; websiteS
           </p>
         )}
       </div>
+    </>
+  );
+
+  // Produk dengan mode internal (ADD_TO_CART/ESCROW): kartu berisi link
+  // (gambar+nama+harga) + tombol cart terpisah di luar link (valid HTML).
+  if (internalMode && href && tenantSlug && item.websiteId) {
+    return (
+      <div
+        className="group block overflow-hidden rounded-xl border text-left transition-colors hover:opacity-95"
+        style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+      >
+        <a href={href} className="block">
+          {content}
+        </a>
+        <div className="px-4 pb-4">
+          <AddToCartButton
+            slug={tenantSlug}
+            websiteId={item.websiteId}
+            product={{
+              id: item.id,
+              slug: item.slug,
+              name: item.name,
+              price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0,
+              image: item.image ?? item.images?.[0],
+              stock: item.stock,
+            }}
+            paymentMode={internalMode.payment_mode}
+            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : 'Masukkan ke Keranjang'}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const Wrapper = href ? 'a' : 'div';
+  return (
+    <Wrapper
+      {...(href ? { href } : {})}
+      className="group block overflow-hidden rounded-xl border text-left transition-colors hover:opacity-90"
+      style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+    >
+      {content}
     </Wrapper>
   );
 }
@@ -767,7 +823,7 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
 }
 
 /** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
-/** Tombol checkout per `payment_mode` — mode baru cukup nambah case, tanpa ubah pemanggilnya (ProductDetailSection). */
+/** Tombol checkout EXTERNAL (LYNK) — mode internal ditangani PurchaseControls (di halaman detail). */
 function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   switch (entry.payment_mode) {
     case 'LYNK':
@@ -788,12 +844,17 @@ function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   }
 }
 
-function ProductDetailSection({ item, allProducts, waHref, websiteSlug }: { item: CatalogItem; allProducts: CatalogItem[]; waHref?: string; websiteSlug?: string }) {
+function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSlug }: { item: CatalogItem; allProducts: CatalogItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
   const familyIds = new Set(family.map((p) => p.id));
+
+  // Mode internal pertama (ADD_TO_CART/ESCROW) — dipakai PurchaseControls.
+  const internalPaymentMode = (item.paymentMeta ?? []).find(
+    (m) => m.payment_mode === 'ADD_TO_CART' || m.payment_mode === 'ESCROW',
+  )?.payment_mode as 'ADD_TO_CART' | 'ESCROW' | undefined;
 
   const related = allProducts
     .filter((p) => !familyIds.has(p.id) && !p.parentProductId && (p.type === item.type || p.category === item.category))
@@ -821,6 +882,24 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug }: { item
 
             <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
 
+            {/* Mode internal (ADD_TO_CART/ESCROW): quantity + stok + tombol cart
+                — urutan: varian → quantity → cart → WhatsApp → LYNK. */}
+            {tenantSlug && internalPaymentMode && item.websiteId && (
+              <PurchaseControls
+                slug={tenantSlug}
+                websiteId={item.websiteId}
+                product={{
+                  id: item.id,
+                  slug: item.slug,
+                  name: item.name,
+                  price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0,
+                  image: item.image ?? item.images?.[0],
+                  stock: item.stock,
+                }}
+                paymentMode={internalPaymentMode}
+              />
+            )}
+
             {waHref && (
               <a
                 href={waHref}
@@ -832,6 +911,7 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug }: { item
                 Pesan via WhatsApp
               </a>
             )}
+            {/* Mode external (LYNK) — dirender setelah WhatsApp */}
             {item.paymentMeta?.map((entry, index) => (
               <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
             ))}
@@ -903,6 +983,20 @@ export function StoreClassicView({
   const productDetailContent = sections.find((s) => s.type === 'product_detail')?.content;
   const productDetailItem = productDetailContent?.product as CatalogItem | undefined;
 
+  const cartSection = sections.find((s) => s.type === 'cart');
+  const checkoutSection = sections.find((s) => s.type === 'checkout');
+  const ordersSection = sections.find((s) => s.type === 'orders');
+  const orderDetailSection = sections.find((s) => s.type === 'order_detail');
+  const pageBannerLabel = checkoutSection
+    ? 'Checkout'
+    : cartSection
+      ? 'Keranjang'
+      : ordersSection
+        ? 'Daftar Transaksi'
+        : orderDetailSection
+          ? 'Status Pesanan'
+          : undefined;
+
   const toLink = (page: NavPage): HeaderNavLink => ({
     href: websiteSlug !== undefined ? buildPageHref(websiteSlug, page) : '#',
     label: page.title,
@@ -945,12 +1039,15 @@ export function StoreClassicView({
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
           auth={auth}
+          cartHref={auth?.cartHref}
         />
 
         {productDetailItem ? (
           <PageHeroBanner label={productDetailItem.name} imageUrl={productDetailItem.image} />
         ) : categoryListingLabel ? (
           <PageHeroBanner label={categoryListingLabel} imageUrl={categoryListingImage} />
+        ) : pageBannerLabel ? (
+          <PageHeroBanner label={pageBannerLabel} />
         ) : (
           <HeroSection
             title={title}
@@ -1123,10 +1220,42 @@ export function StoreClassicView({
                 if (!post) return null;
                 return <BlogArticleSection key={key} post={post} allPosts={blogPosts} websiteSlug={websiteSlug} />;
               }
+              case 'cart': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                return <CartContent key={key} slug={slug} />;
+              }
+              case 'checkout': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                const websiteId =
+                  typeof section.content.websiteId === 'string' ? section.content.websiteId : '';
+                const orderIds = Array.isArray(section.content.orderIds)
+                  ? (section.content.orderIds as unknown[]).filter((v): v is string => typeof v === 'string')
+                  : [];
+                return (
+                  <CheckoutContent
+                    key={key}
+                    slug={slug}
+                    websiteId={websiteId}
+                    initialOrderIds={orderIds}
+                  />
+                );
+              }
+              case 'orders': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                return <OrdersContent key={key} slug={slug} />;
+              }
+              case 'order_detail': {
+                const transaction = section.content.transaction as TransactionDetail | null | undefined;
+                const order = section.content.order as OrderDetail | null | undefined;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} />;
+              }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} />;
+                return <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />;
               }
               default:
                 return null;

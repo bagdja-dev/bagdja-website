@@ -4,12 +4,25 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { SocialLink } from '../../../lib/template-data';
 import { SocialIcon } from './barber-classic-icons';
+import { CartBadge } from '../../cart-badge';
 
 const DRAWER_TRANSITION_MS = 300;
 
 export interface HeaderNavLink {
   href: string;
   label: string;
+}
+
+export interface HeaderAuthState {
+  isLoggedIn: boolean;
+  username?: string;
+  email?: string;
+  avatar?: string;
+  loginHref?: string;
+  logoutHref?: string;
+  cartHref?: string;
+  ordersHref?: string;
+  profileHref?: string;
 }
 
 interface BarberClassicHeaderProps {
@@ -23,6 +36,8 @@ interface BarberClassicHeaderProps {
   /** halaman placement='header' — tampil di sisi kanan header */
   rightNavLinks: HeaderNavLink[];
   socialLinks?: SocialLink[];
+  auth?: HeaderAuthState;
+  cartHref?: string;
 }
 
 function HamburgerIcon() {
@@ -50,9 +65,12 @@ export function BarberClassicHeader({
   leftNavLinks,
   rightNavLinks,
   socialLinks = [],
+  auth,
+  cartHref,
 }: BarberClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openDrawer = () => {
@@ -123,7 +141,10 @@ export function BarberClassicHeader({
           </span>
         </a>
 
-        <div className="flex flex-1 items-center justify-end gap-6">
+        <div className="flex flex-1 items-center justify-end gap-3">
+          {cartHref && auth?.isLoggedIn && (
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} />
+          )}
           <nav className="hidden items-center gap-6 sm:flex">
             {rightNavLinks.map((link) => (
               <a
@@ -136,6 +157,87 @@ export function BarberClassicHeader({
               </a>
             ))}
           </nav>
+          {auth &&
+            (auth.isLoggedIn ? (
+              <div className="relative hidden sm:block">
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((v) => !v)}
+                  className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 transition-colors hover:opacity-80"
+                  style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  aria-haspopup="menu"
+                  aria-expanded={accountOpen}
+                >
+                  {auth.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={auth.avatar}
+                      alt=""
+                      className="h-7 w-7 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold uppercase"
+                      style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                      aria-hidden="true"
+                    >
+                      {(auth.username ?? auth.email ?? 'U').charAt(0)}
+                    </span>
+                  )}
+                  <span className="hidden max-w-[100px] truncate text-xs font-semibold uppercase tracking-wide sm:inline">
+                    {auth.username ?? auth.email}
+                  </span>
+                </button>
+
+                {accountOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-40 mt-2 w-52 overflow-hidden rounded-xl border shadow-lg"
+                    style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  >
+                    {[
+                      { href: auth.cartHref, label: 'Keranjang' },
+                      { href: auth.ordersHref, label: 'Transaksi' },
+                      { href: auth.profileHref, label: 'Profil' },
+                    ].map(
+                      (item) =>
+                        item.href && (
+                          <a
+                            key={item.label}
+                            href={item.href}
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                            className="block border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                            style={{ borderColor: 'var(--brand-border)' }}
+                          >
+                            {item.label}
+                          </a>
+                        ),
+                    )}
+                    {auth.logoutHref && (
+                      <a
+                        href={auth.logoutHref}
+                        role="menuitem"
+                        onClick={() => setAccountOpen(false)}
+                        className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                      >
+                        Keluar
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              auth.loginHref && (
+                <a
+                  href={auth.loginHref}
+                  className="hidden rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 sm:inline-flex"
+                  style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                >
+                  Masuk
+                </a>
+              )
+            ))}
         </div>
       </div>
 
@@ -180,6 +282,68 @@ export function BarberClassicHeader({
                 </a>
               ))}
             </nav>
+
+            {auth &&
+              (auth.isLoggedIn ? (
+                <div className="mx-6 mb-4 rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
+                  <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    {auth.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={auth.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
+                    ) : (
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold uppercase"
+                        style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                        aria-hidden="true"
+                      >
+                        {(auth.username ?? auth.email ?? 'U').charAt(0)}
+                      </span>
+                    )}
+                    <span className="truncate text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>
+                      {auth.username ?? auth.email}
+                    </span>
+                  </div>
+                  {[
+                    { href: auth.cartHref, label: 'Keranjang' },
+                    { href: auth.ordersHref, label: 'Transaksi' },
+                    { href: auth.profileHref, label: 'Profil' },
+                  ].map(
+                    (item) =>
+                      item.href && (
+                        <a
+                          key={item.label}
+                          href={item.href}
+                          onClick={closeDrawer}
+                          className="block border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                        >
+                          {item.label}
+                        </a>
+                      ),
+                  )}
+                  {auth.logoutHref && (
+                    <a
+                      href={auth.logoutHref}
+                      onClick={closeDrawer}
+                      className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
+                      style={{ color: 'var(--brand-text)' }}
+                    >
+                      Keluar
+                    </a>
+                  )}
+                </div>
+              ) : (
+                auth.loginHref && (
+                  <a
+                    href={auth.loginHref}
+                    onClick={closeDrawer}
+                    className="mx-6 mb-4 block rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
+                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                  >
+                    Masuk
+                  </a>
+                )
+              ))}
 
             {socialLinks.length > 0 && (
               <div

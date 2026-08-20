@@ -15,6 +15,9 @@ export type { PaymentMetaEntry } from './api-client';
 
 export interface CatalogItem {
   id: string;
+  /** Website (tenant) pemilik produk — dipakai POST /api/orders/draft.
+   *  Opsional (sample/preview data tidak punya website nyata). */
+  websiteId?: string;
   type: string;
   category?: string;
   name: string;
@@ -28,6 +31,8 @@ export interface CatalogItem {
   parentProductId?: string;
   /** Tag pembeda varian, mis. `{ Warna: "Oil Green", Ukuran: "38" }` — dari `metadata.variant_attributes`. */
   variantAttributes?: Record<string, string>;
+  /** Stok (dari metadata.stock) — opsional, dipakai guard quantity di UI. */
+  stock?: number;
   /** Daftar cara/link pembayaran checkout (mis. Lynk.id) — dirender sebagai tombol beli di halaman detail. */
   paymentMeta?: PaymentMetaEntry[];
 }
@@ -178,6 +183,7 @@ function parseVariantAttributes(raw: unknown): Record<string, string> | undefine
 export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
   return {
     id: product.id,
+    websiteId: product.website_id,
     type: product.type,
     category: product.category ?? undefined,
     name: product.name,
@@ -189,8 +195,16 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     images: product.images,
     parentProductId: product.parent_product_id ?? undefined,
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
+    stock: parseStock(product.metadata?.stock),
     paymentMeta: product.payment_meta,
   };
+}
+
+/** Ambil nilai stok dari metadata.stock — return undefined kalau bukan angka non-negatif. */
+function parseStock(value: unknown): number | undefined {
+  if (typeof value !== 'number' && typeof value !== 'string') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
 interface MasterDefaultsCatalogItem {

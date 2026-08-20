@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { CartProvider } from '../../../../lib/cart';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
@@ -55,6 +56,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   ];
 
   return (
+    <CartProvider slug={params.website_slug}>
     <Renderer
       isPreview={false}
       profile={{
@@ -79,5 +81,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       blogPosts={blogPosts.map(toBlogPostItem)}
       auth={auth}
     />
+    </CartProvider>
   );
 }

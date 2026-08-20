@@ -42,6 +42,7 @@ export async function getAuthViewState(pathname?: string): Promise<AuthViewState
       ? `/auth/logout?returnTo=${encodeURIComponent(safePath)}`
       : '/auth/logout',
     // Menu dropdown akun — route ini diprotect middleware (wajib login).
+    // `ordersHref` = list daftar transaksi; `/order/:id` untuk detail.
     cartHref: safePath ? `${safePath}/cart` : '/cart',
     ordersHref: safePath ? `${safePath}/orders` : '/orders',
     profileHref: safePath ? `${safePath}/profile` : '/profile',

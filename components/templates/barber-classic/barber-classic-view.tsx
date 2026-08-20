@@ -35,6 +35,10 @@ import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from 
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
 import { SocialIcon } from './barber-classic-icons';
+import { CartContent } from '../../cart-content';
+import { CheckoutContent } from '../../checkout-content';
+import { OrdersContent } from '../../orders-content';
+import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 
 export interface BarberClassicProfile {
   name?: string;
@@ -73,6 +77,18 @@ export interface BarberClassicViewProps {
   pages?: NavPage[];
   /** artikel blog terbit — dipakai section blog_list/blog_search/blog_collection */
   blogPosts?: BlogPostItem[];
+  /** W1 auth renderer: state login buyer (dibaca server-side dari cookie). */
+  auth?: {
+    isLoggedIn: boolean;
+    username?: string;
+    email?: string;
+    avatar?: string;
+    loginHref?: string;
+    logoutHref?: string;
+    cartHref?: string;
+    ordersHref?: string;
+    profileHref?: string;
+  };
 }
 
 export function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteSlug?: string }) {
@@ -913,6 +929,7 @@ export function BarberClassicView({
   tenantSlug,
   pages = [],
   blogPosts = [],
+  auth,
 }: BarberClassicViewProps) {
   const title = profile.name?.trim() || 'Nama Barbershop Anda';
   const tagline =
@@ -930,6 +947,19 @@ export function BarberClassicView({
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
   const categoryListingContent = sections.find((s) => s.type === 'category_listing')?.content;
+  const cartSection = sections.find((s) => s.type === 'cart');
+  const checkoutSection = sections.find((s) => s.type === 'checkout');
+  const ordersSection = sections.find((s) => s.type === 'orders');
+  const orderDetailSection = sections.find((s) => s.type === 'order_detail');
+  const pageHeroLabel = checkoutSection
+    ? 'Checkout'
+    : cartSection
+      ? 'Keranjang'
+      : ordersSection
+        ? 'Daftar Transaksi'
+        : orderDetailSection
+          ? 'Status Pesanan'
+          : undefined;
   const categoryListingLabel =
     typeof categoryListingContent?.category_label === 'string' ? categoryListingContent.category_label : undefined;
   const categoryListingImage = categoryListingLabel
@@ -978,11 +1008,14 @@ export function BarberClassicView({
           leftNavLinks={regularNavLinks}
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
+          auth={auth}
+          cartHref={auth?.cartHref}
         />
 
         {categoryListingLabel && (
           <CategoryHeroSection label={categoryListingLabel} imageUrl={categoryListingImage} />
         )}
+        {!categoryListingLabel && pageHeroLabel && <CategoryHeroSection label={pageHeroLabel} />}
 
         {/* <section className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
           <p className="text-xs uppercase tracking-[0.3em]" style={{ color: 'var(--brand-accent)' }}>
@@ -1218,6 +1251,38 @@ export function BarberClassicView({
                 const post = section.content.post as BlogPostItem | undefined;
                 if (!post) return null;
                 return <BlogArticleSection key={key} post={post} />;
+              }
+              case 'cart': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                return <CartContent key={key} slug={slug} />;
+              }
+              case 'checkout': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                const websiteId =
+                  typeof section.content.websiteId === 'string' ? section.content.websiteId : '';
+                const orderIds = Array.isArray(section.content.orderIds)
+                  ? (section.content.orderIds as unknown[]).filter((v): v is string => typeof v === 'string')
+                  : [];
+                return (
+                  <CheckoutContent
+                    key={key}
+                    slug={slug}
+                    websiteId={websiteId}
+                    initialOrderIds={orderIds}
+                  />
+                );
+              }
+              case 'orders': {
+                const slug =
+                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
+                return <OrdersContent key={key} slug={slug} />;
+              }
+              case 'order_detail': {
+                const transaction = section.content.transaction as TransactionDetail | null | undefined;
+                const order = section.content.order as OrderDetail | null | undefined;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
