@@ -8,7 +8,7 @@ import { generateStateId, saveOAuthState } from '../../../lib/oauth-state-store'
 
 function safeNextPath(next: string | null): string | null {
   if (!next || !next.startsWith('/') || next.startsWith('//')) return null;
-  return next;
+  return next; //test
 }
 
 /**
