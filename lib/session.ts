@@ -34,6 +34,9 @@ export async function setSession(token: string, user: SessionUser) {
     ...COOKIE_OPTIONS,
     httpOnly: false, // client needs to read user info
   });
+  console.log(
+    `[session] setSession OK userId=${user.userId} cookieOptions=${JSON.stringify(COOKIE_OPTIONS)}`,
+  );
 }
 
 export async function getSession(): Promise<{
@@ -52,6 +55,10 @@ export async function getSession(): Promise<{
       user = null;
     }
   }
+
+  console.log(
+    `[session] getSession all_cookie_names=[${jar.getAll().map((c) => c.name).join(', ')}] hasToken=${Boolean(token)} hasUser=${Boolean(user)}`,
+  );
 
   return { token, user };
 }
