@@ -1,14 +1,15 @@
 /**
- * Penyimpanan `code_verifier` + `next` path sisi server (Upstash Redis),
- * dikunci oleh ID pendek acak yang dikirim sebagai `state` OAuth.
+ * Penyimpanan `code_verifier` + `next` path sisi server (Redis biasa via
+ * `ioredis`, bukan Upstash — deployment ini di Coolify yang sudah punya
+ * Redis self-hosted, tidak perlu dependency ke Upstash cloud), dikunci oleh
+ * ID pendek acak yang dikirim sebagai `state` OAuth.
  *
- * Sama persis pola admin (bagdja-website-admin/app/lib/oauth-state-store.ts):
  * - Bukan cookie: Safari tidak konsisten menyimpan Set-Cookie yang menempel
  *   di response redirect → state_mismatch di iOS.
  * - `state` cuma ID pendek (~24 karakter) — tidak di-flag ad-blocker.
  *
  * Fallback priority (UNTUK DEV LOKAL):
- *   1. Redis (Upstash) — jika env dikonfigurasi → pakai ini
+ *   1. Redis — jika REDIS_URL dikonfigurasi → pakai ini
  *   2. globalThis memory store — jika Redis null + NODE_ENV !== production
  *      (pakai globalThis supaya tidak hilang saat Next.js hot-reload
  *      module-level state. Ditempatkan di globalForSite agar unik per app)
@@ -16,7 +17,7 @@
  *      karena path /auth di-set sebelum redirect lintas domain ke Auth)
  */
 import crypto from 'crypto';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import { cookies } from 'next/headers';
 
 const STATE_KEY_PREFIX = 'oauth_state:';
@@ -66,15 +67,27 @@ function getRedisClient(): Redis | null {
   const cached = getCachedRedisClient();
   if (cached !== undefined) return cached;
 
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token =
-    process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-
+  const url = process.env.REDIS_URL;
   const isConfigured = Boolean(
-    url && token && url.startsWith('https://') && !url.includes('change-me'),
+    url && /^rediss?:\/\//.test(url) && !url.includes('change-me'),
   );
 
-  const client = isConfigured ? new Redis({ url: url!, token: token! }) : null;
+  if (!isConfigured) {
+    setCachedRedisClient(null);
+    return null;
+  }
+
+  const client = new Redis(url!, {
+    lazyConnect: false,
+    maxRetriesPerRequest: 1,
+  });
+  // ioredis emits 'error' on every connection hiccup — tanpa listener ini
+  // Node akan crash (unhandled 'error' event). Reconnect ditangani ioredis
+  // sendiri; kita cuma log supaya tidak silent.
+  client.on('error', (err) => {
+    console.error(`[oauth-state] redis client error: ${err?.message ?? err}`);
+  });
+
   setCachedRedisClient(client);
   return client;
 }
@@ -109,7 +122,7 @@ export async function saveOAuthState(
 
   if (redis) {
     try {
-      const result = await redis.set(key, payload, { ex: ttlSeconds });
+      const result = await redis.set(key, JSON.stringify(payload), 'EX', ttlSeconds);
       console.log(`[oauth-state] save OK (redis) stateId=${stateId} result=${String(result).slice(0, 20)}`);
       return true;
     } catch (error: any) {
@@ -153,9 +166,13 @@ export async function consumeOAuthState(
 
   if (redis) {
     try {
-      const raw = await redis.getdel<RendererOAuthStatePayload | string>(key);
+      // GET+DEL (bukan GETDEL) supaya tidak bergantung pada versi Redis
+      // server (GETDEL baru ada sejak Redis 6.2). Race kecil antara GET dan
+      // DEL bisa diterima — state token cuma dipakai sekali oleh 1 request.
+      const raw = await redis.get(key);
       if (raw) {
-        const payload = typeof raw === 'string' ? (JSON.parse(raw) as RendererOAuthStatePayload) : raw;
+        await redis.del(key);
+        const payload = JSON.parse(raw) as RendererOAuthStatePayload;
         if (payload?.codeVerifier) {
           console.log(`[oauth-state] consume OK (redis) stateId=${stateId}`);
           return payload;

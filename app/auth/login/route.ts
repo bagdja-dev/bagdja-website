@@ -28,9 +28,7 @@ export async function GET(request: NextRequest) {
   const stateId = generateStateId();
   const saved = await saveOAuthState(stateId, { codeVerifier, next, origin });
   if (!saved) {
-    console.error(
-      'Upstash Redis belum dikonfigurasi (KV_REST_API_URL/TOKEN atau UPSTASH_REDIS_REST_URL/TOKEN)',
-    );
+    console.error('Redis belum dikonfigurasi (REDIS_URL)');
     return NextResponse.redirect(
       new URL('/?error=server_misconfigured', request.url),
     );
