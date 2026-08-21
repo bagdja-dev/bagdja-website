@@ -5,9 +5,21 @@
  * renderer (port 5005) dan admin (port 5004) berjalan di localhost yang sama
  * — kalau sama, login di satu app bisa menimpa/terbaca app lain.
  *
- * Server-side only (dipakai Route Handlers & Server Components).
+ * Write (`setSessionCookies`/`clearSessionCookies`) SENGAJA nempel langsung
+ * ke object `NextResponse` yang benar-benar di-return oleh Route Handler —
+ * BUKAN lewat `cookies()` ambient dari `next/headers`. Di production
+ * (Coolify, di belakang Traefik) mutasi cookie ambient yang di-attach ke
+ * response yang dikonstruksi belakangan (`NextResponse.redirect(...)`
+ * terpisah) terbukti tidak konsisten ke-merge — cookie sesi tidak pernah
+ * sampai ke browser walau `set()` tidak error. Attach langsung ke response
+ * itu satu-satunya cara yang dijamin benar.
+ *
+ * Read (`getSession`) tetap lewat `cookies()` ambient — itu satu-satunya
+ * cara baca cookie di Server Component (read-only, tidak ada response untuk
+ * di-attach).
  */
 import { cookies } from 'next/headers';
+import type { NextResponse } from 'next/server';
 
 const TOKEN_COOKIE = 'site_token';
 const USER_COOKIE = 'site_user';
@@ -27,16 +39,24 @@ export interface SessionUser {
   avatar?: string;
 }
 
-export async function setSession(token: string, user: SessionUser) {
-  const jar = await cookies();
-  jar.set(TOKEN_COOKIE, token, COOKIE_OPTIONS);
-  jar.set(USER_COOKIE, JSON.stringify(user), {
+/** Attach cookie sesi ke response yang akan di-return Route Handler. */
+export function setSessionCookies(
+  response: NextResponse,
+  token: string,
+  user: SessionUser,
+): void {
+  response.cookies.set(TOKEN_COOKIE, token, COOKIE_OPTIONS);
+  response.cookies.set(USER_COOKIE, JSON.stringify(user), {
     ...COOKIE_OPTIONS,
     httpOnly: false, // client needs to read user info
   });
-  console.log(
-    `[session] setSession OK userId=${user.userId} cookieOptions=${JSON.stringify(COOKIE_OPTIONS)}`,
-  );
+  console.log(`[session] setSessionCookies OK userId=${user.userId}`);
+}
+
+/** Hapus cookie sesi dari response yang akan di-return Route Handler. */
+export function clearSessionCookies(response: NextResponse): void {
+  response.cookies.delete(TOKEN_COOKIE);
+  response.cookies.delete(USER_COOKIE);
 }
 
 export async function getSession(): Promise<{
@@ -61,10 +81,4 @@ export async function getSession(): Promise<{
   );
 
   return { token, user };
-}
-
-export async function clearSession() {
-  const jar = await cookies();
-  jar.delete(TOKEN_COOKIE);
-  jar.delete(USER_COOKIE);
 }

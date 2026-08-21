@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { clearSession } from '../../../lib/session';
+import { clearSessionCookies } from '../../../lib/session';
+import { resolveOrigin } from '../../../lib/resolve-origin';
 
 /**
  * W1 auth renderer: logout.
@@ -10,18 +11,18 @@ import { clearSession } from '../../../lib/session';
  *   domain). `returnTo` dari query (disusun getAuthViewState).
  */
 export async function GET(request: NextRequest) {
-  await clearSession();
-
   const returnTo = request.nextUrl.searchParams.get('returnTo');
   const safeReturnTo =
     returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
       ? returnTo
       : '/';
-  const origin = request.nextUrl.origin;
+  const origin = resolveOrigin(request);
 
   const authUrl = process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:4001';
   const ssoLogoutUrl = new URL('/logout', authUrl);
   ssoLogoutUrl.searchParams.set('redirect_uri', `${origin}${safeReturnTo}`);
 
-  return NextResponse.redirect(ssoLogoutUrl.toString());
+  const response = NextResponse.redirect(ssoLogoutUrl.toString());
+  clearSessionCookies(response);
+  return response;
 }

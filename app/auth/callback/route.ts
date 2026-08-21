@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { setSession } from '../../../lib/session';
+import { setSessionCookies } from '../../../lib/session';
 import { syncUserToBackend } from '../../../lib/backend-api';
 import { consumeOAuthState } from '../../../lib/oauth-state-store';
 
@@ -64,7 +64,19 @@ export async function GET(request: NextRequest) {
       Buffer.from(accessToken.split('.')[1], 'base64').toString(),
     );
 
-    await setSession(accessToken, {
+    const nextPath = decoded.next;
+    const redirectTo =
+      nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')
+        ? nextPath
+        : '/';
+    // Redirect balik ke ORIGIN asal login (localhost / custom domain),
+    // bukan ke request.url (selalu localhost karena redirect_uri OAuth fixed).
+    const origin = decoded.origin ?? request.nextUrl.origin;
+    const response = NextResponse.redirect(new URL(redirectTo, origin));
+
+    // Cookie di-attach LANGSUNG ke response ini (bukan lewat cookies()
+    // ambient) — lihat catatan di lib/session.ts kenapa ini penting.
+    setSessionCookies(response, accessToken, {
       userId: payload.sub ?? payload.userId,
       email: payload.email,
       username: payload.username,
@@ -74,15 +86,7 @@ export async function GET(request: NextRequest) {
     // Sync user ke Website API DB (upsert users table)
     await syncUserToBackend(accessToken);
 
-    const nextPath = decoded.next;
-    const redirectTo =
-      nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')
-        ? nextPath
-        : '/';
-    // Redirect balik ke ORIGIN asal login (localhost / custom domain),
-    // bukan ke request.url (selalu localhost karena redirect_uri OAuth fixed).
-    const origin = decoded.origin ?? request.nextUrl.origin;
-    return NextResponse.redirect(new URL(redirectTo, origin));
+    return response;
   } catch (err) {
     console.error('OAuth callback error:', err);
     return NextResponse.redirect(new URL('/?error=server_error', request.url));
