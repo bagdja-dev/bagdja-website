@@ -11,6 +11,7 @@
  * `section.content` — komponen ini murni presentational (bukan client
  * fetch), kecuali tombol retry yang jadi island client tersendiri.
  */
+import { OrderActionButtons } from './order-action-buttons';
 import { RetryPaymentButton } from './retry-payment-button';
 
 export interface TransactionProduct {
@@ -65,7 +66,7 @@ export interface OrderDetail {
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Menunggu pembayaran',
   PENDING_PAYMENT: 'Menunggu pembayaran',
-  HELD: 'Dana ditahan (escrow)',
+  HELD: 'Pembayaran sukses',
   COMPLETED: 'Selesai',
   REFUNDED: 'Direfund',
   CLOSED: 'Ditutup',
@@ -108,7 +109,11 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
   ].filter((line): line is string => Boolean(line));
 
   const statusLabel = STATUS_LABEL[transaction.status] ?? transaction.status;
-  const needsPayment = transaction.status === 'PENDING_PAYMENT';
+  // Backend menormalisasi status escrow `PENDING` -> `PENDING_PAYMENT` saat
+  // sync (lihat `normalizeEscrowStatus` di website-api), tapi cek juga
+  // `PENDING` di sini sebagai jaga-jaga kalau ada transaksi lama yang belum
+  // ke-sync ulang.
+  const needsPayment = transaction.status === 'PENDING_PAYMENT' || transaction.status === 'PENDING';
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -283,6 +288,8 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
               {statusLabel}
             </p>
           )}
+
+          <OrderActionButtons transactionId={transaction.id} status={transaction.status} />
         </aside>
       </div>
     </section>
