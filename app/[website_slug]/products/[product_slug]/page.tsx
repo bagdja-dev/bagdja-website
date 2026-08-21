@@ -40,6 +40,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
     `${resolveTenantLinkBase(params.website_slug)}/products/${params.product_slug}`,
+    resolveTenantLinkBase(params.website_slug),
   );
 
   const { website, products, locations, faqs, blogPosts } = tenant;

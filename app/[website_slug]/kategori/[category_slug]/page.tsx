@@ -43,6 +43,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
     `${resolveTenantLinkBase(params.website_slug)}/kategori/${params.category_slug}`,
+    resolveTenantLinkBase(params.website_slug),
   );
 
   const category = tenant.categories.find((c) => slugifyLabel(c.label) === params.category_slug);

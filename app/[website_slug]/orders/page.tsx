@@ -42,7 +42,10 @@ export default async function OrdersPage({ params }: OrdersPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
-  const auth = await getAuthViewState(`${resolveTenantLinkBase(params.website_slug)}/orders`);
+  const auth = await getAuthViewState(
+    `${resolveTenantLinkBase(params.website_slug)}/orders`,
+    resolveTenantLinkBase(params.website_slug),
+  );
 
   const { website, products, locations, faqs, blogPosts } = tenant;
 

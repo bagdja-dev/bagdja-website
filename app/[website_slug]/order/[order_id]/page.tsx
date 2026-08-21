@@ -50,6 +50,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
     `${resolveTenantLinkBase(params.website_slug)}/order/${params.order_id}`,
+    resolveTenantLinkBase(params.website_slug),
   );
 
   const { website, products, locations, faqs, blogPosts } = tenant;

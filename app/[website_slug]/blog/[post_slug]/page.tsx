@@ -43,6 +43,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
     `${resolveTenantLinkBase(params.website_slug)}/blog/${params.post_slug}`,
+    resolveTenantLinkBase(params.website_slug),
   );
 
   const { website, products, locations, faqs, blogPosts } = tenant;

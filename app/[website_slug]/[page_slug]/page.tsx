@@ -42,6 +42,7 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
     `${resolveTenantLinkBase(params.website_slug)}/${params.page_slug}`,
+    resolveTenantLinkBase(params.website_slug),
   );
 
   const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
