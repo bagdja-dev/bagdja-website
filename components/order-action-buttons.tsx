@@ -10,55 +10,74 @@
  *   ada masalah dengan pesanan.
  *
  * Ketiganya memanggil endpoint yang bisa mengubah/mencairkan dana secara
- * permanen, jadi selalu minta konfirmasi native (`window.confirm`) dulu
- * sebelum submit.
+ * permanen, jadi selalu minta konfirmasi lewat modal (`ConfirmDialog`) dulu
+ * sebelum submit — satu instance modal dipakai bersama semua tombol di sini.
  */
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
+
+import { ConfirmDialog } from './confirm-dialog';
 
 type ActionKind = 'cancel' | 'complete' | 'dispute';
 
 const ACTION_CONFIG: Record<
   ActionKind,
-  { path: string; confirmMessage: string; errorFallback: string }
+  {
+    path: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'primary' | 'danger';
+    errorFallback: string;
+  }
 > = {
   cancel: {
     path: 'cancel',
-    confirmMessage: 'Batalkan pesanan ini? Tindakan ini tidak bisa diurungkan.',
+    title: 'Batalkan Pesanan?',
+    message: 'Pesanan ini akan dibatalkan dan tidak bisa diurungkan.',
+    confirmLabel: 'Ya, Batalkan',
+    variant: 'danger',
     errorFallback: 'Gagal membatalkan pesanan.',
   },
   complete: {
     path: 'complete',
-    confirmMessage:
-      'Konfirmasi barang sudah diterima? Dana akan langsung dicairkan ke penjual dan tidak bisa dibatalkan.',
+    title: 'Konfirmasi Terima Barang?',
+    message: 'Dana akan langsung dicairkan ke penjual dan tidak bisa dibatalkan.',
+    confirmLabel: 'Ya, Barang Diterima',
+    variant: 'primary',
     errorFallback: 'Gagal mengonfirmasi penerimaan barang.',
   },
   dispute: {
     path: 'dispute',
-    confirmMessage:
-      'Ajukan komplain untuk pesanan ini? Dana akan ditahan sementara sampai komplain diselesaikan.',
+    title: 'Ajukan Komplain?',
+    message: 'Dana akan ditahan sementara sampai komplain ini diselesaikan.',
+    confirmLabel: 'Ya, Ajukan Komplain',
+    variant: 'danger',
     errorFallback: 'Gagal mengajukan komplain.',
   },
 };
 
-function ActionButton({
+const BUTTON_STYLE: Record<'primary' | 'danger' | 'ghost', CSSProperties> = {
+  primary: { backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' },
+  danger: { backgroundColor: 'transparent', color: 'crimson', border: '1px solid crimson' },
+  ghost: { backgroundColor: 'transparent', color: 'var(--brand-text)', border: '1px solid var(--brand-border)' },
+};
+
+export function OrderActionButtons({
   transactionId,
-  kind,
-  label,
-  variant,
+  status,
 }: {
   transactionId: string;
-  kind: ActionKind;
-  label: string;
-  variant: 'primary' | 'danger' | 'ghost';
+  status: string;
 }) {
   const router = useRouter();
+  const [pending, setPending] = useState<ActionKind | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const config = ACTION_CONFIG[kind];
 
-  async function handleClick() {
-    if (!window.confirm(config.confirmMessage)) return;
+  async function handleConfirm() {
+    if (!pending) return;
+    const config = ACTION_CONFIG[pending];
     setLoading(true);
     setError(null);
     try {
@@ -69,64 +88,70 @@ function ActionButton({
       if (!res.ok) {
         throw new Error(json?.message ?? config.errorFallback);
       }
+      setPending(null);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : config.errorFallback);
+      setError(err instanceof Error ? err.message : ACTION_CONFIG[pending].errorFallback);
     } finally {
       setLoading(false);
     }
   }
 
-  const style =
-    variant === 'primary'
-      ? { backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }
-      : variant === 'danger'
-        ? { backgroundColor: 'transparent', color: 'crimson', border: '1px solid crimson' }
-        : { backgroundColor: 'transparent', color: 'var(--brand-text)', border: '1px solid var(--brand-border)' };
+  function handleCancelDialog() {
+    if (loading) return;
+    setPending(null);
+    setError(null);
+  }
+
+  const dialogConfig = pending ? ACTION_CONFIG[pending] : null;
+
+  const buttons =
+    status === 'PENDING_PAYMENT' || status === 'PENDING' ? (
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setPending('cancel')}
+          className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+          style={BUTTON_STYLE.danger}
+        >
+          Batalkan Pesanan
+        </button>
+      </div>
+    ) : status === 'HELD' ? (
+      <div className="mt-5 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setPending('complete')}
+          className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+          style={BUTTON_STYLE.primary}
+        >
+          Selesai — Terima Barang
+        </button>
+        <button
+          type="button"
+          onClick={() => setPending('dispute')}
+          className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+          style={BUTTON_STYLE.ghost}
+        >
+          Ajukan Komplain
+        </button>
+      </div>
+    ) : null;
 
   return (
-    <div className="w-full">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={loading}
-        className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-        style={style}
-      >
-        {loading ? 'Memproses…' : label}
-      </button>
-      {error && (
-        <p className="mt-2 text-xs" style={{ color: 'crimson' }}>
-          {error}
-        </p>
-      )}
-    </div>
+    <>
+      {buttons}
+      <ConfirmDialog
+        open={pending !== null}
+        title={dialogConfig?.title ?? ''}
+        message={dialogConfig?.message ?? ''}
+        error={error}
+        confirmLabel={dialogConfig?.confirmLabel}
+        variant={dialogConfig?.variant}
+        loading={loading}
+        onConfirm={handleConfirm}
+        onCancel={handleCancelDialog}
+      />
+    </>
   );
-}
-
-export function OrderActionButtons({
-  transactionId,
-  status,
-}: {
-  transactionId: string;
-  status: string;
-}) {
-  if (status === 'PENDING_PAYMENT' || status === 'PENDING') {
-    return (
-      <div className="mt-3">
-        <ActionButton transactionId={transactionId} kind="cancel" label="Batalkan Pesanan" variant="danger" />
-      </div>
-    );
-  }
-
-  if (status === 'HELD') {
-    return (
-      <div className="mt-5 flex flex-col gap-3">
-        <ActionButton transactionId={transactionId} kind="complete" label="Selesai — Terima Barang" variant="primary" />
-        <ActionButton transactionId={transactionId} kind="dispute" label="Ajukan Komplain" variant="ghost" />
-      </div>
-    );
-  }
-
-  return null;
 }
