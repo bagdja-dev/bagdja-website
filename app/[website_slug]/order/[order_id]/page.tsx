@@ -11,7 +11,10 @@
  * (`/api/orders/:id`, order lama sebelum W2.8 yang masih pakai escrow di
  * level order). Konten read-only-nya ada di `components/order-detail-content.tsx`.
  *
- * Tombol "Konfirmasi Terima" (release milestone) BELUM ada — menyusul W5.
+ * Tombol "Konfirmasi Terima" (release milestone) ada di `OrderActionButtons`,
+ * digate oleh progres fulfillment flow per produk (Order Handling Phase 3,
+ * lihat `FulfillmentProgress` & `allFulfillmentStepsCompleted` di
+ * order-detail-content.tsx).
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';

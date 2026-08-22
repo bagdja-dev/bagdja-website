@@ -11,6 +11,7 @@
  * `section.content` — komponen ini murni presentational (bukan client
  * fetch), kecuali tombol retry yang jadi island client tersendiri.
  */
+import { FulfillmentProgress } from './fulfillment-progress';
 import { OrderActionButtons } from './order-action-buttons';
 import { RetryPaymentButton } from './retry-payment-button';
 
@@ -30,6 +31,38 @@ export interface TransactionItem {
   order?: { product?: TransactionProduct | null } | null;
 }
 
+/**
+ * Order Handling Phase 3 (plan/website-builder/order-hanlde-plan.md §3.0.1)
+ * — cermin tipe backend, dipakai untuk checklist step di `FulfillmentProgress`.
+ */
+export interface FulfillmentStepFormField {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'textarea' | 'select';
+  required?: boolean;
+  options?: string[];
+}
+
+export interface OrderFulfillmentStepProgress {
+  stepName: string;
+  description: string | null;
+  processDay: number | null;
+  releasePercentage: number | null;
+  guarantyDays: number | null;
+  formSchema: FulfillmentStepFormField[] | null;
+  completed: boolean;
+  formData: Record<string, unknown> | null;
+  releaseApproved: boolean;
+  releaseAmount: number | null;
+  releaseApprovedBy: 'buyer' | 'seller_guaranty' | null;
+  disputed: boolean;
+}
+
+export interface OrderFulfillmentProgress {
+  flowName: string;
+  steps: OrderFulfillmentStepProgress[];
+}
+
 export interface TransactionDetail {
   id: string;
   website_id: string;
@@ -44,9 +77,13 @@ export interface TransactionDetail {
   currency: string;
   payment_mode: 'ADD_TO_CART' | 'ESCROW';
   status: string;
+  /** Status BARANG, independen dari `status` (uang) di atas. */
+  fulfillment_status: string;
   checkout_url: string | null;
   created_at: string;
   items?: TransactionItem[];
+  /** `{ order_id: progress }` — hanya ada di response detail. */
+  fulfillment?: Record<string, OrderFulfillmentProgress>;
 }
 
 export interface OrderDetail {
@@ -73,6 +110,12 @@ const STATUS_LABEL: Record<string, string> = {
   DISPUTED: 'Dalam sengketa',
   CANCELLED: 'Dibatalkan',
 };
+
+/** Semua step (kalau ada flow) sudah `STEP_COMPLETED` — gate tombol "Selesai — Terima Barang" (§3.0). */
+function allFulfillmentStepsCompleted(transaction: TransactionDetail): boolean {
+  if (!transaction.fulfillment) return true;
+  return Object.values(transaction.fulfillment).every((progress) => progress.steps.every((s) => s.completed));
+}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -219,6 +262,14 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
             </section>
           )}
 
+          {transaction.fulfillment && Object.keys(transaction.fulfillment).length > 0 && (
+            <FulfillmentProgress
+              transactionId={transaction.id}
+              items={items}
+              fulfillment={transaction.fulfillment}
+            />
+          )}
+
           {transaction.courier && (
             <section>
               <h2
@@ -289,7 +340,11 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
             </p>
           )}
 
-          <OrderActionButtons transactionId={transaction.id} status={transaction.status} />
+          <OrderActionButtons
+            transactionId={transaction.id}
+            status={transaction.status}
+            fulfillmentComplete={allFulfillmentStepsCompleted(transaction)}
+          />
         </aside>
       </div>
     </section>

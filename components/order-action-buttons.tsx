@@ -5,7 +5,10 @@
  * mana yang tampil (lihat pemanggil di order-detail-content.tsx):
  * - CANCEL: transaksi PENDING_PAYMENT (belum diproses/dibayar).
  * - SELESAI: transaksi HELD — buyer konfirmasi terima barang → cairkan
- *   escrow ke penjual (aksi final, tidak bisa dibatalkan).
+ *   escrow ke penjual (aksi final, tidak bisa dibatalkan). Digate lewat
+ *   `fulfillmentComplete` (Order Handling Phase 3 §3.0) — kalau produk
+ *   pakai fulfillment flow, semua step harus selesai dulu (lihat
+ *   `allFulfillmentStepsCompleted` di order-detail-content.tsx).
  * - AJUKAN KOMPLAIN: transaksi HELD — buka dispute (freeze escrow) kalau
  *   ada masalah dengan pesanan.
  *
@@ -66,9 +69,12 @@ const BUTTON_STYLE: Record<'primary' | 'danger' | 'ghost', CSSProperties> = {
 export function OrderActionButtons({
   transactionId,
   status,
+  fulfillmentComplete = true,
 }: {
   transactionId: string;
   status: string;
+  /** Order Handling Phase 3 §3.0 — gate "Selesai — Terima Barang": harus semua step fulfillment selesai dulu. */
+  fulfillmentComplete?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<ActionKind | null>(null);
@@ -121,12 +127,18 @@ export function OrderActionButtons({
       <div className="mt-5 flex flex-col gap-3">
         <button
           type="button"
+          disabled={!fulfillmentComplete}
           onClick={() => setPending('complete')}
-          className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+          className="flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
           style={BUTTON_STYLE.primary}
         >
           Selesai — Terima Barang
         </button>
+        {!fulfillmentComplete && (
+          <p className="-mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+            Menunggu semua tahap pengiriman diselesaikan penjual terlebih dahulu.
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setPending('dispute')}
