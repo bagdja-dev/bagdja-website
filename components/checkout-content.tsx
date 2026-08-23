@@ -77,21 +77,26 @@ export function CheckoutContent({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<ServerOrder[] | null>(null);
+  const [draftsError, setDraftsError] = useState(false);
 
   const [shipping, setShipping] = useState<ShippingForm>(EMPTY_SHIPPING);
   const [courier, setCourier] = useState<string | null>(null);
 
   const loadDrafts = useCallback(async () => {
+    setDraftsError(false);
     try {
       const res = await fetch('/api/orders', { cache: 'no-store' });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setDraftsError(true);
+        return;
+      }
       const data = (await res.json()) as { data?: ServerOrder[] };
       const pending = (data?.data ?? []).filter(
         (o) => o.status === 'PENDING' && !o.transaction_id,
       );
       setDrafts(pending);
     } catch {
-      // fallback ke cart lokal
+      setDraftsError(true);
     }
   }, []);
 
@@ -100,7 +105,12 @@ export function CheckoutContent({
   }, [loadDrafts]);
 
   // Sumber utama: order terpilih dari cart (initialOrderIds) — multi-item.
-  // Kalau kosong: draft server pertama (perilaku lama). Fallback: cart lokal.
+  // Kalau kosong: draft server pertama (perilaku lama). Fallback cart lokal
+  // HANYA relevan kalau memang tidak ada seleksi eksplisit dari cart —
+  // kalau buyer sudah memilih order_ids tertentu, jangan pernah diam-diam
+  // ganti ke item cart lokal lain hanya karena draft server belum/gagal
+  // dimuat (bug lama: race/error fetch bikin checkout memuat 1 item cart
+  // lokal yang salah walau 2 item server sudah dipilih di halaman cart).
   const selectedOrders = useMemo(() => {
     if (!Array.isArray(drafts)) return null;
     if (initialOrderIds.length > 0) {
@@ -110,17 +120,20 @@ export function CheckoutContent({
     return drafts;
   }, [drafts, initialOrderIds]);
 
-  const draftOrders = useMemo(() => {
-    if (!selectedOrders || selectedOrders.length === 0) return [];
-    return selectedOrders;
-  }, [selectedOrders]);
+  // Masih menunggu fetch draft server selesai (belum sukses ATAU gagal) —
+  // cuma relevan kalau ada order_ids eksplisit untuk ditunggu; alur legacy
+  // (tanpa order_ids) tidak perlu menunggu apa-apa.
+  const draftsLoading = initialOrderIds.length > 0 && drafts === null && !draftsError;
 
-  const draftOrder = draftOrders[0] ?? null;
+  const draftOrders = useMemo(() => selectedOrders ?? [], [selectedOrders]);
 
-  const localItem = items[0];
+  const localItem = initialOrderIds.length === 0 ? items[0] : undefined;
 
   const hasAny = draftOrders.length > 0 || Boolean(localItem);
-  const extraCount = draftOrders.length > 0 ? 0 : Math.max(0, items.length - 1);
+  const extraCount =
+    initialOrderIds.length > 0 || draftOrders.length > 0
+      ? 0
+      : Math.max(0, items.length - 1);
 
   // Detail pemesanan: SEMUA order terpilih (multi-item).
   const displayItems = useMemo(() => {
@@ -182,24 +195,53 @@ export function CheckoutContent({
     Boolean(courier) &&
     !loading;
 
-  if (!hasAnyItem) {
+  // Order_ids eksplisit dari cart tapi draft server belum selesai dimuat —
+  // JANGAN jatuh ke tampilan "kosong"/fallback cart lokal dulu, tunggu.
+  if (draftsLoading) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
           Checkout
         </h1>
         <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          {missingSelection
-            ? 'Item yang dipilih sudah tidak tersedia (sudah di-checkout atau dihapus).'
-            : 'Keranjang Anda masih kosong.'}
+          Memuat pesanan…
         </p>
-        <Link
-          href={`/${slug}`}
-          className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
-          style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-        >
-          Lihat Produk
-        </Link>
+      </main>
+    );
+  }
+
+  if (!hasAnyItem) {
+    const showRetry = initialOrderIds.length > 0 && draftsError;
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+          Checkout
+        </h1>
+        <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
+          {showRetry
+            ? 'Gagal memuat pesanan dari server. Coba lagi sebelum melanjutkan.'
+            : missingSelection
+              ? 'Item yang dipilih sudah tidak tersedia (sudah di-checkout atau dihapus).'
+              : 'Keranjang Anda masih kosong.'}
+        </p>
+        {showRetry ? (
+          <button
+            type="button"
+            onClick={() => void loadDrafts()}
+            className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+          >
+            Coba Lagi
+          </button>
+        ) : (
+          <Link
+            href={`/${slug}`}
+            className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+          >
+            Lihat Produk
+          </Link>
+        )}
       </main>
     );
   }
