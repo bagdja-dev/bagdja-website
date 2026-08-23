@@ -68,10 +68,13 @@ export function CheckoutContent({
   slug,
   websiteId,
   initialOrderIds = [],
+  initialLocalProductIds = [],
 }: {
   slug: string;
   websiteId: string;
   initialOrderIds?: string[];
+  /** Id produk yang dicentang di cart TAPI itemnya cuma ada di localStorage (belum/tidak ada draft server) — lihat cart-content.tsx `local_ids`. */
+  initialLocalProductIds?: string[];
 }) {
   const { items } = useCart();
   const [loading, setLoading] = useState(false);
@@ -127,13 +130,28 @@ export function CheckoutContent({
 
   const draftOrders = useMemo(() => selectedOrders ?? [], [selectedOrders]);
 
-  const localItem = initialOrderIds.length === 0 ? items[0] : undefined;
+  // Item cart LOKAL yang relevan untuk checkout ini — kalau ada seleksi
+  // eksplisit (`initialLocalProductIds`, dari checkbox di cart), pakai HANYA
+  // yang dipilih; kalau tidak ada seleksi sama sekali (akses langsung tanpa
+  // lewat cart), pakai semua item lokal. TIDAK PERNAH diam-diam terpotong
+  // jadi 1 item — itu bug lama (lihat catatan di cart-content.tsx).
+  const localItems = useMemo(() => {
+    if (initialOrderIds.length > 0) return [];
+    if (initialLocalProductIds.length > 0) {
+      const wanted = new Set(initialLocalProductIds);
+      return items.filter((i) => wanted.has(i.productId));
+    }
+    return items;
+  }, [items, initialOrderIds, initialLocalProductIds]);
 
-  const hasAny = draftOrders.length > 0 || Boolean(localItem);
+  const hasAny = draftOrders.length > 0 || localItems.length > 0;
+  // Item yang sengaja TIDAK dicentang di cart tetap tinggal di keranjang —
+  // cuma relevan utk jalur lokal (jalur server: item yang tidak dipilih
+  // tetap jadi draft order terpisah, bukan "hilang" dari cart juga).
   const extraCount =
-    initialOrderIds.length > 0 || draftOrders.length > 0
+    draftOrders.length > 0 || initialOrderIds.length > 0
       ? 0
-      : Math.max(0, items.length - 1);
+      : Math.max(0, items.length - localItems.length);
 
   // Detail pemesanan: SEMUA order terpilih (multi-item).
   const displayItems = useMemo(() => {
@@ -148,29 +166,26 @@ export function CheckoutContent({
         mode: o.payment_mode,
       }));
     }
-    if (localItem) {
-      return [
-        {
-          id: localItem.productId,
-          name: localItem.name,
-          image: localItem.image,
-          description: undefined,
-          qty: localItem.quantity,
-          price: localItem.price,
-          mode: localItem.paymentMode ?? 'ADD_TO_CART',
-        },
-      ];
-    }
-    return [];
-  }, [draftOrders, localItem]);
+    return localItems.map((li) => ({
+      id: li.productId,
+      name: li.name,
+      image: li.image,
+      description: undefined,
+      qty: li.quantity,
+      price: li.price,
+      mode: li.paymentMode ?? 'ADD_TO_CART',
+    }));
+  }, [draftOrders, localItems]);
 
   const total = displayItems.reduce((acc, d) => acc + d.price * d.qty, 0);
 
   // Validasi: item terpilih harus ketemu semua (kalau ada yang sudah
   // di-checkout/dihapus, backend menolak).
   const missingSelection =
-    initialOrderIds.length > 0 &&
-    draftOrders.length !== initialOrderIds.length;
+    (initialOrderIds.length > 0 && draftOrders.length !== initialOrderIds.length) ||
+    (initialOrderIds.length === 0 &&
+      initialLocalProductIds.length > 0 &&
+      localItems.length !== initialLocalProductIds.length);
   const hasAnyItem = displayItems.length > 0;
   const isMulti = displayItems.length > 1;
 
@@ -252,23 +267,29 @@ export function CheckoutContent({
     setError(null);
     try {
       // Item transaksi = id order (cart) PENDING milik buyer. Tanpa draft
-      // (fallback cart lokal), buat order draft dulu → id-nya jadi item.
+      // (fallback cart lokal), buat order draft dulu untuk SETIAP item lokal
+      // terpilih → id-nya jadi item transaksi (dulu cuma `localItems[0]`,
+      // makanya pilih banyak produk di cart lokal tetap ke-checkout 1 saja).
       let orderIds: string[] = draftOrders.map((o) => o.id);
-      if (orderIds.length === 0 && localItem) {
-        const draftRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            website_id: websiteId,
-            product_id: localItem.productId,
-            quantity: localItem.quantity,
-          }),
-        });
-        const draftJson = await draftRes.json();
-        if (!draftRes.ok) {
-          throw new Error(draftJson?.message ?? 'Gagal menyiapkan pesanan.');
+      if (orderIds.length === 0 && localItems.length > 0) {
+        const createdIds: string[] = [];
+        for (const li of localItems) {
+          const draftRes = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              website_id: websiteId,
+              product_id: li.productId,
+              quantity: li.quantity,
+            }),
+          });
+          const draftJson = await draftRes.json();
+          if (!draftRes.ok) {
+            throw new Error(draftJson?.message ?? 'Gagal menyiapkan pesanan.');
+          }
+          createdIds.push(draftJson?.id as string);
         }
-        orderIds = [draftJson?.id as string];
+        orderIds = createdIds;
       }
       if (orderIds.length === 0) throw new Error('Tidak ada item untuk di-checkout.');
 

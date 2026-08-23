@@ -29,7 +29,7 @@ export const revalidate = 60;
 
 interface CheckoutPageProps {
   params: { website_slug: string };
-  searchParams?: { order_ids?: string };
+  searchParams?: { order_ids?: string; local_ids?: string };
 }
 
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
@@ -57,11 +57,17 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  // Cart murni lokal (belum/tidak ada draft server) — id PRODUK yang
+  // dicentang, dipakai checkout-content.tsx buat filter `useCart()` items.
+  const localIds = (searchParams?.local_ids ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const sections: SectionEntry[] = [
     {
       type: 'checkout',
-      content: { slug: params.website_slug, websiteId: website.id, orderIds },
+      content: { slug: params.website_slug, websiteId: website.id, orderIds, localIds },
     },
   ];
 

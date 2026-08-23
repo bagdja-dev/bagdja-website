@@ -172,7 +172,17 @@ export function CartContent({ slug }: { slug: string }) {
     [selectedLines],
   );
 
-  // Item server terpilih → order_ids utk checkout multi-item.
+  // Item server terpilih → order_ids utk checkout multi-item. Cart ini
+  // isinya SATU jenis line saja per saat (server ATAU lokal, lihat
+  // `localLines: hasServerItems ? [] : ...` di atas — tidak pernah campur),
+  // jadi cukup cek server dulu lalu lokal.
+  //
+  // BUG LAMA (2026-08-24): kalau cart murni lokal (server order gagal
+  // dibuat / belum sempat sync), href-nya cuma `/checkout` tanpa info
+  // seleksi SAMA SEKALI — checkout-content.tsx lalu asal ambil `items[0]`
+  // dari localStorage, jadi berapa pun produk yang dicentang di sini,
+  // yang ke-checkout selalu cuma 1. Fix: kirim juga id produk lokal yang
+  // dipilih lewat `local_ids`, sama seperti `order_ids` untuk item server.
   const checkoutHref = useMemo(() => {
     const serverSelected = selectedLines
       .filter((l) => l.isServer && l.orderId)
@@ -180,8 +190,11 @@ export function CartContent({ slug }: { slug: string }) {
     if (serverSelected.length > 0) {
       return `/${slug}/checkout?order_ids=${encodeURIComponent(serverSelected.join(','))}`;
     }
-    // Tanpa item server → fallback cart lokal (alur legacy 1 item).
-    return selectedLines.length > 0 ? `/${slug}/checkout` : '#';
+    const localSelected = selectedLines.filter((l) => !l.isServer).map((l) => l.productId);
+    if (localSelected.length > 0) {
+      return `/${slug}/checkout?local_ids=${encodeURIComponent(localSelected.join(','))}`;
+    }
+    return '#';
   }, [selectedLines, slug]);
 
   // Update qty item server → PATCH via BFF → refresh list.
