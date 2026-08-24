@@ -1,18 +1,24 @@
 'use client';
 
 /**
- * Konten halaman Cart (keranjang) — W1b/W2/W2.5 cart server-side draft.
- * Client component, dirender DI DALAM template (section type `cart`) supaya
- * header/footer/theme konsisten dengan home & halaman lain.
- * - Fetch GET /api/orders (BFF → website-api) saat mount; filter status=PENDING.
- * - Draft server sebagai sumber utama; fallback ke useCart (localStorage).
- * - Item server: foto/nama/deskripsi/chip varian dari relasi product;
- *   qty editable (PATCH via BFF) + hapus (DELETE via BFF).
- * - Item lokal: qty/remove via useCart.
+ * Konten halaman Cart (keranjang) — client component, dirender DI DALAM
+ * template (section type `cart`) supaya header/footer/theme konsisten
+ * dengan home & halaman lain.
+ *
+ * Draft order server ADALAH satu-satunya sumber kebenaran (revisi
+ * 2026-08-24) — fetch `GET /api/orders?cart=true` (difilter di
+ * website-api: PENDING & belum di-claim transaksi), TIDAK ADA lagi
+ * fallback ke cart lokal (localStorage). Fallback lokal yang lama bikin
+ * produk yang SUDAH di-checkout muncul lagi seolah masih di keranjang
+ * begitu draft server-nya habis (root cause: `AddToCartButton` dulu
+ * menulis dobel ke server DAN localStorage, tidak pernah dibersihkan
+ * setelah checkout) — lihat cart-button.tsx & checkout-content.tsx untuk
+ * detail perbaikannya.
+ *
+ * Qty editable (PATCH via BFF) + hapus (DELETE via BFF).
  */
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useCart } from '../lib/cart';
 
 interface ServerOrder {
   id: string;
@@ -33,11 +39,10 @@ interface ServerOrder {
   transaction_id: string | null;  payment_mode: string;
 }
 
-/** Item gabungan (server draft atau cart lokal) dengan semua data tampil. */
+/** Item cart — 1:1 dengan 1 draft order server. */
 interface CartLine {
   key: string;
-  isServer: boolean;
-  orderId?: string;
+  orderId: string;
   productId: string;
   name: string;
   description?: string;
@@ -62,8 +67,6 @@ function CartIcon({ className = '' }: { className?: string }) {
 }
 
 export function CartContent({ slug }: { slug: string }) {
-  const { items, removeItem, updateQuantity, clear } = useCart();
-
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -72,16 +75,13 @@ export function CartContent({ slug }: { slug: string }) {
 
   const loadServerOrders = useCallback(async () => {
     try {
-      const res = await fetch('/api/orders', { cache: 'no-store' });
+      const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
       if (!res.ok) {
         setServerError('Gagal memuat keranjang dari server');
         return;
       }
       const data = (await res.json()) as { data?: ServerOrder[] };
-      const pending = (data?.data ?? []).filter(
-        (o) => o.status === 'PENDING' && !o.transaction_id,
-      );
-      setServerOrders(pending);
+      setServerOrders(data?.data ?? []);
     } catch {
       setServerError('Gagal memuat keranjang dari server');
     }
@@ -92,46 +92,29 @@ export function CartContent({ slug }: { slug: string }) {
   }, [loadServerOrders]);
 
   // Beri tahu CartBadge (header) supaya badge ikut ter-update saat item
-  // server diubah/dihapus dari halaman cart — item server tidak lewat
-  // CartProvider, jadi event `bagdja:cart-changed` tidak otomatis terpicu.
+  // diubah/dihapus dari halaman cart.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('bagdja:cart-changed'));
   }, [serverOrders]);
 
-  const hasServerItems = Array.isArray(serverOrders) && serverOrders.length > 0;
-
-  // Gabungkan server draft + cart lokal jadi satu list (server lebih dulu).
-  const lines: CartLine[] = useMemo(() => {
-    const serverLines: CartLine[] = (serverOrders ?? []).map((o) => ({
-      key: `srv:${o.id}`,
-      isServer: true,
-      orderId: o.id,
-      productId: o.product_id,
-      name: o.product?.name ?? 'Produk',
-      description: o.product?.description ?? undefined,
-      image: o.product?.images?.[0],
-      unitPrice: Number(o.unit_price),
-      quantity: o.quantity,
-      paymentMode: o.payment_mode,
-      variantAttributes: o.product?.metadata?.variant_attributes,
-      isVariant: Boolean(o.product?.parent_product_id),
-    }));
-    const localLines: CartLine[] = hasServerItems
-      ? []
-      : items.map((i) => ({
-          key: `loc:${i.productId}`,
-          isServer: false,
-          productId: i.productId,
-          name: i.name,
-          image: i.image,
-          unitPrice: i.price,
-          quantity: i.quantity,
-          paymentMode: i.paymentMode ?? 'ADD_TO_CART',
-          isVariant: false,
-        }));
-    return [...serverLines, ...localLines];
-  }, [serverOrders, items, hasServerItems]);
+  const lines: CartLine[] = useMemo(
+    () =>
+      (serverOrders ?? []).map((o) => ({
+        key: o.id,
+        orderId: o.id,
+        productId: o.product_id,
+        name: o.product?.name ?? 'Produk',
+        description: o.product?.description ?? undefined,
+        image: o.product?.images?.[0],
+        unitPrice: Number(o.unit_price),
+        quantity: o.quantity,
+        paymentMode: o.payment_mode,
+        variantAttributes: o.product?.metadata?.variant_attributes,
+        isVariant: Boolean(o.product?.parent_product_id),
+      })),
+    [serverOrders],
+  );
 
   // Default: semua item terpilih saat list pertama dimuat.
   useEffect(() => {
@@ -172,35 +155,17 @@ export function CartContent({ slug }: { slug: string }) {
     [selectedLines],
   );
 
-  // Item server terpilih → order_ids utk checkout multi-item. Cart ini
-  // isinya SATU jenis line saja per saat (server ATAU lokal, lihat
-  // `localLines: hasServerItems ? [] : ...` di atas — tidak pernah campur),
-  // jadi cukup cek server dulu lalu lokal.
-  //
-  // BUG LAMA (2026-08-24): kalau cart murni lokal (server order gagal
-  // dibuat / belum sempat sync), href-nya cuma `/checkout` tanpa info
-  // seleksi SAMA SEKALI — checkout-content.tsx lalu asal ambil `items[0]`
-  // dari localStorage, jadi berapa pun produk yang dicentang di sini,
-  // yang ke-checkout selalu cuma 1. Fix: kirim juga id produk lokal yang
-  // dipilih lewat `local_ids`, sama seperti `order_ids` untuk item server.
+  // Item terpilih → order_ids utk checkout multi-item.
   const checkoutHref = useMemo(() => {
-    const serverSelected = selectedLines
-      .filter((l) => l.isServer && l.orderId)
-      .map((l) => l.orderId as string);
-    if (serverSelected.length > 0) {
-      return `/${slug}/checkout?order_ids=${encodeURIComponent(serverSelected.join(','))}`;
-    }
-    const localSelected = selectedLines.filter((l) => !l.isServer).map((l) => l.productId);
-    if (localSelected.length > 0) {
-      return `/${slug}/checkout?local_ids=${encodeURIComponent(localSelected.join(','))}`;
-    }
-    return '#';
+    if (selectedLines.length === 0) return '#';
+    const orderIds = selectedLines.map((l) => l.orderId);
+    return `/${slug}/checkout?order_ids=${encodeURIComponent(orderIds.join(','))}`;
   }, [selectedLines, slug]);
 
   // Update qty item server → PATCH via BFF → refresh list.
   const changeServerQty = useCallback(
     async (line: CartLine, nextQty: number) => {
-      if (!line.orderId || nextQty < 1) return;
+      if (nextQty < 1) return;
       setBusyKey(line.key);
       setActionError(null);
       try {
@@ -226,7 +191,6 @@ export function CartContent({ slug }: { slug: string }) {
   // Hapus item server → DELETE via BFF → refresh list.
   const removeServerItem = useCallback(
     async (line: CartLine) => {
-      if (!line.orderId) return;
       setBusyKey(line.key);
       setActionError(null);
       try {
@@ -299,16 +263,6 @@ export function CartContent({ slug }: { slug: string }) {
             ({displayCount} item)
           </span>
         </h1>
-        {!hasServerItems && (
-          <button
-            type="button"
-            onClick={clear}
-            className="text-xs font-semibold uppercase tracking-wide hover:opacity-70"
-            style={{ color: 'var(--brand-muted)' }}
-          >
-            Kosongkan
-          </button>
-        )}
       </div>
 
       {actionError && (
@@ -410,7 +364,7 @@ export function CartContent({ slug }: { slug: string }) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => (line.isServer ? removeServerItem(line) : removeItem(line.productId))}
+                      onClick={() => removeServerItem(line)}
                       disabled={isBusy}
                       className="shrink-0 text-xs font-medium hover:opacity-70 disabled:opacity-50"
                       style={{ color: 'var(--brand-muted)' }}
@@ -433,11 +387,7 @@ export function CartContent({ slug }: { slug: string }) {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          line.isServer
-                            ? changeServerQty(line, line.quantity - 1)
-                            : updateQuantity(line.productId, line.quantity - 1)
-                        }
+                        onClick={() => changeServerQty(line, line.quantity - 1)}
                         disabled={isBusy || line.quantity <= 1}
                         className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
                         style={{ borderColor: 'var(--brand-border)' }}
@@ -450,11 +400,7 @@ export function CartContent({ slug }: { slug: string }) {
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          line.isServer
-                            ? changeServerQty(line, line.quantity + 1)
-                            : updateQuantity(line.productId, line.quantity + 1)
-                        }
+                        onClick={() => changeServerQty(line, line.quantity + 1)}
                         disabled={isBusy}
                         className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
                         style={{ borderColor: 'var(--brand-border)' }}

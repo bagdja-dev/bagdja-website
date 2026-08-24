@@ -29,7 +29,7 @@ export const revalidate = 60;
 
 interface CheckoutPageProps {
   params: { website_slug: string };
-  searchParams?: { order_ids?: string; local_ids?: string };
+  searchParams?: { order_ids?: string };
 }
 
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
@@ -52,14 +52,8 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
   const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
   if (!Renderer) notFound();
 
-  // W2.9: order_ids dari halaman cart (checkbox multi-item), comma-separated.
+  // order_ids dari halaman cart (checkbox multi-item), comma-separated.
   const orderIds = (searchParams?.order_ids ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  // Cart murni lokal (belum/tidak ada draft server) — id PRODUK yang
-  // dicentang, dipakai checkout-content.tsx buat filter `useCart()` items.
-  const localIds = (searchParams?.local_ids ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
@@ -67,7 +61,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
   const sections: SectionEntry[] = [
     {
       type: 'checkout',
-      content: { slug: params.website_slug, websiteId: website.id, orderIds, localIds },
+      content: { slug: params.website_slug, websiteId: website.id, orderIds },
     },
   ];
 

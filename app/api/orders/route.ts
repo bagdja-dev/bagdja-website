@@ -29,8 +29,12 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(result.data, { status: 201 });
 }
 
-export async function GET() {
-  const result = await backendFetch('/api/orders');
+export async function GET(request: NextRequest) {
+  // Teruskan `?cart=true` apa adanya — website-api yang memfilter "keranjang
+  // aktif" (PENDING & belum di-claim transaksi) di server, jadi FE tidak
+  // perlu memfilter/menduplikasi logic ini sendiri.
+  const qs = request.nextUrl.searchParams.toString();
+  const result = await backendFetch(`/api/orders${qs ? `?${qs}` : ''}`);
 
   if (result.status === 401) {
     return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });

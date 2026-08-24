@@ -1265,16 +1265,12 @@ export function BarberClassicView({
                 const orderIds = Array.isArray(section.content.orderIds)
                   ? (section.content.orderIds as unknown[]).filter((v): v is string => typeof v === 'string')
                   : [];
-                const localIds = Array.isArray(section.content.localIds)
-                  ? (section.content.localIds as unknown[]).filter((v): v is string => typeof v === 'string')
-                  : [];
                 return (
                   <CheckoutContent
                     key={key}
                     slug={slug}
                     websiteId={websiteId}
                     initialOrderIds={orderIds}
-                    initialLocalProductIds={localIds}
                   />
                 );
               }

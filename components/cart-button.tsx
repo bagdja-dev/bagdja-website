@@ -1,12 +1,17 @@
 'use client';
 
 /**
- * Tombol "Masukkan ke Keranjang" — W1b/W2 cart server-side draft.
- * onClick async: panggil POST /api/orders (BFF → website-api draft), lalu
- * tambahkan item ke cart lokal dengan orderId dari server. Error → onError.
+ * Tombol "Masukkan ke Keranjang" — cart server-side draft.
+ * onClick async: panggil POST /api/orders (BFF → website-api draft). Server
+ * draft ADALAH sumber kebenaran keranjang (lihat cart-content.tsx/
+ * cart-badge.tsx, keduanya baca `GET /api/orders?cart=true` langsung) —
+ * TIDAK ditulis dobel ke localStorage lagi (revisi 2026-08-24). Dulu ada
+ * dual-write ke `useCart()` sebagai "fallback tampilan", tapi karena tidak
+ * pernah dibersihkan setelah checkout, produk yang SUDAH dibeli bisa
+ * muncul lagi seolah masih di keranjang begitu draft server-nya habis.
+ * Error → onError.
  */
 import { useState } from 'react';
-import { useCart } from '../lib/cart';
 
 export interface AddToCartButtonProps {
   slug: string;
@@ -39,7 +44,6 @@ export function AddToCartButton({
   onAdded,
   onError,
 }: AddToCartButtonProps) {
-  const { addItem } = useCart();
   const [busy, setBusy] = useState(false);
   const qty = Math.max(1, Math.floor(quantity || 1));
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
@@ -71,19 +75,13 @@ export function AddToCartButton({
         return;
       }
       const data = (await res.json()) as { id: string };
-      addItem(
-        {
-          productId: product.id,
-          slug: product.slug,
-          name: product.name,
-          price: product.price,
-          image: product.image,
-          stock: product.stock,
-          paymentMode,
-        },
-        qty,
-        data.id,
-      );
+      // Beri tahu CartBadge (header) supaya count ikut refresh — dulu ini
+      // otomatis lewat efek `items` di CartProvider (karena dual-write),
+      // sekarang harus di-dispatch manual karena tidak ada lagi tulisan ke
+      // cart lokal.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bagdja:cart-changed'));
+      }
       onAdded?.(data.id);
     } catch {
       onError?.('Terjadi kesalahan jaringan. Coba lagi.');

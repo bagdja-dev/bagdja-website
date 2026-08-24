@@ -1,19 +1,20 @@
 'use client';
 
 /**
- * CartBadge (W1c/W2.6) — ikon keranjang + jumlah item di header template.
- * Client component: memakai useCart (CartProvider harus membungkus header —
- * di halaman-halaman renderer `[website_slug]/*`).
+ * CartBadge — ikon keranjang + jumlah item di header template.
  * Hanya tampil saat user login (cart butuh session buyer).
  *
- * Jumlah item diambil dari SERVER (GET /api/orders → draft PENDING), bukan
- * localStorage — sumber utama cart adalah draft server (W1b). Fallback ke
- * cart lokal saat API gagal / server kosong. Refresh otomatis lewat event
- * `bagdja:cart-changed` (di-dispatch CartProvider saat items berubah).
+ * Jumlah item diambil LANGSUNG dari server (`GET /api/orders?cart=true`,
+ * difilter di website-api) — SATU-SATUNYA sumber kebenaran, tanpa fallback
+ * ke localStorage (revisi 2026-08-24). Fallback lokal yang lama membuat
+ * badge menampilkan angka basi (produk yang sudah di-checkout dihitung
+ * lagi) begitu draft server habis — lihat cart-button.tsx untuk detail.
+ * Refresh otomatis lewat event `bagdja:cart-changed` (di-dispatch
+ * cart-button.tsx setelah add-to-cart, dan cart-content.tsx setelah
+ * qty/hapus di halaman /cart).
  */
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useCart } from '../lib/cart';
 
 export interface CartBadgeProps {
   href: string;
@@ -22,30 +23,20 @@ export interface CartBadgeProps {
 
 interface ServerOrder {
   quantity: number;
-  status: string;
-  transaction_id: string | null;
 }
 
 export function CartBadge({ href, isLoggedIn }: CartBadgeProps) {
-  const { count: localCount } = useCart();
-  /** Jumlah draft PENDING dari server; null = belum dimuat/gagal. */
-  const [serverCount, setServerCount] = useState<number | null>(null);
+  const [count, setCount] = useState(0);
 
   const loadServerCount = useCallback(async () => {
     try {
-      const res = await fetch('/api/orders', { cache: 'no-store' });
-      if (!res.ok) {
-        setServerCount(null);
-        return;
-      }
+      const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
+      if (!res.ok) return;
       const data = (await res.json()) as { data?: ServerOrder[] };
-      const pending = (data?.data ?? []).filter(
-        (o) => o.status === 'PENDING' && !o.transaction_id,
-      );
-      const total = pending.reduce((acc, o) => acc + Number(o.quantity), 0);
-      setServerCount(total);
+      const total = (data?.data ?? []).reduce((acc, o) => acc + Number(o.quantity), 0);
+      setCount(total);
     } catch {
-      setServerCount(null);
+      // biarkan count apa adanya (nilai terakhir yang berhasil dimuat)
     }
   }, []);
 
@@ -55,10 +46,6 @@ export function CartBadge({ href, isLoggedIn }: CartBadgeProps) {
     window.addEventListener('bagdja:cart-changed', loadServerCount);
     return () => window.removeEventListener('bagdja:cart-changed', loadServerCount);
   }, [isLoggedIn, loadServerCount]);
-
-  // Server draft sebagai sumber utama; fallback cart lokal saat server
-  // kosong (0 pending) atau gagal dimuat.
-  const count = serverCount !== null && serverCount > 0 ? serverCount : localCount;
 
   if (!isLoggedIn) return null;
 
