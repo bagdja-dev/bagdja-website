@@ -66,7 +66,7 @@ function CartIcon({ className = '' }: { className?: string }) {
   );
 }
 
-export function CartContent({ slug }: { slug: string }) {
+export function CartContent({ basePath }: { basePath: string }) {
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -155,12 +155,16 @@ export function CartContent({ slug }: { slug: string }) {
     [selectedLines],
   );
 
-  // Item terpilih → order_ids utk checkout multi-item.
+  // Item terpilih → order_ids utk checkout multi-item. `basePath` kosong
+  // ('') di subdomain/custom domain, `/{slug}` cuma di path-based (local
+  // dev) — lihat `resolveTenantLinkBase`. JANGAN prefix `/${slug}` manual,
+  // itu bikin URL dobel slug di subdomain (mis.
+  // `fashion-store.sites.bagdja.com/fashion-store`).
   const checkoutHref = useMemo(() => {
     if (selectedLines.length === 0) return '#';
     const orderIds = selectedLines.map((l) => l.orderId);
-    return `/${slug}/checkout?order_ids=${encodeURIComponent(orderIds.join(','))}`;
-  }, [selectedLines, slug]);
+    return `${basePath}/checkout?order_ids=${encodeURIComponent(orderIds.join(','))}`;
+  }, [selectedLines, basePath]);
 
   // Update qty item server → PATCH via BFF → refresh list.
   const changeServerQty = useCallback(
@@ -244,7 +248,7 @@ export function CartContent({ slug }: { slug: string }) {
           {serverError ?? 'Belum ada produk di keranjang. Yuk mulai belanja!'}
         </p>
         <Link
-          href={`/${slug}`}
+          href={basePath || '/'}
           className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
           style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
         >

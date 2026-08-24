@@ -67,11 +67,12 @@ function inputClass(): string {
 }
 
 export function CheckoutContent({
-  slug,
+  basePath,
   websiteId,
   initialOrderIds = [],
 }: {
-  slug: string;
+  /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
+  basePath: string;
   websiteId: string;
   initialOrderIds?: string[];
 }) {
@@ -207,7 +208,7 @@ export function CheckoutContent({
           </button>
         ) : (
           <Link
-            href={`/${slug}`}
+            href={basePath || '/'}
             className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >

@@ -63,8 +63,8 @@ interface WebsiteTransactionRow {
 }
 
 interface OrdersContentProps {
-  /** Slug tenant (base path link) — e.g. `fashion-store` atau '' untuk custom domain/subdomain. */
-  slug: string;
+  /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
+  basePath: string;
 }
 
 type TabKey = 'all' | 'awaiting' | 'process' | 'done' | 'cancelled';
@@ -133,9 +133,7 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-export function OrdersContent({ slug }: OrdersContentProps) {
-  const basePath = slug ? `/${slug}` : '';
-
+export function OrdersContent({ basePath }: OrdersContentProps) {
   const [rows, setRows] = useState<WebsiteTransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

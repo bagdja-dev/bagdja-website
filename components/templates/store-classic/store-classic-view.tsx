@@ -1221,13 +1221,9 @@ export function StoreClassicView({
                 return <BlogArticleSection key={key} post={post} allPosts={blogPosts} websiteSlug={websiteSlug} />;
               }
               case 'cart': {
-                const slug =
-                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
-                return <CartContent key={key} slug={slug} />;
+                return <CartContent key={key} basePath={websiteSlug ?? ''} />;
               }
               case 'checkout': {
-                const slug =
-                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
                 const websiteId =
                   typeof section.content.websiteId === 'string' ? section.content.websiteId : '';
                 const orderIds = Array.isArray(section.content.orderIds)
@@ -1236,16 +1232,14 @@ export function StoreClassicView({
                 return (
                   <CheckoutContent
                     key={key}
-                    slug={slug}
+                    basePath={websiteSlug ?? ''}
                     websiteId={websiteId}
                     initialOrderIds={orderIds}
                   />
                 );
               }
               case 'orders': {
-                const slug =
-                  typeof section.content.slug === 'string' ? section.content.slug : tenantSlug ?? '';
-                return <OrdersContent key={key} slug={slug} />;
+                return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
