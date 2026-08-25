@@ -38,6 +38,7 @@ import { SocialIcon } from './barber-classic-icons';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
+import { ProfileContent } from '../../profile-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 
 export interface BarberClassicProfile {
@@ -951,6 +952,7 @@ export function BarberClassicView({
   const checkoutSection = sections.find((s) => s.type === 'checkout');
   const ordersSection = sections.find((s) => s.type === 'orders');
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
+  const profileSection = sections.find((s) => s.type === 'profile');
   const pageHeroLabel = checkoutSection
     ? 'Checkout'
     : cartSection
@@ -959,7 +961,9 @@ export function BarberClassicView({
         ? 'Daftar Transaksi'
         : orderDetailSection
           ? 'Status Pesanan'
-          : undefined;
+          : profileSection
+            ? 'Profil Saya'
+            : undefined;
   const categoryListingLabel =
     typeof categoryListingContent?.category_label === 'string' ? categoryListingContent.category_label : undefined;
   const categoryListingImage = categoryListingLabel
@@ -1270,6 +1274,9 @@ export function BarberClassicView({
                     locations={locations}
                   />
                 );
+              }
+              case 'profile': {
+                return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;

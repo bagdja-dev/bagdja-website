@@ -37,7 +37,7 @@ const SUBDOMAIN_PATTERN = new RegExp(`^([a-z0-9-]+)\\.${PLATFORM_HOST.replace(/\
 // ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
 // Path dalam tenant: `/{slug}/cart`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`
 const PROTECTED_PATH_PATTERN =
-  /^\/([a-z0-9-]+)\/(cart|checkout|orders)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
+  /^\/([a-z0-9-]+)\/(cart|checkout|orders|profile)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
 
 function shouldProtect(pathname: string): boolean {
   return PROTECTED_PATH_PATTERN.test(pathname);

@@ -41,6 +41,7 @@ import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
+import { ProfileContent } from '../../profile-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from './store-classic-icons';
 import { AddToCartButton } from '../../cart-button';
@@ -987,6 +988,7 @@ export function StoreClassicView({
   const checkoutSection = sections.find((s) => s.type === 'checkout');
   const ordersSection = sections.find((s) => s.type === 'orders');
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
+  const profileSection = sections.find((s) => s.type === 'profile');
   const pageBannerLabel = checkoutSection
     ? 'Checkout'
     : cartSection
@@ -995,7 +997,9 @@ export function StoreClassicView({
         ? 'Daftar Transaksi'
         : orderDetailSection
           ? 'Status Pesanan'
-          : undefined;
+          : profileSection
+            ? 'Profil Saya'
+            : undefined;
 
   const toLink = (page: NavPage): HeaderNavLink => ({
     href: websiteSlug !== undefined ? buildPageHref(websiteSlug, page) : '#',
@@ -1241,6 +1245,9 @@ export function StoreClassicView({
               }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+              }
+              case 'profile': {
+                return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
