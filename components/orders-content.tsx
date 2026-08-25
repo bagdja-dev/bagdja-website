@@ -381,10 +381,10 @@ function TransactionCard({ row, basePath }: { row: WebsiteTransactionRow; basePa
         </span>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <a
           href={detailHref}
-          className="flex flex-shrink-0 items-center gap-4 sm:max-w-md sm:flex-1"
+          className="flex min-w-0 items-center gap-4 sm:max-w-md"
         >
           <div
             className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border"
@@ -422,7 +422,7 @@ function TransactionCard({ row, basePath }: { row: WebsiteTransactionRow; basePa
           </div>
         </a>
 
-        <div className="flex flex-col items-start justify-between gap-3 sm:items-end sm:gap-4">
+        <div className="flex flex-col items-start gap-3 sm:shrink-0 sm:items-end sm:gap-3">
           <div className="text-right">
             <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
               Total

@@ -1267,6 +1267,7 @@ export function BarberClassicView({
                     basePath={websiteSlug ?? ''}
                     websiteId={websiteId}
                     initialOrderIds={orderIds}
+                    locations={locations}
                   />
                 );
               }

@@ -4,23 +4,28 @@
  * Konten halaman Checkout — client component, dirender DI DALAM template
  * (section type `checkout`) supaya header/footer/theme konsisten.
  *
- * Berisi:
- * - Detail pemesanan: produk (foto, nama, deskripsi, qty, harga).
- * - Form alamat pengiriman (input baru): penerima, no. HP, alamat, kota,
- *   kecamatan, kode pos.
- * - Pilihan kurir (input baru): JNE / J&T / SiCepat / GoSend / AnterAja /
- *   Lainnya.
- * - Ringkasan + tombol bayar.
+ * DUA FLOW, tergantung apakah website ini punya lokasi "shippable" (sudah
+ * diisi `shipping_area_name` lewat admin > Lokasi) — lihat
+ * plan/website-builder/integration-check-shipping-plan.md Fase 3:
  *
- * Sumber item: draft order server (`GET /api/orders?cart=true`, difilter
- * di website-api) — SATU-SATUNYA sumber kebenaran (revisi 2026-08-24, lihat
- * cart-content.tsx untuk root cause fallback lokal yang dihapus). Submit:
- * POST /api/transactions/checkout (BFF) → website-api buat transaksi +
- * escrow/payment → redirect checkoutUrl. Alamat + kurir dikirim dan
- * disimpan server ke `transaction`.
+ * - `shippableLocations.length === 0` → flow LAMA dipertahankan apa adanya
+ *   (kota/kecamatan free-text, tombol label kurir statis, ongkir "ditentukan
+ *   penjual") — backward-compat wajib untuk tenant yang belum setup.
+ * - `shippableLocations.length >= 1` → flow BARU: search-select tujuan,
+ *   pilih lokasi asal (disembunyikan kalau cuma 1 lokasi shippable), cek
+ *   ongkir real-time (`POST /api/shipping/cost`), pilih kurir dari hasil
+ *   nyata, ongkir ikut ditagih (`shipping_cost`) — cost yang di-charge tetap
+ *   divalidasi ULANG server-side saat submit (lihat transactions.service.ts).
+ *
+ * Sumber item: draft order server (`GET /api/orders?cart=true`) — SATU-
+ * SATUNYA sumber kebenaran (revisi 2026-08-24). Submit: POST
+ * /api/transactions/checkout (BFF) → website-api buat transaksi +
+ * escrow/payment → redirect checkoutUrl.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { ShippingAreaSearch, type ShippingAreaValue } from './shipping-area-search';
+import type { LocationItem } from '../lib/template-data';
 
 interface DraftProduct {
   name?: string;
@@ -46,11 +51,21 @@ interface ShippingForm {
   recipient_name: string;
   phone: string;
   address: string;
+  /** Flow lama saja (free-text) — flow baru pakai `destinationArea`. */
   city: string;
   district: string;
   postal_code: string;
 }
 
+interface ShippingCostOption {
+  courierCode: string;
+  serviceName: string;
+  cost: number;
+  etdMinDays?: number;
+  etdMaxDays?: number;
+}
+
+/** Flow lama saja — dipakai kalau website belum punya lokasi shippable. */
 const COURIERS = ['JNE', 'J&T', 'SiCepat', 'GoSend', 'AnterAja', 'Lainnya'] as const;
 
 const EMPTY_SHIPPING: ShippingForm = {
@@ -70,11 +85,13 @@ export function CheckoutContent({
   basePath,
   websiteId,
   initialOrderIds = [],
+  locations = [],
 }: {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
   websiteId: string;
   initialOrderIds?: string[];
+  locations?: LocationItem[];
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +100,27 @@ export function CheckoutContent({
 
   const [shipping, setShipping] = useState<ShippingForm>(EMPTY_SHIPPING);
   const [courier, setCourier] = useState<string | null>(null);
+
+  // ─── Flow baru: lokasi asal + tujuan search-select + cost real ──────────
+  const shippableLocations = useMemo(
+    () => locations.filter((l) => l.shippingEnabled),
+    [locations],
+  );
+  const shippingEnabled = shippableLocations.length > 0;
+
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [destinationArea, setDestinationArea] = useState<ShippingAreaValue | null>(null);
+  const [costOptions, setCostOptions] = useState<ShippingCostOption[] | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
+  const [selectedCourierOption, setSelectedCourierOption] = useState<ShippingCostOption | null>(null);
+
+  // Cuma 1 lokasi shippable → auto-pakai, jangan tampilkan picker (poin #1).
+  useEffect(() => {
+    if (shippableLocations.length === 1) {
+      setSelectedLocationId(shippableLocations[0].id);
+    }
+  }, [shippableLocations]);
 
   const loadDrafts = useCallback(async () => {
     setDraftsError(false);
@@ -141,7 +179,68 @@ export function CheckoutContent({
     [draftOrders],
   );
 
-  const total = displayItems.reduce((acc, d) => acc + d.price * d.qty, 0);
+  const subtotal = displayItems.reduce((acc, d) => acc + d.price * d.qty, 0);
+  const shippingCost = shippingEnabled ? selectedCourierOption?.cost ?? 0 : 0;
+  const total = subtotal + shippingCost;
+
+  const orderIdsKey = useMemo(
+    () => draftOrders.map((o) => o.id).slice().sort().join(','),
+    [draftOrders],
+  );
+
+  // Cek ongkir real-time begitu lokasi + tujuan + item terpilih siap.
+  useEffect(() => {
+    if (!shippingEnabled) return;
+    if (!selectedLocationId || !destinationArea || draftOrders.length === 0) {
+      setCostOptions(null);
+      setSelectedCourierOption(null);
+      setCostError(null);
+      return;
+    }
+    let cancelled = false;
+    setCostLoading(true);
+    setCostError(null);
+    (async () => {
+      try {
+        const res = await fetch('/api/shipping/cost', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            websiteId,
+            order_ids: draftOrders.map((o) => o.id),
+            location_id: selectedLocationId,
+            destination_area_id: destinationArea.id,
+          }),
+        });
+        const json = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok) {
+          setCostOptions(null);
+          setSelectedCourierOption(null);
+          setCostError(json?.message ?? 'Gagal menghitung ongkir untuk tujuan ini.');
+          return;
+        }
+        const options: ShippingCostOption[] = Array.isArray(json) ? json : [];
+        setCostOptions(options);
+        setSelectedCourierOption((prev) => {
+          const stillValid = prev && options.find((o) => o.courierCode === prev.courierCode);
+          return stillValid ? (stillValid as ShippingCostOption) : null;
+        });
+      } catch {
+        if (!cancelled) {
+          setCostOptions(null);
+          setSelectedCourierOption(null);
+          setCostError('Layanan pengiriman tidak bisa dihubungi, coba lagi.');
+        }
+      } finally {
+        if (!cancelled) setCostLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shippingEnabled, selectedLocationId, destinationArea?.id, orderIdsKey, websiteId]);
 
   // Validasi: item terpilih harus ketemu semua (kalau ada yang sudah
   // di-checkout/dihapus, backend menolak).
@@ -155,19 +254,20 @@ export function CheckoutContent({
 
   // Validasi client: data pengiriman wajib lengkap sebelum bayar.
   const shippingInvalid = useMemo(() => {
-    return !(
-      shipping.recipient_name.trim() &&
-      shipping.phone.trim() &&
-      shipping.address.trim() &&
-      shipping.city.trim()
+    const baseValid = Boolean(
+      shipping.recipient_name.trim() && shipping.phone.trim() && shipping.address.trim(),
     );
-  }, [shipping]);
+    if (shippingEnabled) {
+      return !(baseValid && destinationArea);
+    }
+    return !(baseValid && shipping.city.trim());
+  }, [shipping, shippingEnabled, destinationArea]);
 
   const canPay =
     hasAnyItem &&
     !missingSelection &&
     !shippingInvalid &&
-    Boolean(courier) &&
+    (shippingEnabled ? Boolean(selectedCourierOption) : Boolean(courier)) &&
     !loading;
 
   if (draftsLoading) {
@@ -225,21 +325,33 @@ export function CheckoutContent({
     setError(null);
     try {
       const orderIds = draftOrders.map((o) => o.id);
+      const payload: Record<string, unknown> = {
+        order_ids: orderIds,
+        shipping_address: {
+          recipient_name: shipping.recipient_name.trim(),
+          phone: shipping.phone.trim(),
+          address: shipping.address.trim(),
+          city: shippingEnabled ? destinationArea?.name : shipping.city.trim(),
+          district: shippingEnabled ? undefined : shipping.district.trim() || undefined,
+          postal_code: shipping.postal_code.trim() || undefined,
+        },
+      };
+      if (shippingEnabled && selectedCourierOption && selectedLocationId && destinationArea) {
+        payload.shipping = {
+          location_id: selectedLocationId,
+          destination_area_id: destinationArea.id,
+          destination_area_name: destinationArea.name,
+          courier_code: selectedCourierOption.courierCode,
+          courier_service_name: selectedCourierOption.serviceName,
+        };
+      } else {
+        payload.courier = courier;
+      }
+
       const res = await fetch('/api/transactions/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_ids: orderIds,
-          shipping_address: {
-            recipient_name: shipping.recipient_name.trim(),
-            phone: shipping.phone.trim(),
-            address: shipping.address.trim(),
-            city: shipping.city.trim(),
-            district: shipping.district.trim() || undefined,
-            postal_code: shipping.postal_code.trim() || undefined,
-          },
-          courier,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -330,6 +442,47 @@ export function CheckoutContent({
             </div>
           </section>
 
+          {/* Lokasi asal pengiriman — cuma tampil kalau >1 lokasi shippable (poin #1) */}
+          {shippingEnabled && shippableLocations.length > 1 && (
+            <section>
+              <h2
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Kirim Dari
+              </h2>
+              <div
+                className="mt-4 grid grid-cols-1 gap-2 rounded-xl border p-5 sm:grid-cols-2"
+                style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+              >
+                {shippableLocations.map((loc) => {
+                  const active = selectedLocationId === loc.id;
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => setSelectedLocationId(loc.id)}
+                      aria-pressed={active}
+                      className="rounded-lg border-2 px-3 py-2.5 text-left text-sm font-medium transition-colors hover:opacity-80"
+                      style={{
+                        borderColor: active ? 'var(--brand-accent)' : 'var(--brand-border)',
+                        backgroundColor: 'var(--brand-bg)',
+                        color: 'var(--brand-text)',
+                      }}
+                    >
+                      {loc.name}
+                      {loc.city && (
+                        <span className="mt-0.5 block text-xs" style={{ color: 'var(--brand-muted)' }}>
+                          {loc.city}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Alamat pengiriman */}
           <section>
             <h2
@@ -381,32 +534,42 @@ export function CheckoutContent({
                   style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
                 />
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  Kota/Kabupaten <span style={{ color: 'var(--brand-accent)' }}>*</span>
-                </span>
-                <input
-                  type="text"
-                  value={shipping.city}
-                  onChange={(e) => setField('city', e.target.value)}
-                  placeholder="Kota"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  Kecamatan
-                </span>
-                <input
-                  type="text"
-                  value={shipping.district}
-                  onChange={(e) => setField('district', e.target.value)}
-                  placeholder="Kecamatan (opsional)"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
+
+              {shippingEnabled ? (
+                <div className="sm:col-span-2">
+                  <ShippingAreaSearch value={destinationArea} onChange={setDestinationArea} />
+                </div>
+              ) : (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                    Kota/Kabupaten <span style={{ color: 'var(--brand-accent)' }}>*</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={shipping.city}
+                    onChange={(e) => setField('city', e.target.value)}
+                    placeholder="Kota"
+                    className={inputClass()}
+                    style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                  />
+                </label>
+              )}
+
+              {!shippingEnabled && (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                    Kecamatan
+                  </span>
+                  <input
+                    type="text"
+                    value={shipping.district}
+                    onChange={(e) => setField('district', e.target.value)}
+                    placeholder="Kecamatan (opsional)"
+                    className={inputClass()}
+                    style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                  />
+                </label>
+              )}
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
                   Kode Pos
@@ -432,35 +595,95 @@ export function CheckoutContent({
             >
               Kurir Pengiriman
             </h2>
-            <div
-              className="mt-4 grid grid-cols-2 gap-2 rounded-xl border p-5 sm:grid-cols-3"
-              style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
-            >
-              {COURIERS.map((c) => {
-                const active = courier === c;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCourier(c)}
-                    aria-pressed={active}
-                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                      active ? '' : 'hover:opacity-80'
-                    }`}
-                    style={{
-                      borderColor: active ? 'var(--brand-accent)' : 'var(--brand-border)',
-                      backgroundColor: 'var(--brand-bg)',
-                      color: 'var(--brand-text)',
-                    }}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
-              Biaya ongkir ditentukan penjual setelah pesanan diproses.
-            </p>
+
+            {shippingEnabled ? (
+              <div
+                className="mt-4 rounded-xl border p-5"
+                style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+              >
+                {!selectedLocationId || !destinationArea ? (
+                  <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                    Isi kota/kecamatan tujuan dulu untuk lihat pilihan kurir & ongkir.
+                  </p>
+                ) : costLoading ? (
+                  <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                    Menghitung ongkir…
+                  </p>
+                ) : costError ? (
+                  <p className="text-xs" style={{ color: 'crimson' }}>
+                    {costError}
+                  </p>
+                ) : costOptions && costOptions.length > 0 ? (
+                  <div className="grid gap-2">
+                    {costOptions.map((opt) => {
+                      const active = selectedCourierOption?.courierCode === opt.courierCode &&
+                        selectedCourierOption?.serviceName === opt.serviceName;
+                      return (
+                        <button
+                          key={`${opt.courierCode}-${opt.serviceName}`}
+                          type="button"
+                          onClick={() => setSelectedCourierOption(opt)}
+                          aria-pressed={active}
+                          className="flex items-center justify-between rounded-lg border-2 px-4 py-3 text-left text-sm transition-colors hover:opacity-80"
+                          style={{
+                            borderColor: active ? 'var(--brand-accent)' : 'var(--brand-border)',
+                            backgroundColor: 'var(--brand-bg)',
+                            color: 'var(--brand-text)',
+                          }}
+                        >
+                          <span>
+                            <span className="font-semibold uppercase">{opt.courierCode}</span>{' '}
+                            {opt.serviceName}
+                            {(opt.etdMinDays || opt.etdMaxDays) && (
+                              <span className="ml-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                                Estimasi {opt.etdMinDays ?? '?'}-{opt.etdMaxDays ?? '?'} hari
+                              </span>
+                            )}
+                          </span>
+                          <span className="font-bold">Rp {opt.cost.toLocaleString('id-ID')}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                    Tidak ada kurir tersedia untuk tujuan ini.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <div
+                  className="mt-4 grid grid-cols-2 gap-2 rounded-xl border p-5 sm:grid-cols-3"
+                  style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+                >
+                  {COURIERS.map((c) => {
+                    const active = courier === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCourier(c)}
+                        aria-pressed={active}
+                        className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                          active ? '' : 'hover:opacity-80'
+                        }`}
+                        style={{
+                          borderColor: active ? 'var(--brand-accent)' : 'var(--brand-border)',
+                          backgroundColor: 'var(--brand-bg)',
+                          color: 'var(--brand-text)',
+                        }}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                  Biaya ongkir ditentukan penjual setelah pesanan diproses.
+                </p>
+              </>
+            )}
           </section>
         </div>
 
@@ -479,11 +702,17 @@ export function CheckoutContent({
                   ? `${displayItems.length} item`
                   : `${displayItems[0]?.qty} × ${displayItems[0]?.name ?? 'Produk'}`}
               </dt>
-              <dd className="font-semibold">Rp {total.toLocaleString('id-ID')}</dd>
+              <dd className="font-semibold">Rp {subtotal.toLocaleString('id-ID')}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt style={{ color: 'var(--brand-muted)' }}>Ongkir</dt>
-              <dd style={{ color: 'var(--brand-muted)' }}>Ditentukan penjual</dd>
+              <dd style={{ color: selectedCourierOption ? undefined : 'var(--brand-muted)' }}>
+                {shippingEnabled
+                  ? selectedCourierOption
+                    ? `Rp ${selectedCourierOption.cost.toLocaleString('id-ID')}`
+                    : 'Pilih kurir dulu'
+                  : 'Ditentukan penjual'}
+              </dd>
             </div>
             <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--brand-border)' }}>
               <dt className="font-semibold">Total</dt>
@@ -503,10 +732,17 @@ export function CheckoutContent({
 
           {shippingInvalid && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
-              Lengkapi alamat pengiriman (nama, HP, alamat, kota) dulu.
+              {shippingEnabled
+                ? 'Lengkapi alamat pengiriman (nama, HP, alamat, kota/kecamatan tujuan) dulu.'
+                : 'Lengkapi alamat pengiriman (nama, HP, alamat, kota) dulu.'}
             </p>
           )}
-          {!shippingInvalid && !courier && (
+          {!shippingInvalid && shippingEnabled && !selectedCourierOption && (
+            <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
+              Pilih kurir pengiriman dulu.
+            </p>
+          )}
+          {!shippingInvalid && !shippingEnabled && !courier && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
               Pilih kurir pengiriman dulu.
             </p>

@@ -1235,6 +1235,7 @@ export function StoreClassicView({
                     basePath={websiteSlug ?? ''}
                     websiteId={websiteId}
                     initialOrderIds={orderIds}
+                    locations={locations}
                   />
                 );
               }

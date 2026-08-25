@@ -61,6 +61,8 @@ export interface LocationItem {
   mapsUrl?: string;
   latitude?: number | string;
   longitude?: number | string;
+  /** true = lokasi ini bisa dipilih buyer sebagai asal pengiriman saat checkout (lihat CheckoutContent). */
+  shippingEnabled: boolean;
 }
 
 export interface FaqItem {
@@ -334,6 +336,7 @@ export function toLocationItem(location: ApiWebsiteLocation): LocationItem {
     whatsapp: location.whatsapp ?? undefined,
     openingHoursNote: typeof note === 'string' ? note : undefined,
     mapsUrl: location.maps_url ?? undefined,
+    shippingEnabled: Boolean(location.shipping_enabled),
   };
 }
 

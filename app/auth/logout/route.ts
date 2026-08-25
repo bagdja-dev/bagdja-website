@@ -23,6 +23,6 @@ export async function GET(request: NextRequest) {
   ssoLogoutUrl.searchParams.set('redirect_uri', `${origin}${safeReturnTo}`);
 
   const response = NextResponse.redirect(ssoLogoutUrl.toString());
-  clearSessionCookies(response);
+  clearSessionCookies(response, origin);
   return response;
 }

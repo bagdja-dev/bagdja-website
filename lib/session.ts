@@ -28,6 +28,18 @@
  * redirect kedua (lihat app/auth/callback/route.ts). `getCookieDomain()`
  * menurunkan suffix ini dari env yang sama dipakai middleware.ts (PLATFORM_HOST)
  * supaya konsisten satu sumber kebenaran.
+ *
+ * BUG (25 Agustus 2026): `Domain` attribute harus domain-match host yang
+ * BENAR-BENAR melayani response (RFC 6265) — kalau tidak, browser DIAM-DIAM
+ * membuang seluruh `Set-Cookie` itu (bukan error yang kelihatan). Dulu
+ * `getCookieDomain()` selalu pakai `NEXT_PUBLIC_PLATFORM_URL` apa pun host
+ * request sebenarnya, jadi begitu app dijalankan di `localhost:5005` dengan
+ * `.env` yang masih berisi nilai production (`sites.bagdja.com`), cookie sesi
+ * SELALU dibuang browser — OAuth di server sukses, tapi UI tetap "guest"
+ * selamanya. Sekarang `getCookieOptions()` terima hostname TUJUAN response
+ * (dari `resolveOrigin`/origin login) dan skip `domain` attribute sama sekali
+ * kalau hostname itu local (lihat `LOCAL_HOSTS`, sama seperti middleware.ts)
+ * — jadi perilaku lokal tidak lagi bergantung isi `NEXT_PUBLIC_PLATFORM_URL`.
  */
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
@@ -35,7 +47,12 @@ import type { NextResponse } from 'next/server';
 const TOKEN_COOKIE = 'site_token';
 const USER_COOKIE = 'site_user';
 
-function getCookieDomain(): string | undefined {
+/** Sama seperti middleware.ts — host dev lokal, tidak pernah domain-match subdomain wildcard produksi. */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+function getCookieDomain(targetHostname: string): string | undefined {
+  if (LOCAL_HOSTS.has(targetHostname)) return undefined;
+
   const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_URL;
   if (!platformUrl) return undefined;
   try {
@@ -45,14 +62,17 @@ function getCookieDomain(): string | undefined {
   }
 }
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-  maxAge: 60 * 60 * 24, // 24 hours
-  domain: getCookieDomain(),
-};
+/** `targetHostname` = host yang benar-benar akan menerima response ini (lihat catatan BUG di atas) — WAJIB diisi benar, jangan diasumsikan dari env. */
+function getCookieOptions(targetHostname: string) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 60 * 60 * 24, // 24 hours
+    domain: getCookieDomain(targetHostname),
+  };
+}
 
 export interface SessionUser {
   userId: string;
@@ -62,28 +82,41 @@ export interface SessionUser {
   avatar?: string;
 }
 
-/** Attach cookie sesi ke response yang akan di-return Route Handler. */
+/**
+ * Attach cookie sesi ke response yang akan di-return Route Handler.
+ * `targetOrigin` = origin (scheme+host) yang BENAR-BENAR akan menerima
+ * response ini — di callback route ini `decoded.origin ?? request.nextUrl.origin`,
+ * BUKAN `request.url` (yang selalu host `redirect_uri` OAuth tetap). Dari
+ * sinilah `Domain` attribute cookie diputuskan (lihat catatan BUG di atas).
+ */
 export function setSessionCookies(
   response: NextResponse,
   token: string,
   user: SessionUser,
+  targetOrigin: string,
 ): void {
-  response.cookies.set(TOKEN_COOKIE, token, COOKIE_OPTIONS);
+  const hostname = new URL(targetOrigin).hostname;
+  const cookieOptions = getCookieOptions(hostname);
+  response.cookies.set(TOKEN_COOKIE, token, cookieOptions);
   response.cookies.set(USER_COOKIE, JSON.stringify(user), {
-    ...COOKIE_OPTIONS,
+    ...cookieOptions,
     httpOnly: false, // client needs to read user info
   });
-  console.log(`[session] setSessionCookies OK userId=${user.userId}`);
+  console.log(
+    `[session] setSessionCookies OK userId=${user.userId} targetHostname=${hostname} domain=${cookieOptions.domain ?? '(host-only)'}`,
+  );
 }
 
-/** Hapus cookie sesi dari response yang akan di-return Route Handler. */
-export function clearSessionCookies(response: NextResponse): void {
+/** Hapus cookie sesi dari response yang akan di-return Route Handler. `targetOrigin` — lihat catatan `setSessionCookies`. */
+export function clearSessionCookies(response: NextResponse, targetOrigin: string): void {
+  const hostname = new URL(targetOrigin).hostname;
+  const cookieOptions = getCookieOptions(hostname);
   // Delete via .set(..., maxAge: 0) dengan domain/path yang SAMA persis
   // dengan saat di-set — .delete(name) tanpa domain tidak akan match cookie
   // yang di-set dengan Domain attribute (browser treat sebagai cookie beda).
-  response.cookies.set(TOKEN_COOKIE, '', { ...COOKIE_OPTIONS, maxAge: 0 });
+  response.cookies.set(TOKEN_COOKIE, '', { ...cookieOptions, maxAge: 0 });
   response.cookies.set(USER_COOKIE, '', {
-    ...COOKIE_OPTIONS,
+    ...cookieOptions,
     httpOnly: false,
     maxAge: 0,
   });

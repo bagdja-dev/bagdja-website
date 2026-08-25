@@ -133,6 +133,8 @@ export interface ApiWebsiteLocation {
   maps_url: string | null;
   maps_embed: string | null;
   sort_order: number;
+  /** true kalau lokasi ini punya `shipping_area_name` terisi — bisa dipilih buyer sebagai asal pengiriman saat checkout. */
+  shipping_enabled: boolean;
 }
 
 export interface ApiWebsiteFaq {

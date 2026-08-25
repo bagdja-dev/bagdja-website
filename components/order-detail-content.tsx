@@ -63,6 +63,34 @@ export interface OrderFulfillmentProgress {
   steps: OrderFulfillmentStepProgress[];
 }
 
+/** Tersimpan di `transaction.metadata.shipping` — hanya ada kalau checkout lewat flow baru (search-select + cek ongkir real, bukan tombol label statis). */
+export interface TransactionShippingMetadata {
+  location_id: string;
+  destination_area_id: string;
+  destination_area_name?: string;
+  courier_code: string;
+  courier_service_name?: string;
+  /** Nama layanan hasil resolve server-side saat submit — sumber kebenaran tampilan kalau `courier_service_name` kosong. */
+  resolved_service?: string;
+}
+
+/** Kode kurir (mis. 'jne') → label tampilan (mis. 'JNE'). Fallback: uppercase kode aslinya kalau tidak dikenali. */
+const COURIER_LABELS: Record<string, string> = {
+  jne: 'JNE',
+  jnt: 'J&T Express',
+  sicepat: 'SiCepat',
+  pos: 'Pos Indonesia',
+  tiki: 'TIKI',
+  anteraja: 'AnterAja',
+  wahana: 'Wahana',
+  ninja: 'Ninja Xpress',
+  lion: 'Lion Parcel',
+  sap: 'SAP Express',
+};
+function formatCourierCode(code: string): string {
+  return COURIER_LABELS[code.toLowerCase()] ?? code.toUpperCase();
+}
+
 export interface TransactionDetail {
   id: string;
   website_id: string;
@@ -73,6 +101,8 @@ export interface TransactionDetail {
   district: string | null;
   postal_code: string | null;
   courier: string | null;
+  /** Biaya ongkir — kolom terpisah dari total_amount. Selalu berisi angka (default 0), BUKAN indikator "ongkir belum ditentukan" — pakai `metadata.shipping` untuk itu. */
+  shipping_cost?: number | null;
   total_amount: number;
   currency: string;
   payment_mode: 'ADD_TO_CART' | 'ESCROW';
@@ -84,6 +114,7 @@ export interface TransactionDetail {
   items?: TransactionItem[];
   /** `{ order_id: progress }` — hanya ada di response detail. */
   fulfillment?: Record<string, OrderFulfillmentProgress>;
+  metadata?: { shipping?: TransactionShippingMetadata } | null;
 }
 
 export interface OrderDetail {
@@ -150,6 +181,12 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
       .join(', '),
     transaction.postal_code,
   ].filter((line): line is string => Boolean(line));
+
+  // `metadata.shipping` cuma ada kalau checkout lewat flow baru (cek ongkir
+  // real) — transaksi lama (tombol label statis) tidak punya ini sama sekali.
+  const shippingDetail = transaction.metadata?.shipping ?? null;
+  const itemsSubtotal = items.reduce((sum, i) => sum + Number(i.total_amount), 0);
+  const shippingCost = transaction.shipping_cost ?? 0;
 
   const statusLabel = STATUS_LABEL[transaction.status] ?? transaction.status;
   // Backend menormalisasi status escrow `PENDING` -> `PENDING_PAYMENT` saat
@@ -270,7 +307,7 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
             />
           )}
 
-          {transaction.courier && (
+          {(transaction.courier || shippingDetail) && (
             <section>
               <h2
                 className="text-sm font-bold uppercase tracking-wide"
@@ -278,12 +315,33 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
               >
                 Kurir Pengiriman
               </h2>
-              <div
-                className="mt-4 inline-flex rounded-lg border-2 px-4 py-2.5 text-sm font-medium"
-                style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'var(--brand-bg)' }}
-              >
-                {transaction.courier}
-              </div>
+              {shippingDetail ? (
+                <div
+                  className="mt-4 space-y-2 rounded-xl border p-5 text-sm"
+                  style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+                >
+                  <Row
+                    label="Kurir"
+                    value={
+                      formatCourierCode(shippingDetail.courier_code) +
+                      (shippingDetail.courier_service_name || shippingDetail.resolved_service
+                        ? ` — ${shippingDetail.courier_service_name ?? shippingDetail.resolved_service}`
+                        : '')
+                    }
+                  />
+                  <Row label="Biaya Ongkir" value={`Rp ${shippingCost.toLocaleString('id-ID')}`} />
+                  {shippingDetail.destination_area_name && (
+                    <Row label="Area Tujuan" value={shippingDetail.destination_area_name} />
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="mt-4 inline-flex rounded-lg border-2 px-4 py-2.5 text-sm font-medium"
+                  style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'var(--brand-bg)' }}
+                >
+                  {transaction.courier}
+                </div>
+              )}
             </section>
           )}
         </div>
@@ -300,7 +358,13 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
             <div className="flex items-center justify-between gap-3">
               <dt style={{ color: 'var(--brand-muted)' }}>{items.length} item</dt>
               <dd className="font-semibold">
-                Rp {transaction.total_amount.toLocaleString('id-ID')}
+                Rp {itemsSubtotal.toLocaleString('id-ID')}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt style={{ color: 'var(--brand-muted)' }}>Ongkir</dt>
+              <dd className="font-semibold">
+                {shippingDetail ? `Rp ${shippingCost.toLocaleString('id-ID')}` : 'Ditentukan penjual'}
               </dd>
             </div>
             <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--brand-border)' }}>

@@ -76,12 +76,17 @@ export async function GET(request: NextRequest) {
 
     // Cookie di-attach LANGSUNG ke response ini (bukan lewat cookies()
     // ambient) — lihat catatan di lib/session.ts kenapa ini penting.
-    setSessionCookies(response, accessToken, {
-      userId: payload.sub ?? payload.userId,
-      email: payload.email,
-      username: payload.username,
-      avatar: payload.picture ?? payload.avatar,
-    });
+    setSessionCookies(
+      response,
+      accessToken,
+      {
+        userId: payload.sub ?? payload.userId,
+        email: payload.email,
+        username: payload.username,
+        avatar: payload.picture ?? payload.avatar,
+      },
+      origin,
+    );
 
     // Sync user ke Website API DB (upsert users table)
     await syncUserToBackend(accessToken);
