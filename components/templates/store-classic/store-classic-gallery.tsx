@@ -5,17 +5,57 @@ import { useEffect, useRef, useState, type MouseEvent, type TouchEvent } from 'r
 const SWIPE_THRESHOLD_PX = 40;
 const ZOOM_SCALE = 2.2;
 
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, SearchIcon } from './store-classic-icons';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  CubeIcon,
+  FullscreenIcon,
+  PlayIcon,
+  SearchIcon,
+} from './store-classic-icons';
+import { ModelViewerElement } from '../../model-viewer-element';
 
-/** Galeri produk: gambar utama besar + strip thumbnail — dipakai di halaman detail produk. */
-export function StoreClassicProductGallery({ images }: { images: string[] }) {
+interface Slide {
+  type: 'image' | 'video' | 'model';
+  url: string;
+}
+
+/**
+ * Galeri produk: gambar utama besar + strip thumbnail — dipakai di halaman
+ * detail produk. Video/model 3D (opsional, masing-masing satu) jadi slide
+ * tambahan di akhir — thumbnail-nya tampil sama seperti foto, diklik
+ * seperti biasa, cuma area preview-nya berubah sesuai tipe slide (pemutar
+ * video / viewer 3D interaktif, bukan zoom gambar) begitu slide itu aktif.
+ * Tombol di pojok kanan-bawah preview berubah jadi "fullscreen" untuk
+ * slide video/model — keduanya membuka lightbox yang sama, cuma isinya
+ * beda. Swipe/drag di slide model dipakai model-viewer sendiri untuk
+ * rotate, bukan navigasi slide — makanya touch handler navigasi di-skip
+ * saat slide itu aktif.
+ */
+export function StoreClassicProductGallery({
+  images,
+  videoUrl,
+  model3dUrl,
+}: {
+  images: string[];
+  videoUrl?: string;
+  model3dUrl?: string;
+}) {
+  const slides: Slide[] = [
+    ...images.map((url): Slide => ({ type: 'image', url })),
+    ...(videoUrl ? [{ type: 'video', url: videoUrl } as Slide] : []),
+    ...(model3dUrl ? [{ type: 'model', url: model3dUrl } as Slide] : []),
+  ];
+
   const [index, setIndex] = useState(0);
   const [isZooming, setIsZooming] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
-  const count = images.length;
+  const count = slides.length;
+  const current = slides[index];
   const goTo = (next: number) => setIndex(((next % count) + count) % count);
   const goPrev = () => goTo(index - 1);
   const goNext = () => goTo(index + 1);
@@ -56,65 +96,129 @@ export function StoreClassicProductGallery({ images }: { images: string[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLightboxOpen, index]);
 
-  if (!images.length) return null;
+  if (!slides.length) return null;
+
+  const isInteractive3d = current.type === 'model';
 
   return (
     <div className={`grid gap-3 ${count > 1 ? 'sm:grid-cols-[80px_1fr]' : ''}`}>
       {count > 1 && (
         <div className="order-2 flex gap-2 overflow-x-auto sm:order-1 sm:flex-col sm:overflow-visible">
-          {images.map((url, i) => (
+          {slides.map((slide, i) => (
             <button
               key={i}
               type="button"
               onClick={() => goTo(i)}
-              className="shrink-0 overflow-hidden rounded-lg border-2 transition-opacity"
+              className="relative shrink-0 overflow-hidden rounded-lg border-2 transition-opacity"
               style={{
                 borderColor: i === index ? 'var(--brand-accent)' : 'var(--brand-border)',
                 opacity: i === index ? 1 : 0.7,
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-16 w-16 object-cover sm:h-20 sm:w-20" />
+              {slide.type === 'video' && (
+                <>
+                  <video
+                    src={slide.url}
+                    className="h-16 w-16 object-cover sm:h-20 sm:w-20"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                    <PlayIcon />
+                  </span>
+                </>
+              )}
+              {slide.type === 'model' && (
+                <>
+                  <ModelViewerElement
+                    src={slide.url}
+                    className="pointer-events-none h-16 w-16 sm:h-20 sm:w-20"
+                    cameraControls={false}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                    <CubeIcon />
+                  </span>
+                </>
+              )}
+              {slide.type === 'image' && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={slide.url} alt="" className="h-16 w-16 object-cover sm:h-20 sm:w-20" />
+              )}
             </button>
           ))}
         </div>
       )}
 
       <div
-        className="relative order-1 cursor-zoom-in overflow-hidden rounded-xl sm:order-2"
+        className={`relative order-1 overflow-hidden rounded-xl sm:order-2 ${
+          current.type === 'image' ? 'cursor-zoom-in' : ''
+        }`}
         style={{ backgroundColor: 'var(--brand-surface)' }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onMouseEnter={() => setIsZooming(true)}
+        onTouchStart={isInteractive3d ? undefined : handleTouchStart}
+        onTouchEnd={isInteractive3d ? undefined : handleTouchEnd}
+        onMouseEnter={() => current.type === 'image' && setIsZooming(true)}
         onMouseLeave={() => setIsZooming(false)}
-        onMouseMove={handleMouseMove}
-        onClick={() => setIsLightboxOpen(true)}
+        onMouseMove={current.type === 'image' ? handleMouseMove : undefined}
+        onClick={() => current.type === 'image' && setIsLightboxOpen(true)}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[index]} alt="" className="aspect-square w-full object-cover" />
+        {current.type === 'video' && (
+          <video
+            key={current.url}
+            src={current.url}
+            className="aspect-square w-full object-cover"
+            controls
+            autoPlay
+            loop
+            playsInline
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        {current.type === 'model' && (
+          <ModelViewerElement
+            key={current.url}
+            src={current.url}
+            className="aspect-square w-full"
+            cameraControls
+            autoRotate
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        {current.type === 'image' && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={current.url} alt="" className="aspect-square w-full object-cover" />
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 transition-opacity duration-150 ${
+                isZooming ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={{
+                backgroundImage: `url(${current.url})`,
+                backgroundSize: `${ZOOM_SCALE * 100}%`,
+                backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
+              }}
+            />
+          </>
+        )}
 
-        <div
-          aria-hidden
-          className={`pointer-events-none absolute inset-0 transition-opacity duration-150 ${
-            isZooming ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={{
-            backgroundImage: `url(${images[index]})`,
-            backgroundSize: `${ZOOM_SCALE * 100}%`,
-            backgroundPosition: `${zoomPos.x}% ${zoomPos.y}%`,
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsLightboxOpen(true);
           }}
-        />
-
-        <div
-          className="pointer-events-none absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-opacity duration-150"
+          aria-label={current.type === 'image' ? 'Perbesar gambar' : 'Fullscreen'}
+          className="pointer-events-auto absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-opacity duration-150"
           style={{
             backgroundColor: 'var(--brand-bg)',
             color: 'var(--brand-text)',
-            opacity: isZooming ? 1 : 0.85,
+            opacity: current.type !== 'image' || isZooming ? 1 : 0.85,
           }}
         >
-          <SearchIcon />
-        </div>
+          {current.type === 'image' ? <SearchIcon /> : <FullscreenIcon />}
+        </button>
 
         {count > 1 && (
           <>
@@ -124,7 +228,7 @@ export function StoreClassicProductGallery({ images }: { images: string[] }) {
                 e.stopPropagation();
                 goPrev();
               }}
-              aria-label="Gambar sebelumnya"
+              aria-label="Slide sebelumnya"
               className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
               style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
             >
@@ -136,7 +240,7 @@ export function StoreClassicProductGallery({ images }: { images: string[] }) {
                 e.stopPropagation();
                 goNext();
               }}
-              aria-label="Gambar berikutnya"
+              aria-label="Slide berikutnya"
               className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
               style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
             >
@@ -161,20 +265,43 @@ export function StoreClassicProductGallery({ images }: { images: string[] }) {
           </button>
 
           <div
-            className="relative flex max-h-full max-w-4xl items-center justify-center"
+            className="relative flex h-full max-h-full w-full max-w-4xl items-center justify-center"
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
+            onTouchStart={isInteractive3d ? undefined : handleTouchStart}
+            onTouchEnd={isInteractive3d ? undefined : handleTouchEnd}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={images[index]} alt="" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+            {current.type === 'video' && (
+              <video
+                key={current.url}
+                src={current.url}
+                className="max-h-[85vh] max-w-full rounded-lg object-contain"
+                controls
+                autoPlay
+                loop
+                playsInline
+              />
+            )}
+            {current.type === 'model' && (
+              <ModelViewerElement
+                key={current.url}
+                src={current.url}
+                className="h-[70vh] w-full max-w-full rounded-lg"
+                cameraControls
+                autoRotate
+                ar
+              />
+            )}
+            {current.type === 'image' && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={current.url} alt="" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+            )}
 
             {count > 1 && (
               <>
                 <button
                   type="button"
                   onClick={goPrev}
-                  aria-label="Gambar sebelumnya"
+                  aria-label="Slide sebelumnya"
                   className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:-left-14"
                 >
                   <ChevronLeftIcon />
@@ -182,7 +309,7 @@ export function StoreClassicProductGallery({ images }: { images: string[] }) {
                 <button
                   type="button"
                   onClick={goNext}
-                  aria-label="Gambar berikutnya"
+                  aria-label="Slide berikutnya"
                   className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:-right-14"
                 >
                   <ChevronRightIcon />

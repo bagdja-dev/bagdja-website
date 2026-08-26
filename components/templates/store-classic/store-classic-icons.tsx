@@ -128,3 +128,35 @@ export function SearchIcon() {
     </svg>
   );
 }
+
+export function PlayIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+export function CubeIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+      />
+    </svg>
+  );
+}
+
+export function FullscreenIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8.25 3.75H4.5a.75.75 0 0 0-.75.75v3.75m16.5 0V4.5a.75.75 0 0 0-.75-.75h-3.75m0 16.5h3.75a.75.75 0 0 0 .75-.75v-3.75M3.75 15.75v3.75c0 .414.336.75.75.75h3.75"
+      />
+    </svg>
+  );
+}

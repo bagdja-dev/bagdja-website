@@ -860,8 +860,12 @@ function ProductDetailSection({
   const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      {images.length > 0 && (
-        <BarberClassicGalleryCarousel images={images.map((url) => ({ url }))} />
+      {(images.length > 0 || item.videoUrl || item.model3dUrl) && (
+        <BarberClassicGalleryCarousel
+          images={images.map((url) => ({ url }))}
+          videoUrl={item.videoUrl}
+          model3dUrl={item.model3dUrl}
+        />
       )}
       <h1
         className="mt-8 text-center text-2xl font-semibold sm:text-4xl"

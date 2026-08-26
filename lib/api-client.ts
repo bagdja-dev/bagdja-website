@@ -88,6 +88,8 @@ export interface ApiWebsiteProduct {
   detail: string | null;
   price: number;
   images: string[];
+  video_url?: string | null;
+  model3d_url?: string | null;
   metadata: Record<string, unknown>;
   payment_meta?: PaymentMetaEntry[];
   sort_order: number;

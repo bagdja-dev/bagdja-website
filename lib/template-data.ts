@@ -27,6 +27,10 @@ export interface CatalogItem {
   priceLabel: string;
   image?: string;
   images?: string[];
+  /** Video produk (opsional), diupload lewat bagdja-storage-service. */
+  videoUrl?: string;
+  /** Model 3D produk (opsional, glTF/GLB), diupload lewat bagdja-storage-service. */
+  model3dUrl?: string;
   /** Kalau diisi, produk ini adalah varian (warna/ukuran) dari produk lain. */
   parentProductId?: string;
   /** Tag pembeda varian, mis. `{ Warna: "Oil Green", Ukuran: "38" }` — dari `metadata.variant_attributes`. */
@@ -195,6 +199,8 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     priceLabel: formatIDR(product.price),
     image: product.images?.[0],
     images: product.images,
+    videoUrl: product.video_url ?? undefined,
+    model3dUrl: product.model3d_url ?? undefined,
     parentProductId: product.parent_product_id ?? undefined,
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
     stock: parseStock(product.metadata?.stock),
