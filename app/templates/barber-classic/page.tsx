@@ -7,7 +7,7 @@
 
 import { BarberClassicView } from '../../../components/templates/barber-classic/barber-classic-view';
 import { getTemplateBySlug } from '../../../lib/api-client';
-import { buildTemplateDefaultsPreview } from '../../../lib/template-data';
+import { buildTemplateDefaultsPreview, resolveSections } from '../../../lib/template-data';
 import { parseThemeFromSearchParams } from '../../../lib/website-theme';
 
 type SearchParams = Record<string, string | undefined>;
@@ -15,8 +15,23 @@ type SearchParams = Record<string, string | undefined>;
 export default async function BarberClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
   const isPreview = searchParams.preview === '1';
   const websiteTheme = parseThemeFromSearchParams(searchParams);
-  const template = await getTemplateBySlug('barber-classic');
-  const { sections, products, categories, faqs } = buildTemplateDefaultsPreview(template?.structure);
+
+  let template = null;
+  try {
+    template = await getTemplateBySlug('barber-classic');
+  } catch {
+    template = null;
+  }
+
+  const previewData = template
+    ? buildTemplateDefaultsPreview(template.structure)
+    : {
+        sections: resolveSections(null, null),
+        products: [],
+        categories: [],
+        faqs: [],
+      };
+  const { sections, products, categories, faqs } = previewData;
 
   return (
     <>
