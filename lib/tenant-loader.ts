@@ -4,6 +4,7 @@ import {
   getBlogPosts,
   getCategories,
   getFaqs,
+  getFulfillmentFlow,
   getHomePage,
   getLocations,
   getPageBySlug,
@@ -45,6 +46,33 @@ export async function loadTenant(slug: string, pageSlug?: string): Promise<Tenan
     getFaqs(slug),
     getBlogPosts(slug),
   ]);
+
+  if (page?.sections) {
+    await Promise.all(
+      page.sections.map(async (section) => {
+        if (
+          section.type !== 'service_process_section' ||
+          typeof section.content.flow_id !== 'string' ||
+          !section.content.flow_id
+        ) {
+          return;
+        }
+        const flow = await getFulfillmentFlow(slug, section.content.flow_id);
+        if (flow) {
+          section.content = {
+            ...section.content,
+            flow_steps: flow.steps.map((step) => ({
+              number: String(step.sequence).padStart(2, '0'),
+              title: step.status_name,
+              body: [step.description, step.process_day ? `${step.process_day} hari` : undefined]
+                .filter(Boolean)
+                .join(' · '),
+            })),
+          };
+        }
+      }),
+    );
+  }
 
   return {
     website,

@@ -95,6 +95,24 @@ export interface ApiWebsiteProduct {
   sort_order: number;
 }
 
+export interface ApiFulfillmentFlow {
+  id: string;
+  name: string;
+  description?: string | null;
+  steps: Array<{
+    sequence: number;
+    status_name: string;
+    description?: string | null;
+    process_day?: number | null;
+  }>;
+}
+
+export async function getFulfillmentFlow(slug: string, flowId: string): Promise<ApiFulfillmentFlow | null> {
+  return fetchPublic<ApiFulfillmentFlow>(
+    `/api/public/sites/${encodeURIComponent(slug)}/fulfillment-flows/${encodeURIComponent(flowId)}`,
+  );
+}
+
 export interface GridMeta {
   totalItems: number;
   itemCount: number;

@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { BarberClassicView } from '../components/templates/barber-classic/barber-classic-view';
 import { StoreClassicView } from '../components/templates/store-classic/store-classic-view';
+import { WorkshopView } from '../components/templates/workshop/workshop-view';
 import type {
   BlogPostItem,
   CatalogItem,
@@ -60,6 +61,7 @@ export interface TemplateRenderProps {
 const TEMPLATE_REGISTRY: Record<string, ComponentType<TemplateRenderProps>> = {
   'barber-classic': BarberClassicView,
   'store-classic': StoreClassicView,
+  workshop: WorkshopView,
 };
 
 export function getTemplateRenderer(templateSlug: string): ComponentType<TemplateRenderProps> | null {
