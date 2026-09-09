@@ -48,4 +48,8 @@ ENV HOSTNAME="0.0.0.0"
 
 # Next.js standalone server sudah termasuk middleware.ts (host-based tenant
 # resolution untuk custom domain/subdomain) — tidak butuh proses terpisah.
-CMD ["node", "server.js"]
+# Heap guard 288MB — pasangkan dengan Memory Limit 384MB di Coolify (Advanced
+# > Resource Limits); Next.js SSR lebih berat dari service NestJS lain di
+# ekosistem, host cuma 4GB dibagi ke 10 service jadi tidak ada budget scaling
+# headroom.
+CMD ["node", "--max-old-space-size=288", "server.js"]
