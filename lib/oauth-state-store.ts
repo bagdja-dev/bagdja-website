@@ -24,6 +24,18 @@ const STATE_KEY_PREFIX = 'oauth_state:';
 const DEFAULT_TTL_SECONDS = 600;
 const COOKIE_STATE_PREFIX = 'oauthst_';
 
+const SESSION_HANDOFF_KEY_PREFIX = 'session_handoff:';
+/**
+ * TTL pendek SENGAJA — handoff ini cuma dipakai untuk SATU redirect
+ * berikutnya (dari host callback tetap ke `{origin-tenant}/auth/session`),
+ * harusnya dikonsumsi dalam hitungan detik. Port dari
+ * `bagdja-auction-web/lib/oauth-state-store.ts` — lihat docblock
+ * `SessionHandoffPayload` untuk kenapa hop ini ada.
+ */
+const SESSION_HANDOFF_TTL_SECONDS = 60;
+/** Grace window setelah handoff dikonsumsi — retry jaringan yang menyusul dalam window ini dapat payload yang sama, bukan `state_mismatch`. */
+const CONSUMED_GRACE_SECONDS = 30;
+
 export interface RendererOAuthStatePayload {
   codeVerifier: string;
   next: string | null;
@@ -33,13 +45,36 @@ export interface RendererOAuthStatePayload {
   origin?: string;
 }
 
-type MemoryEntry = { payload: RendererOAuthStatePayload; expiresAt: number };
+/**
+ * Payload dikirim lewat hop tambahan `/auth/session?handoff=<id>` — HANYA
+ * dipakai untuk domain custom (bukan subdomain platform, lihat
+ * `session.ts` `isPlatformHost`/`getCookieDomain`). Alasan hop ini ada:
+ * `/auth/callback` SELALU jalan di host `redirect_uri` OAuth yang tetap
+ * (mis. `sites.bagdja.com`) — server itu SECARA FUNDAMENTAL tidak bisa
+ * men-set cookie untuk domain lain yang tidak terkait (`tokosaya.com`), apa
+ * pun `Domain` attribute-nya (proteksi cookie browser, BUKAN bug yang bisa
+ * di-workaround dari sisi kita). Solusinya: titipkan payload sesi di sini
+ * (server-side, sekali pakai, TTL pendek), redirect balik ke ORIGIN TENANT
+ * ASLI (`tokosaya.com`, lewat Traefik ke app yang sama) — baru DI SANA
+ * cookie di-set, karena request itu genuinely dilayani "sebagai"
+ * `tokosaya.com` dari sudut pandang browser. Port persis dari
+ * `bagdja-auction-web/lib/oauth-state-store.ts`.
+ */
+export interface SessionHandoffPayload {
+  accessToken: string;
+  user: { userId: string; email?: string; username?: string; avatar?: string };
+  redirectTo: string;
+}
+
+type MemoryEntry<T = RendererOAuthStatePayload> = { payload: T; expiresAt: number };
 
 const GLOBAL_STORE_KEY = Symbol.for('bagdja.website.renderer.oauthMemoryStore');
+const GLOBAL_HANDOFF_STORE_KEY = Symbol.for('bagdja.website.renderer.sessionHandoffMemoryStore');
 const GLOBAL_CLIENT_KEY = Symbol.for('bagdja.website.renderer.redisClient');
 
 type OAuthGlobal = {
   [GLOBAL_STORE_KEY]?: Map<string, MemoryEntry>;
+  [GLOBAL_HANDOFF_STORE_KEY]?: Map<string, MemoryEntry<SessionHandoffPayload>>;
   [GLOBAL_CLIENT_KEY]?: Redis | null;
 };
 
@@ -48,11 +83,25 @@ function getOAuthGlobal(): OAuthGlobal {
   if (!g[GLOBAL_STORE_KEY]) {
     g[GLOBAL_STORE_KEY] = new Map<string, MemoryEntry>();
   }
+  if (!g[GLOBAL_HANDOFF_STORE_KEY]) {
+    g[GLOBAL_HANDOFF_STORE_KEY] = new Map<string, MemoryEntry<SessionHandoffPayload>>();
+  }
   return g;
 }
 
 function getMemoryStore(): Map<string, MemoryEntry> {
   return getOAuthGlobal()[GLOBAL_STORE_KEY]!;
+}
+
+function getHandoffMemoryStore(): Map<string, MemoryEntry<SessionHandoffPayload>> {
+  return getOAuthGlobal()[GLOBAL_HANDOFF_STORE_KEY]!;
+}
+
+function purgeExpiredEntries<T>(store: Map<string, MemoryEntry<T>>): void {
+  const now = Date.now();
+  for (const [key, entry] of store) {
+    if (entry.expiresAt <= now) store.delete(key);
+  }
 }
 
 function getCachedRedisClient(): Redis | null | undefined {
@@ -217,5 +266,70 @@ export async function consumeOAuthState(
   }
 
   console.error(`[oauth-state] consume FAIL (all layers) stateId=${stateId}`);
+  return null;
+}
+
+/** Lihat docblock `SessionHandoffPayload` — dipanggil `auth/callback/route.ts` sebelum redirect ke `/auth/session` di origin tenant asli. */
+export async function saveSessionHandoff(
+  handoffId: string,
+  payload: SessionHandoffPayload,
+): Promise<boolean> {
+  const redis = getRedisClient();
+  const key = `${SESSION_HANDOFF_KEY_PREFIX}${handoffId}`;
+
+  if (redis) {
+    try {
+      await redis.set(key, JSON.stringify(payload), 'EX', SESSION_HANDOFF_TTL_SECONDS);
+      console.log(`[session-handoff] save OK (redis) handoffId=${handoffId}`);
+      return true;
+    } catch (error: any) {
+      console.error(`[session-handoff] save REDIS FAIL handoffId=${handoffId}: ${error?.message ?? error}`);
+    }
+  }
+
+  if (!isMemoryFallbackAllowed()) {
+    console.error('[session-handoff] save: production mode & no redis → fail');
+    return false;
+  }
+
+  const store = getHandoffMemoryStore();
+  purgeExpiredEntries(store);
+  store.set(key, { payload, expiresAt: Date.now() + SESSION_HANDOFF_TTL_SECONDS * 1000 });
+  console.log(`[session-handoff] save OK (memory) handoffId=${handoffId}`);
+  return true;
+}
+
+/** Sekali pakai — pola sama `consumeOAuthState` tapi dengan grace window (lihat `CONSUMED_GRACE_SECONDS`), bukan langsung hapus. */
+export async function consumeSessionHandoff(handoffId: string): Promise<SessionHandoffPayload | null> {
+  const redis = getRedisClient();
+  const key = `${SESSION_HANDOFF_KEY_PREFIX}${handoffId}`;
+
+  if (redis) {
+    try {
+      const raw = await redis.get(key);
+      if (raw) {
+        await redis.expire(key, CONSUMED_GRACE_SECONDS);
+        const payload = JSON.parse(raw) as SessionHandoffPayload;
+        if (payload?.accessToken) {
+          console.log(`[session-handoff] consume OK (redis) handoffId=${handoffId}`);
+          return payload;
+        }
+      }
+    } catch (error: any) {
+      console.error(`[session-handoff] consume REDIS FAIL handoffId=${handoffId}: ${error?.message ?? error}`);
+    }
+  }
+
+  if (isMemoryFallbackAllowed()) {
+    const store = getHandoffMemoryStore();
+    const entry = store.get(key);
+    if (entry) store.set(key, { ...entry, expiresAt: Date.now() + CONSUMED_GRACE_SECONDS * 1000 });
+    if (entry && entry.expiresAt > Date.now()) {
+      console.log(`[session-handoff] consume OK (memory) handoffId=${handoffId}`);
+      return entry.payload;
+    }
+  }
+
+  console.error(`[session-handoff] consume FAIL (all layers) handoffId=${handoffId}`);
   return null;
 }

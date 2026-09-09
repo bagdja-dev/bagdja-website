@@ -29,17 +29,25 @@
  * menurunkan suffix ini dari env yang sama dipakai middleware.ts (PLATFORM_HOST)
  * supaya konsisten satu sumber kebenaran.
  *
- * BUG (25 Agustus 2026): `Domain` attribute harus domain-match host yang
- * BENAR-BENAR melayani response (RFC 6265) — kalau tidak, browser DIAM-DIAM
- * membuang seluruh `Set-Cookie` itu (bukan error yang kelihatan). Dulu
- * `getCookieDomain()` selalu pakai `NEXT_PUBLIC_PLATFORM_URL` apa pun host
- * request sebenarnya, jadi begitu app dijalankan di `localhost:5005` dengan
- * `.env` yang masih berisi nilai production (`sites.bagdja.com`), cookie sesi
- * SELALU dibuang browser — OAuth di server sukses, tapi UI tetap "guest"
- * selamanya. Sekarang `getCookieOptions()` terima hostname TUJUAN response
- * (dari `resolveOrigin`/origin login) dan skip `domain` attribute sama sekali
- * kalau hostname itu local (lihat `LOCAL_HOSTS`, sama seperti middleware.ts)
- * — jadi perilaku lokal tidak lagi bergantung isi `NEXT_PUBLIC_PLATFORM_URL`.
+ * BUG (25 Agustus 2026, PARTIAL FIX): `Domain` attribute harus domain-match
+ * host yang BENAR-BENAR melayani response (RFC 6265) — kalau tidak, browser
+ * DIAM-DIAM membuang seluruh `Set-Cookie` itu (bukan error yang kelihatan).
+ * Dulu `getCookieDomain()` selalu pakai `NEXT_PUBLIC_PLATFORM_URL` apa pun
+ * host request sebenarnya — fix 25 Agustus di atas cuma menutup kasus
+ * localhost (skip `domain` attribute total kalau host itu local), TAPI
+ * untuk domain custom Owner sungguhan (`tokosaya.com`, BUKAN localhost DAN
+ * BUKAN subdomain platform) `getCookieDomain()` MASIH SELALU balas
+ * `.{platformHostname}` (`.sites.bagdja.com`) — domain mismatch yang sama
+ * persis, cuma kasusnya belum pernah ketahuan karena fitur custom domain
+ * belum pernah dipakai user nyata.
+ *
+ * BUG (9 September 2026, FIX PENUH): port `isPlatformHost()` dari
+ * `bagdja-auction-web/lib/session.ts` (fitur custom domain SUDAH production
+ * di sana, `pasarmolly.com` sejak 7 Sep 2026) — wildcard cookie
+ * (`.{platformHostname}`) HANYA kalau target memang subdomain (atau sama
+ * persis) platform kita sendiri; domain custom dapat cookie host-only
+ * (`undefined`, otomatis ter-scope ke domain itu sendiri, tidak perlu
+ * `Domain` attribute apa pun). Lihat plan/website-builder/custom-domain-adjustment-plan.md.
  */
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
@@ -50,16 +58,34 @@ const USER_COOKIE = 'site_user';
 /** Sama seperti middleware.ts — host dev lokal, tidak pernah domain-match subdomain wildcard produksi. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
+/**
+ * `true` kalau `targetHostname` adalah subdomain (atau sama persis)
+ * platform kita sendiri (`NEXT_PUBLIC_PLATFORM_URL`) — dipakai `session.ts`
+ * (tentukan cookie wildcard vs host-only) DAN `app/auth/callback/route.ts`
+ * (tentukan perlu hop `/auth/session` handoff atau tidak), harus konsisten
+ * di kedua tempat jadi diekspor dari sini, satu sumber kebenaran. Port
+ * persis dari `bagdja-auction-web/lib/session.ts`.
+ */
+export function isPlatformHost(targetHostname: string): boolean {
+  const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_URL;
+  if (!platformUrl) return false;
+
+  try {
+    const platformHostname = new URL(platformUrl).hostname;
+    return targetHostname === platformHostname || targetHostname.endsWith(`.${platformHostname}`);
+  } catch {
+    return false;
+  }
+}
+
 function getCookieDomain(targetHostname: string): string | undefined {
   if (LOCAL_HOSTS.has(targetHostname)) return undefined;
+  if (!isPlatformHost(targetHostname)) return undefined;
 
-  const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_URL;
-  if (!platformUrl) return undefined;
-  try {
-    return `.${new URL(platformUrl).hostname}`;
-  } catch {
-    return undefined;
-  }
+  // isPlatformHost() sudah pastikan NEXT_PUBLIC_PLATFORM_URL valid & match —
+  // aman parse ulang di sini buat ambil hostname-nya.
+  const platformHostname = new URL(process.env.NEXT_PUBLIC_PLATFORM_URL!).hostname;
+  return `.${platformHostname}`;
 }
 
 /** `targetHostname` = host yang benar-benar akan menerima response ini (lihat catatan BUG di atas) — WAJIB diisi benar, jangan diasumsikan dari env. */
