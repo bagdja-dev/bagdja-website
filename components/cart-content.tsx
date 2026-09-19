@@ -37,6 +37,8 @@ interface ServerOrder {
   total_amount: number;
   status: string;
   transaction_id: string | null;  payment_mode: string;
+  /** Ada kalau produknya punya step Praorder di Fulfillment Flow-nya — TERLEPAS dari harga (bisa produk harga fix yang tetap butuh survey/denah sebelum produksi). */
+  praorderProgress?: { flowName: string; steps: { completed: boolean }[] } | null;
 }
 
 /** Item cart — 1:1 dengan 1 draft order server. */
@@ -52,6 +54,7 @@ interface CartLine {
   paymentMode: string;
   variantAttributes?: Record<string, string>;
   isVariant: boolean;
+  hasIncompletePraorderSteps: boolean;
 }
 
 function CartIcon({ className = '' }: { className?: string }) {
@@ -112,6 +115,7 @@ export function CartContent({ basePath }: { basePath: string }) {
         paymentMode: o.payment_mode,
         variantAttributes: o.product?.metadata?.variant_attributes,
         isVariant: Boolean(o.product?.parent_product_id),
+        hasIncompletePraorderSteps: Boolean(o.praorderProgress?.steps?.some((s) => !s.completed)),
       })),
     [serverOrders],
   );
@@ -154,6 +158,7 @@ export function CartContent({ basePath }: { basePath: string }) {
     () => selectedLines.reduce((acc, l) => acc + l.unitPrice * l.quantity, 0),
     [selectedLines],
   );
+  const hasUnquotedSelected = selectedLines.some((line) => line.unitPrice <= 0);
 
   // Item terpilih → order_ids utk checkout multi-item. `basePath` kosong
   // ('') di subdomain/custom domain, `/{slug}` cuma di path-based (local
@@ -415,12 +420,33 @@ export function CartContent({ basePath }: { basePath: string }) {
                     </div>
 
                     <div className="text-right">
-                      <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
-                        Rp {line.unitPrice.toLocaleString('id-ID')} × {line.quantity}
-                      </p>
-                      <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-                        Rp {lineTotal.toLocaleString('id-ID')}
-                      </p>
+                      {line.unitPrice <= 0 ? (
+                        <Link
+                          href={`${basePath}/order/${line.orderId}`}
+                          className="text-sm font-semibold underline"
+                          style={{ color: 'var(--brand-accent-muted)' }}
+                        >
+                          Lihat Progres Penawaran
+                        </Link>
+                      ) : (
+                        <>
+                          <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                            Rp {line.unitPrice.toLocaleString('id-ID')} × {line.quantity}
+                          </p>
+                          <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
+                            Rp {lineTotal.toLocaleString('id-ID')}
+                          </p>
+                          {line.hasIncompletePraorderSteps && (
+                            <Link
+                              href={`${basePath}/order/${line.orderId}`}
+                              className="mt-1 block text-xs font-semibold underline"
+                              style={{ color: 'var(--brand-accent-muted)' }}
+                            >
+                              Lengkapi Data Praorder
+                            </Link>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -453,7 +479,7 @@ export function CartContent({ basePath }: { basePath: string }) {
             </div>
           </dl>
 
-          {selectedLines.length > 0 ? (
+          {selectedLines.length > 0 && !hasUnquotedSelected ? (
             <Link
               href={checkoutHref}
               className="mt-5 block rounded-full px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.03] active:scale-95"
@@ -468,7 +494,7 @@ export function CartContent({ basePath }: { basePath: string }) {
               className="mt-5 block w-full cursor-not-allowed rounded-full px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide opacity-50"
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
-              Pilih item dulu
+              {selectedLines.length > 0 && hasUnquotedSelected ? 'Menunggu Penawaran' : 'Pilih item dulu'}
             </button>
           )}
 
@@ -476,8 +502,9 @@ export function CartContent({ basePath }: { basePath: string }) {
             className="mt-4 rounded-lg border px-3 py-2 text-xs leading-relaxed"
             style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
           >
-            Item terpilih akan di-checkout dalam satu transaksi. Item lain tetap
-            di keranjang sampai transaksi ini selesai.
+            {hasUnquotedSelected
+              ? 'Harga final sedang disiapkan oleh admin. Checkout aktif setelah penawaran tersedia.'
+              : 'Item terpilih akan di-checkout dalam satu transaksi. Item lain tetap di keranjang sampai transaksi ini selesai.'}
           </p>
         </aside>
       </div>

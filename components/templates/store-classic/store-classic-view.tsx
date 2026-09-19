@@ -16,6 +16,7 @@ import {
   buildPageHref,
   buildProductHref,
   buildWhatsAppHref,
+  formatIDR,
   parseGalleryImages,
   parseSocialLinks,
   type BlogPostItem,
@@ -34,6 +35,7 @@ import {
   themeToCssVariables,
   type WebsiteTheme,
 } from '../../../lib/website-theme';
+import { resolvePageHeadingLabel } from '../../../lib/page-title';
 import { StoreClassicBlogSidebar } from './store-classic-blog-sidebar';
 import { CategoryListingSection, ProductGridSection, VariantTreeSelector } from './store-classic-catalog';
 import { StoreClassicProductGallery } from './store-classic-gallery';
@@ -845,7 +847,7 @@ function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   }
 }
 
-function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSlug }: { item: CatalogItem; allProducts: CatalogItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string }) {
+function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
@@ -860,6 +862,12 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSl
   const related = allProducts
     .filter((p) => !familyIds.has(p.id) && !p.parentProductId && (p.type === item.type || p.category === item.category))
     .slice(0, 4);
+  const specificationEntries = Object.entries(item.specifications ?? {}).filter(
+    ([, value]) => value !== undefined && value !== null && String(value).trim() !== '',
+  );
+  const estimationEntries = Array.isArray(item.estimation)
+    ? item.estimation.filter((entry) => entry && typeof entry.label === 'string' && entry.label.trim() !== '')
+    : [];
 
   return (
     <>
@@ -888,6 +896,7 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSl
             {tenantSlug && internalPaymentMode && item.websiteId && (
               <PurchaseControls
                 slug={tenantSlug}
+                basePath={websiteSlug}
                 websiteId={item.websiteId}
                 product={{
                   id: item.id,
@@ -898,6 +907,8 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSl
                   stock: item.stock,
                 }}
                 paymentMode={internalPaymentMode}
+                locationIds={item.locationIds}
+                locations={locations}
               />
             )}
 
@@ -916,6 +927,43 @@ function ProductDetailSection({ item, allProducts, waHref, websiteSlug, tenantSl
             {item.paymentMeta?.map((entry, index) => (
               <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
             ))}
+            {specificationEntries.length > 0 && (
+              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Spesifikasi
+                </h2>
+                <dl className="grid gap-3 sm:grid-cols-2">
+                  {specificationEntries.map(([key, value]) => (
+                    <div key={key} className="rounded-lg border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      <dt className="text-[11px] uppercase tracking-[0.18em]" style={{ color: 'var(--brand-muted)' }}>
+                        {key}
+                      </dt>
+                      <dd className="mt-1 font-medium">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
+            {estimationEntries.length > 0 && (
+              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Estimasi Harga
+                </h2>
+                <div className="space-y-2">
+                  {estimationEntries.map((entry, index) => {
+                    const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
+                    return (
+                      <div key={`${entry.label}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: 'var(--brand-border)' }}>
+                        <span>{entry.label}</span>
+                        <strong style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(numericPrice)}</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {item.detail && (
               <details className="mt-8 rounded-xl border p-4" open style={{ borderColor: 'var(--brand-border)' }}>
                 <summary className="cursor-pointer font-semibold marker:content-none" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -983,6 +1031,11 @@ export function StoreClassicView({
 
   const productDetailContent = sections.find((s) => s.type === 'product_detail')?.content;
   const productDetailItem = productDetailContent?.product as CatalogItem | undefined;
+  const productPageTitle = resolvePageHeadingLabel({
+    productName: productDetailItem?.name,
+    platformName: title,
+    fallbackTitle: 'Produk',
+  });
 
   const cartSection = sections.find((s) => s.type === 'cart');
   const checkoutSection = sections.find((s) => s.type === 'checkout');
@@ -1047,7 +1100,7 @@ export function StoreClassicView({
         />
 
         {productDetailItem ? (
-          <PageHeroBanner label={productDetailItem.name} imageUrl={productDetailItem.image} />
+          <PageHeroBanner label={productPageTitle} imageUrl={productDetailItem.image} />
         ) : categoryListingLabel ? (
           <PageHeroBanner label={categoryListingLabel} imageUrl={categoryListingImage} />
         ) : pageBannerLabel ? (
@@ -1133,12 +1186,14 @@ export function StoreClassicView({
               case 'category_listing': {
                 const categoryId = typeof section.content.category_id === 'string' ? section.content.category_id : '';
                 const categoryLabel = typeof section.content.category_label === 'string' ? section.content.category_label : '';
+                const categoryDetail = categories.find((c) => c.id === categoryId || c.label === categoryLabel);
                 const initialItems = topLevelProducts.filter((p) => p.category === categoryLabel);
                 return (
                   <CategoryListingSection
                     key={key}
                     categoryId={categoryId}
                     categoryLabel={categoryLabel}
+                    categoryDetail={categoryDetail}
                     initialProducts={initialItems}
                     tenantSlug={tenantSlug}
                     websiteSlug={websiteSlug}
@@ -1257,7 +1312,7 @@ export function StoreClassicView({
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />;
+                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />;
               }
               default:
                 return null;

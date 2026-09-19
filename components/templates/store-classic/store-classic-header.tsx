@@ -36,6 +36,7 @@ interface StoreClassicHeaderProps {
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
   cartHref?: string;
+  cartLabel?: string;
 }
 
 export function StoreClassicHeader({
@@ -49,12 +50,12 @@ export function StoreClassicHeader({
   socialLinks = [],
   auth,
   cartHref,
+  cartLabel = 'Cart',
 }: StoreClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const openDrawer = () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     setDrawerMounted(true);
@@ -110,7 +111,7 @@ export function StoreClassicHeader({
 
         <div className="flex shrink-0 items-center gap-3">
           {cartHref && auth?.isLoggedIn && (
-            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} />
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} label={cartLabel} />
           )}
           {showWhatsappCta && waHref && (
             <a
@@ -162,7 +163,7 @@ export function StoreClassicHeader({
                     style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
                   >
                     {[
-                      { href: auth.cartHref, label: 'Cart' },
+                      { href: auth.cartHref, label: cartLabel },
                       { href: auth.ordersHref, label: 'Transaction' },
                       { href: auth.profileHref, label: 'Profile' },
                     ].map(
@@ -198,7 +199,7 @@ export function StoreClassicHeader({
               auth.loginHref && (
                 <a
                   href={auth.loginHref}
-                  className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+                  className="rounded-full px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
                   style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                 >
                   Masuk

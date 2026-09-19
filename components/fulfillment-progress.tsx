@@ -25,6 +25,15 @@ function formatIDR(n: number): string {
   return `Rp ${Math.round(n).toLocaleString('id-ID')}`;
 }
 
+/** Step ber-`filledBy:'buyer'` (level Step, mis. No Resi pengiriman balik pada flow reparasi). */
+function isStepBuyerOwned(step: Pick<OrderFulfillmentStepProgress, 'filledBy'>): boolean {
+  return step.filledBy === 'buyer';
+}
+
+function buyerStepKey(orderId: string, stepName: string): string {
+  return `${orderId}::${stepName}`;
+}
+
 interface PendingAction {
   orderIds: string[];
   stepName: string;
@@ -40,6 +49,7 @@ interface GroupItem {
 interface GroupStepView {
   index: number;
   stepName: string;
+  filledBy: OrderFulfillmentStepProgress['filledBy'];
   description: string | null;
   releasePercentage: number | null;
   formSchema: OrderFulfillmentStepProgress['formSchema'];
@@ -63,6 +73,7 @@ function buildGroupSteps(groupItems: GroupItem[]): GroupStepView[] {
     return {
       index,
       stepName: template.stepName,
+      filledBy: template.filledBy,
       description: template.description,
       releasePercentage: template.releasePercentage,
       formSchema: template.formSchema,
@@ -90,6 +101,72 @@ export function FulfillmentProgress({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [buyerFormData, setBuyerFormData] = useState<Record<string, string>>({});
+  const [buyerFormOpen, setBuyerFormOpen] = useState<string | null>(null);
+  const [buyerStepBusy, setBuyerStepBusy] = useState<string | null>(null);
+  const [buyerStepError, setBuyerStepError] = useState<Record<string, string>>({});
+  const [terminBusy, setTerminBusy] = useState<string | null>(null);
+  const [terminError, setTerminError] = useState<Record<string, string>>({});
+
+  /** fulfillment-praorder-plan.md §2.4 — buyer bayar 1 Termin/Tagihan, redirect ke checkout_url seperti checkout biasa. */
+  async function payTermin(terminId: string) {
+    setTerminBusy(terminId);
+    setTerminError((prev) => ({ ...prev, [terminId]: '' }));
+    try {
+      const res = await fetch(`/api/transactions/termins/${terminId}/pay`, { method: 'POST' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message ?? 'Gagal memproses pembayaran Termin');
+      if (!json?.checkout_url) throw new Error('Gagal mendapatkan link pembayaran.');
+      window.location.href = json.checkout_url;
+    } catch (err) {
+      setTerminError((prev) => ({
+        ...prev,
+        [terminId]: err instanceof Error ? err.message : 'Gagal memproses pembayaran Termin',
+      }));
+      setTerminBusy(null);
+    }
+  }
+
+  async function submitBuyerStep(orderId: string, step: OrderFulfillmentStepProgress) {
+    const key = buyerStepKey(orderId, step.stepName);
+    // Kepemilikan sekarang di level Step (isStepBuyerOwned sudah menggate
+    // render form ini) — SEMUA field di step ini milik buyer, bukan disaring
+    // per-field lagi (field.filled_by di formSchema sudah tidak dipakai).
+    const buyerFields = step.formSchema ?? [];
+    for (const field of buyerFields) {
+      if (field.required && !buyerFormData[field.key]?.trim()) {
+        setBuyerStepError((prev) => ({ ...prev, [key]: `Field "${field.label}" wajib diisi` }));
+        return;
+      }
+    }
+    setBuyerStepBusy(key);
+    setBuyerStepError((prev) => ({ ...prev, [key]: '' }));
+    try {
+      const formData: Record<string, string> = {};
+      for (const field of buyerFields) {
+        if (buyerFormData[field.key]?.trim()) formData[field.key] = buyerFormData[field.key].trim();
+      }
+      const res = await fetch(`/api/transactions/${transactionId}/orders/${orderId}/steps/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          step_name: step.stepName,
+          form_data: Object.keys(formData).length ? formData : undefined,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message ?? 'Gagal menyelesaikan step ini');
+      setBuyerFormOpen(null);
+      router.refresh();
+    } catch (err) {
+      setBuyerStepError((prev) => ({
+        ...prev,
+        [key]: err instanceof Error ? err.message : 'Gagal menyelesaikan step ini',
+      }));
+    } finally {
+      setBuyerStepBusy(null);
+    }
+  }
 
   const byFlow = new Map<string, GroupItem[]>();
   for (const item of items) {
@@ -236,6 +313,13 @@ export function FulfillmentProgress({
                           </p>
                         )}
 
+                        {!allCompleted && isStepBuyerOwned(step) && (
+                          <p className="mt-2 text-xs font-medium" style={{ color: 'var(--brand-accent-muted)' }}>
+                            Ada data yang perlu Anda lengkapi di tahap ini — buka &quot;Lihat per produk&quot; di
+                            atas.
+                          </p>
+                        )}
+
                         {sampleFormData && Object.keys(sampleFormData).length > 0 && (
                           <div className="mt-2 space-y-0.5 text-xs">
                             {(step.formSchema ?? []).map((f) =>
@@ -349,6 +433,63 @@ export function FulfillmentProgress({
                                 </p>
                               )}
 
+                              {!step.completed && priorCompleted && isStepBuyerOwned(step) && (() => {
+                                const key = buyerStepKey(gi.orderId, step.stepName);
+                                const buyerFields = (step.formSchema ?? []).filter((f) => f.filled_by === 'buyer');
+                                return buyerFormOpen === key ? (
+                                  <div className="mt-2 flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                                    {buyerFields.map((f) => (
+                                      <label key={f.key} className="flex flex-col gap-1 text-xs">
+                                        <span style={{ color: 'var(--brand-muted)' }}>
+                                          {f.label}
+                                          {f.required && ' *'}
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={buyerFormData[f.key] ?? ''}
+                                          onChange={(e) =>
+                                            setBuyerFormData((prev) => ({ ...prev, [f.key]: e.target.value }))
+                                          }
+                                          className="rounded-md border px-2 py-1.5 text-sm"
+                                          style={{ borderColor: 'var(--brand-border)' }}
+                                        />
+                                      </label>
+                                    ))}
+                                    {buyerStepError[key] && (
+                                      <p className="text-xs" style={{ color: 'crimson' }}>{buyerStepError[key]}</p>
+                                    )}
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setBuyerFormOpen(null)}
+                                        className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                                        style={{ border: '1px solid var(--brand-border)' }}
+                                      >
+                                        Batal
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={buyerStepBusy === key}
+                                        onClick={() => submitBuyerStep(gi.orderId, step)}
+                                        className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                                        style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                                      >
+                                        {buyerStepBusy === key ? 'Menyimpan…' : 'Tandai Selesai'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBuyerFormOpen(key)}
+                                    className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+                                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                                  >
+                                    Lengkapi {step.stepName}
+                                  </button>
+                                );
+                              })()}
+
                               {step.completed && step.formData && Object.keys(step.formData).length > 0 && (
                                 <div className="mt-2 space-y-0.5 text-xs">
                                   {(step.formSchema ?? []).map((f) =>
@@ -425,6 +566,60 @@ export function FulfillmentProgress({
                           );
                         })}
                       </ol>
+
+                      {gi.progress.termins.length > 0 && (
+                        <div className="mt-3 flex flex-col gap-2">
+                          {gi.progress.termins.map((termin) => (
+                            <div
+                              key={termin.id}
+                              className="rounded-lg border p-3 text-sm"
+                              style={{ borderColor: 'var(--brand-border)' }}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-medium">
+                                  {termin.label}
+                                  {termin.anchorStepName && (
+                                    <span className="ml-1 text-xs font-normal" style={{ color: 'var(--brand-muted)' }}>
+                                      (setelah {termin.anchorStepName})
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-xs font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>
+                                  {formatIDR(termin.amount)}
+                                </span>
+                              </div>
+                              {termin.status === 'PAID' && (
+                                <p className="mt-1 text-xs font-medium" style={{ color: 'var(--brand-accent-muted)' }}>
+                                  ✓ Sudah dibayar
+                                </p>
+                              )}
+                              {termin.status === 'ISSUED' && (
+                                <>
+                                  {terminError[termin.id] && (
+                                    <p className="mt-1 text-xs" style={{ color: 'crimson' }}>
+                                      {terminError[termin.id]}
+                                    </p>
+                                  )}
+                                  <button
+                                    type="button"
+                                    disabled={terminBusy === termin.id}
+                                    onClick={() => payTermin(termin.id)}
+                                    className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                                  >
+                                    {terminBusy === termin.id ? 'Memproses…' : 'Bayar'}
+                                  </button>
+                                </>
+                              )}
+                              {termin.status === 'SCHEDULED' && (
+                                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                                  Menunggu diterbitkan penjual.
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

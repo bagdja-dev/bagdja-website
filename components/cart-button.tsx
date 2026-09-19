@@ -24,6 +24,7 @@ export interface AddToCartButtonProps {
     image?: string;
     stock?: number;
   };
+  locationId?: string;
   paymentMode: 'ADD_TO_CART' | 'ESCROW';
   label?: string;
   /** Quantity yang ditambahkan (default 1). */
@@ -32,6 +33,7 @@ export interface AddToCartButtonProps {
   onAdded?: (orderId: string) => void;
   /** Dipanggil saat error — terima pesan dari server. */
   onError?: (message: string) => void;
+  disabled?: boolean;
 }
 
 export function AddToCartButton({
@@ -41,12 +43,17 @@ export function AddToCartButton({
   paymentMode,
   label = 'Masukkan ke Keranjang',
   quantity = 1,
+  locationId,
   onAdded,
   onError,
+  disabled = false,
 }: AddToCartButtonProps) {
   const [busy, setBusy] = useState(false);
   const qty = Math.max(1, Math.floor(quantity || 1));
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
+  // Rp 0 = sentinel "belum ada harga final" (fulfillment-praorder-plan.md
+  // §2.1) — CTA-nya minta penawaran, bukan beli, walau paymentMode ESCROW.
+  const isQuoteRequest = product.price <= 0;
 
   const handleClick = async () => {
     if (busy) return;
@@ -59,6 +66,7 @@ export function AddToCartButton({
           website_id: websiteId,
           product_id: product.id,
           quantity: qty,
+          ...(locationId ? { location_id: locationId } : {}),
         }),
       });
       if (!res.ok) {
@@ -93,18 +101,20 @@ export function AddToCartButton({
   return (
     <button
       type="button"
-      disabled={outOfStock || busy}
+      disabled={outOfStock || busy || disabled}
       onClick={handleClick}
-      className="mt-3 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+      className="mt-3 inline-flex justify-center text-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
       style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
     >
       {outOfStock
         ? 'Stok Habis'
         : busy
           ? 'Menambah...'
-          : paymentMode === 'ESCROW'
-            ? 'Beli (Escrow)'
-            : label}
+          : isQuoteRequest
+            ? 'Minta Penawaran'
+            : paymentMode === 'ESCROW'
+              ? 'Beli (Escrow)'
+              : label}
     </button>
   );
 }

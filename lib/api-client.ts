@@ -84,8 +84,11 @@ export interface ApiWebsiteProduct {
   type: string;
   category: string | null;
   parent_product_id: string | null;
+  location_ids?: string[];
   description: string | null;
   detail: string | null;
+  specifications?: Record<string, string> | null;
+  estimation?: Array<{ label: string; price: number | string | null }> | null;
   price: number;
   images: string[];
   video_url?: string | null;
@@ -130,7 +133,10 @@ export interface ApiWebsiteCategory {
   id: string;
   website_id: string;
   label: string;
+  description?: string | null;
   images: string[];
+  specifications?: Record<string, string> | null;
+  estimation?: Array<{ label: string; price: number | string | null }> | null;
   sort_order: number;
 }
 

@@ -11,6 +11,22 @@ interface RouteContext {
   params: { id: string };
 }
 
+/** Detail 1 order milik buyer — sekarang menyertakan `praorderProgress` kalau produknya punya step Praorder ("Progres Penawaran"). */
+export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const result = await backendFetch(`/api/orders/${params.id}`);
+
+  if (result.status === 401) {
+    return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
+  }
+  if (!result.data || result.status >= 400) {
+    return NextResponse.json(
+      { message: result.error ?? 'Failed to load order' },
+      { status: result.status },
+    );
+  }
+  return NextResponse.json(result.data, { status: 200 });
+}
+
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body?.quantity !== 'number' || body.quantity < 1) {

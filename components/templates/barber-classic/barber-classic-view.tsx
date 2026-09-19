@@ -12,6 +12,7 @@ import {
   buildPageHref,
   buildProductHref,
   buildWhatsAppHref,
+  formatIDR,
   parseGalleryImages,
   parseSocialLinks,
   type BlogPostItem,
@@ -858,6 +859,13 @@ function ProductDetailSection({
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
+  const specificationEntries = Object.entries(item.specifications ?? {}).filter(
+    ([, value]) => value !== undefined && value !== null && String(value).trim() !== '',
+  );
+  const estimationEntries = Array.isArray(item.estimation)
+    ? item.estimation.filter((entry) => entry && typeof entry.label === 'string' && entry.label.trim() !== '')
+    : [];
+
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       {(images.length > 0 || item.videoUrl || item.model3dUrl) && (
@@ -885,6 +893,43 @@ function ProductDetailSection({
       )}
 
       <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
+
+      {specificationEntries.length > 0 && (
+        <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+          <h2 className="mb-4 text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
+            Spesifikasi
+          </h2>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            {specificationEntries.map(([key, value]) => (
+              <div key={key} className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <dt className="text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>
+                  {key}
+                </dt>
+                <dd className="mt-1 font-medium">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {estimationEntries.length > 0 && (
+        <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+          <h2 className="mb-4 text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
+            Estimasi Harga
+          </h2>
+          <div className="space-y-2">
+            {estimationEntries.map((entry, index) => {
+              const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
+              return (
+                <div key={`${entry.label}-${index}`} className="flex items-center justify-between rounded-xl border px-3 py-2" style={{ borderColor: 'var(--brand-border)' }}>
+                  <span>{entry.label}</span>
+                  <strong style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(numericPrice)}</strong>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {item.detail && (
         <div
@@ -1116,12 +1161,14 @@ export function BarberClassicView({
               case 'category_listing': {
                 const categoryId = typeof section.content.category_id === 'string' ? section.content.category_id : '';
                 const categoryLabel = typeof section.content.category_label === 'string' ? section.content.category_label : '';
+                const categoryDetail = categories.find((c) => c.id === categoryId || c.label === categoryLabel);
                 const initialItems = topLevelProducts.filter((p) => p.category === categoryLabel);
                 return (
                   <CategoryListingSection
                     key={key}
                     categoryId={categoryId}
                     categoryLabel={categoryLabel}
+                    categoryDetail={categoryDetail}
                     initialProducts={initialItems}
                     tenantSlug={tenantSlug}
                     websiteSlug={websiteSlug}

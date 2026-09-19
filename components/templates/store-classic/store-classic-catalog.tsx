@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { getProducts } from '../../../lib/api-client';
-import { buildProductHref, toCatalogItem, type CatalogItem } from '../../../lib/template-data';
+import { buildProductHref, toCatalogItem, type CatalogItem, type CategoryItem } from '../../../lib/template-data';
 import { ProductCard, SectionHeading } from './store-classic-view';
 
 const PAGE_SIZE = 8;
@@ -182,6 +182,7 @@ const SORT_OPTIONS: { value: SortValue; label: string }[] = [
 export function CategoryListingSection({
   categoryId,
   categoryLabel,
+  categoryDetail,
   initialProducts,
   tenantSlug,
   websiteSlug,
@@ -189,6 +190,7 @@ export function CategoryListingSection({
 }: {
   categoryId: string;
   categoryLabel: string;
+  categoryDetail?: CategoryItem;
   /** Sudah difilter untuk kategori ini (dari hasil SSR) — dipakai render awal tanpa round-trip tambahan. */
   initialProducts: CatalogItem[];
   tenantSlug?: string;
@@ -241,6 +243,14 @@ export function CategoryListingSection({
     }
   }
 
+  const description = categoryDetail?.description?.trim();
+  const specificationEntries = Object.entries(categoryDetail?.specifications ?? {}).filter(
+    ([, value]) => value !== undefined && value !== null && String(value).trim() !== '',
+  );
+  const estimationEntries = Array.isArray(categoryDetail?.estimation)
+    ? categoryDetail!.estimation.filter((entry) => entry && typeof entry.label === 'string' && entry.label.trim() !== '')
+    : [];
+
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <nav className="mb-4 flex items-center gap-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
@@ -250,6 +260,66 @@ export function CategoryListingSection({
         <span>/</span>
         <span style={{ color: 'var(--brand-text)' }}>{categoryLabel}</span>
       </nav>
+
+      {(description || specificationEntries.length > 0 || estimationEntries.length > 0) && (
+        <div className="mb-8 rounded-2xl border p-5 sm:p-6" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            {description ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand-accent)' }}>
+                  Tentang kategori
+                </p>
+                <h1 className="mt-3 text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
+                  {categoryLabel}
+                </h1>
+                <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{description}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand-accent)' }}>
+                  Kategori
+                </p>
+                <h1 className="mt-3 text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
+                  {categoryLabel}
+                </h1>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {specificationEntries.length > 0 && (
+                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Spesifikasi</h2>
+                  <dl className="space-y-2 text-sm">
+                    {specificationEntries.map(([key, value]) => (
+                      <div key={key} className="flex items-start justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0" style={{ borderColor: 'var(--brand-border)' }}>
+                        <dt style={{ color: 'var(--brand-muted)' }}>{key}</dt>
+                        <dd className="text-right font-medium">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+
+              {estimationEntries.length > 0 && (
+                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Estimasi</h2>
+                  <div className="space-y-2 text-sm">
+                    {estimationEntries.map((entry, index) => {
+                      const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
+                      return (
+                        <div key={`${entry.label}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--brand-border)' }}>
+                          <span>{entry.label}</span>
+                          <strong style={{ color: 'var(--brand-accent)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(numericPrice)}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 flex items-center justify-end">
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--brand-muted)' }}>

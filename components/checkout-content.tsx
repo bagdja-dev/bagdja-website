@@ -32,6 +32,8 @@ interface DraftProduct {
   images?: string[];
   price?: number;
   description?: string | null;
+  /** fulfillment-praorder-plan.md §2.6/§0.1 (Q10) — independen dari `type`/vendor-routing. */
+  requires_shipping?: boolean;
 }
 
 interface ServerOrder {
@@ -106,7 +108,7 @@ export function CheckoutContent({
     () => locations.filter((l) => l.shippingEnabled),
     [locations],
   );
-  const shippingEnabled = shippableLocations.length > 0;
+  const websiteHasShippableLocations = shippableLocations.length > 0;
 
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [destinationArea, setDestinationArea] = useState<ShippingAreaValue | null>(null);
@@ -157,6 +159,13 @@ export function CheckoutContent({
   const draftsLoading = drafts === null && !draftsError;
 
   const draftOrders = useMemo(() => selectedOrders ?? [], [selectedOrders]);
+
+  // fulfillment-praorder-plan.md §2.6/§0.1 (Q10) — kalau SEMUA item yang mau
+  // di-checkout ini requires_shipping=false (mis. jasa on-site/digital), flow
+  // ongkir (baik lama maupun baru) tidak relevan sama sekali, terlepas dari
+  // apakah website ini punya lokasi shippable untuk produk fisiknya yang lain.
+  const cartNeedsShipping = draftOrders.some((o) => o.product?.requires_shipping !== false);
+  const shippingEnabled = websiteHasShippableLocations && cartNeedsShipping;
 
   // Item yang sengaja TIDAK dicentang di cart tetap tinggal di keranjang.
   const extraCount =
@@ -254,6 +263,10 @@ export function CheckoutContent({
 
   // Validasi client: data pengiriman wajib lengkap sebelum bayar.
   const shippingInvalid = useMemo(() => {
+    // Cart 100% requires_shipping=false (jasa on-site/digital) — alamat &
+    // kurir memang tidak relevan, jangan blokir checkout gara-gara ini
+    // (§2.6/§0.1 fulfillment-praorder-plan.md, Q10).
+    if (!cartNeedsShipping) return false;
     const baseValid = Boolean(
       shipping.recipient_name.trim() && shipping.phone.trim() && shipping.address.trim(),
     );
@@ -261,13 +274,13 @@ export function CheckoutContent({
       return !(baseValid && destinationArea);
     }
     return !(baseValid && shipping.city.trim());
-  }, [shipping, shippingEnabled, destinationArea]);
+  }, [shipping, shippingEnabled, destinationArea, cartNeedsShipping]);
 
   const canPay =
     hasAnyItem &&
     !missingSelection &&
     !shippingInvalid &&
-    (shippingEnabled ? Boolean(selectedCourierOption) : Boolean(courier)) &&
+    (!cartNeedsShipping || (shippingEnabled ? Boolean(selectedCourierOption) : Boolean(courier))) &&
     !loading;
 
   if (draftsLoading) {

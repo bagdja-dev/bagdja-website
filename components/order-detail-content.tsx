@@ -13,6 +13,7 @@
  */
 import { FulfillmentProgress } from './fulfillment-progress';
 import { OrderActionButtons } from './order-action-buttons';
+import { PraorderStepList } from './praorder-step-list';
 import { RetryPaymentButton } from './retry-payment-button';
 
 export interface TransactionProduct {
@@ -35,16 +36,23 @@ export interface TransactionItem {
  * Order Handling Phase 3 (plan/website-builder/order-hanlde-plan.md §3.0.1)
  * — cermin tipe backend, dipakai untuk checklist step di `FulfillmentProgress`.
  */
+export type FulfillmentStepFormFieldFilledBy = 'seller' | 'buyer';
+
 export interface FulfillmentStepFormField {
   key: string;
   label: string;
   type: 'text' | 'number' | 'textarea' | 'select';
   required?: boolean;
+  filled_by?: FulfillmentStepFormFieldFilledBy;
   options?: string[];
 }
 
 export interface OrderFulfillmentStepProgress {
   stepName: string;
+  /** fulfillment-praorder-plan.md §2.1 — PRAORDER (sebelum checkout) atau PASCAORDER (existing). */
+  phase: 'PRAORDER' | 'PASCAORDER';
+  /** Siapa yang menyelesaikan step ini — sumber kebenaran (bukan lagi field.filled_by di formSchema). */
+  filledBy: 'admin' | 'buyer';
   description: string | null;
   processDay: number | null;
   releasePercentage: number | null;
@@ -58,9 +66,21 @@ export interface OrderFulfillmentStepProgress {
   disputed: boolean;
 }
 
+/** 1 Termin (fulfillment-praorder-plan.md §2.4) — disisipkan di timeline lewat `anchorStepName`. */
+export interface TerminSummary {
+  id: string;
+  sequence: number;
+  label: string;
+  amount: number;
+  anchorStepName: string | null;
+  status: 'SCHEDULED' | 'ISSUED' | 'PAID' | 'CANCELLED';
+  transactionId: string | null;
+}
+
 export interface OrderFulfillmentProgress {
   flowName: string;
   steps: OrderFulfillmentStepProgress[];
+  termins: TerminSummary[];
 }
 
 /** Tersimpan di `transaction.metadata.shipping` — hanya ada kalau checkout lewat flow baru (search-select + cek ongkir real, bukan tombol label statis). */
@@ -120,7 +140,7 @@ export interface TransactionDetail {
 export interface OrderDetail {
   id: string;
   product_id: string;
-  product?: { name: string } | null;
+  product?: { name: string; images?: string[] } | null;
   quantity: number;
   unit_price: number;
   total_amount: number;
@@ -129,6 +149,8 @@ export interface OrderDetail {
   status: string;
   checkout_url: string | null;
   created_at: string;
+  /** fulfillment-praorder-plan.md §2.1 — cuma ada kalau produknya punya step Praorder & order belum checkout. */
+  praorderProgress?: OrderFulfillmentProgress | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -417,24 +439,52 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
 
 /** Tampilan order legacy (sebelum W2.8 — escrow di level order). */
 function LegacyOrderView({ order }: { order: OrderDetail }) {
+  // fulfillment-praorder-plan.md Q5 — harga 0 = belum ada penawaran (seller
+  // belum isi harga final), tampilkan "-" dulu, jangan "Rp 0" mentah
+  // (terlihat seperti gratis/rusak).
+  const awaitingQuote = order.total_amount <= 0;
+  const image = order.product?.images?.[0];
+
   return (
     <section className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div
-        className="space-y-3 rounded-xl border p-5 text-sm"
+        className="flex gap-4 rounded-xl border p-5 text-sm"
         style={{ borderColor: 'var(--brand-border)' }}
       >
-        <Row label="Produk" value={order.product?.name ?? order.product_id} />
-        <Row label="Jumlah" value={String(order.quantity)} />
-        <Row label="Total" value={`Rp ${order.total_amount.toLocaleString('id-ID')}`} />
-        <Row
-          label="Mode"
-          value={order.payment_mode === 'ESCROW' ? 'Escrow' : 'Checkout Bagdja'}
-        />
-        <Row label="Status" value={STATUS_LABEL[order.status] ?? order.status} />
-        <Row label="Tanggal" value={new Date(order.created_at).toLocaleString('id-ID')} />
+        {image ? (
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div
+            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg text-lg font-bold uppercase"
+            style={{ backgroundColor: 'var(--brand-muted)', color: 'var(--brand-on-accent)' }}
+          >
+            {(order.product?.name ?? 'P').charAt(0)}
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-3">
+          <Row label="Produk" value={order.product?.name ?? order.product_id} />
+          <Row label="Jumlah" value={String(order.quantity)} />
+          <Row
+            label="Total"
+            value={awaitingQuote ? '-' : `Rp ${order.total_amount.toLocaleString('id-ID')}`}
+          />
+          <Row
+            label="Mode"
+            value={order.payment_mode === 'ESCROW' ? 'Escrow' : 'Checkout Bagdja'}
+          />
+          <Row label="Status" value={STATUS_LABEL[order.status] ?? order.status} />
+          <Row label="Tanggal" value={new Date(order.created_at).toLocaleString('id-ID')} />
+        </div>
       </div>
 
-      {order.status === 'PENDING' && order.checkout_url && (
+      {order.praorderProgress && (
+        <PraorderStepList orderId={order.id} progress={order.praorderProgress} />
+      )}
+
+      {order.status === 'PENDING' && order.checkout_url && !awaitingQuote && (
         <a
           href={order.checkout_url}
           className="mt-6 inline-flex rounded-full px-8 py-3 text-sm font-semibold uppercase tracking-wide"

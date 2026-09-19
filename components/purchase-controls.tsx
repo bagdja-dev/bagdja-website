@@ -15,9 +15,12 @@
  */
 import { useMemo, useState } from 'react';
 import { AddToCartButton } from './cart-button';
+import type { LocationItem } from '../lib/template-data';
 
 export interface PurchaseControlsProps {
   slug: string;
+  /** Base path untuk link internal (root-relative kalau via subdomain/custom domain) — lihat `resolveTenantLinkBase`. Dipakai buat link "lihat progres penawaran". */
+  basePath?: string;
   websiteId: string;
   product: {
     id: string;
@@ -28,11 +31,16 @@ export interface PurchaseControlsProps {
     stock?: number;
   };
   paymentMode: 'ADD_TO_CART' | 'ESCROW';
+  locationIds?: string[];
+  locations?: LocationItem[];
+  cartLabel?: string;
 }
 
-export function PurchaseControls({ slug, websiteId, product, paymentMode }: PurchaseControlsProps) {
+export function PurchaseControls({ slug, basePath, websiteId, product, paymentMode, locationIds = [], locations = [], cartLabel = '+ Keranjang' }: PurchaseControlsProps) {
   const [qty, setQty] = useState(1);
-  const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [feedback, setFeedback] = useState<{ ok: boolean; message: string; href?: string } | null>(null);
+  const isQuoteRequest = product.price <= 0;
 
   const max = useMemo(() => {
     if (typeof product.stock === 'number' && product.stock > 0) return product.stock;
@@ -41,19 +49,31 @@ export function PurchaseControls({ slug, websiteId, product, paymentMode }: Purc
 
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
   const displayStock = typeof product.stock === 'number' ? product.stock : undefined;
+  const availableLocations = locations.filter((location) => locationIds.includes(location.id));
 
   const minus = () => setQty((q) => Math.max(1, q - 1));
   const plus = () => setQty((q) => (max !== undefined ? Math.min(max, q + 1) : q + 1));
 
   const handleAdded = (orderId: string) => {
-    setFeedback({ ok: true, message: 'Ditambahkan ke keranjang' });
+    setFeedback(
+      isQuoteRequest
+        ? { ok: true, message: 'Permintaan penawaran terkirim.', href: `${basePath ?? ''}/order/${orderId}` }
+        : { ok: true, message: 'Ditambahkan ke keranjang' },
+    );
   };
   const handleError = (message: string) => {
     setFeedback({ ok: false, message });
   };
 
+  const requiresLocation = locationIds.length > 0;
+
   return (
     <div className="mt-4 flex flex-col gap-3">
+      {isQuoteRequest && (
+        <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+          Harga belum ditentukan — kirim permintaan penawaran, tim kami akan menghubungi Anda.
+        </p>
+      )}
       <div className="flex items-center gap-3">
         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
           Jumlah
@@ -90,15 +110,38 @@ export function PurchaseControls({ slug, websiteId, product, paymentMode }: Purc
         )}
       </div>
 
+      {requiresLocation && (
+        <label className="flex flex-col gap-1 text-sm" style={{ color: 'var(--brand-text)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
+            Lokasi layanan
+          </span>
+          <select
+            value={selectedLocationId}
+            onChange={(event) => setSelectedLocationId(event.target.value)}
+            className="rounded-lg border px-3 py-2"
+            style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+          >
+            <option value="">Pilih lokasi layanan</option>
+            {availableLocations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}{location.city ? ` — ${location.city}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <AddToCartButton
         slug={slug}
         websiteId={websiteId}
         product={product}
         paymentMode={paymentMode}
         quantity={qty}
-        label={paymentMode === 'ESCROW' ? 'Beli (Escrow)' : '+ Keranjang'}
+        locationId={selectedLocationId || undefined}
+        label={paymentMode === 'ESCROW' ? 'Beli (Escrow)' : cartLabel}
         onAdded={handleAdded}
         onError={handleError}
+        disabled={requiresLocation && !selectedLocationId}
       />
 
       {feedback && (
@@ -107,6 +150,14 @@ export function PurchaseControls({ slug, websiteId, product, paymentMode }: Purc
           style={{ color: feedback.ok ? 'var(--success, #16a34a)' : 'var(--destructive, #dc2626)' }}
         >
           {feedback.message}
+          {feedback.href && (
+            <>
+              {' '}
+              <a href={feedback.href} className="underline">
+                Lihat progres penawaran →
+              </a>
+            </>
+          )}
         </p>
       )}
     </div>

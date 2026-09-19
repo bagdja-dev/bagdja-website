@@ -19,13 +19,14 @@ import Link from 'next/link';
 export interface CartBadgeProps {
   href: string;
   isLoggedIn: boolean;
+  label?: string;
 }
 
 interface ServerOrder {
   quantity: number;
 }
 
-export function CartBadge({ href, isLoggedIn }: CartBadgeProps) {
+export function CartBadge({ href, isLoggedIn, label = 'Keranjang' }: CartBadgeProps) {
   const [count, setCount] = useState(0);
 
   const loadServerCount = useCallback(async () => {
@@ -54,7 +55,7 @@ export function CartBadge({ href, isLoggedIn }: CartBadgeProps) {
       href={href}
       className="relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors hover:opacity-80"
       style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-      aria-label={`Keranjang, ${count} item`}
+      aria-label={`${label}, ${count} item`}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

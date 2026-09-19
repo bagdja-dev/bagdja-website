@@ -24,6 +24,8 @@ export interface CatalogItem {
   slug: string;
   description?: string;
   detail?: string;
+  specifications?: Record<string, string>;
+  estimation?: Array<{ label: string; price: number | string }>;
   priceLabel: string;
   image?: string;
   images?: string[];
@@ -33,6 +35,8 @@ export interface CatalogItem {
   model3dUrl?: string;
   /** Kalau diisi, produk ini adalah varian (warna/ukuran) dari produk lain. */
   parentProductId?: string;
+  /** Lokasi layanan yang diizinkan; kosong berarti semua lokasi. */
+  locationIds?: string[];
   /** Tag pembeda varian, mis. `{ Warna: "Oil Green", Ukuran: "38" }` — dari `metadata.variant_attributes`. */
   variantAttributes?: Record<string, string>;
   /** Stok (dari metadata.stock) — opsional, dipakai guard quantity di UI. */
@@ -44,11 +48,57 @@ export interface CatalogItem {
 export interface CategoryItem {
   id: string;
   label: string;
+  description?: string;
   images: string[];
+  specifications?: Record<string, string>;
+  estimation?: Array<{ label: string; price: number | string }>;
+}
+
+function normalizeCategorySpecifications(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter((entry): entry is [string, string | number | boolean] => typeof entry[0] === 'string')
+    .map(([key, value]): [string, string] => [key.trim(), String(value)])
+    .filter(([key, value]) => key.length > 0 && value.trim().length > 0);
+
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function normalizeCategoryEstimation(raw: unknown): Array<{ label: string; price: number | string }> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+
+  const entries: Array<{ label: string; price: number | string }> = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    if (!label) continue;
+
+    const priceValue = item.price;
+    const numericPrice =
+      typeof priceValue === 'number'
+        ? priceValue
+        : typeof priceValue === 'string'
+          ? Number(String(priceValue).replace(/[^\d.-]/g, '')) || 0
+          : 0;
+
+    entries.push({ label, price: numericPrice });
+  }
+
+  return entries.length ? entries : undefined;
 }
 
 export function toCategoryItem(category: ApiWebsiteCategory): CategoryItem {
-  return { id: category.id, label: category.label, images: category.images };
+  return {
+    id: category.id,
+    label: category.label,
+    description: category.description ?? undefined,
+    images: category.images ?? [],
+    specifications: normalizeCategorySpecifications(category.specifications),
+    estimation: normalizeCategoryEstimation(category.estimation),
+  };
 }
 
 export interface LocationItem {
@@ -186,6 +236,48 @@ function parseVariantAttributes(raw: unknown): Record<string, string> | undefine
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
+function normalizeProductSpecifications(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter((entry): entry is [string, string | number | boolean] => typeof entry[0] === 'string')
+    .map(([key, value]): [string, string] => [key.trim(), String(value)])
+    .filter(([key, value]) => key.length > 0 && value.trim().length > 0);
+
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function normalizeProductEstimation(raw: unknown): Array<{ label: string; price: number | string }> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+
+  const entries: Array<{ label: string; price: number | string }> = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    if (!label) continue;
+
+    const priceValue = item.price;
+    const numericPrice =
+      typeof priceValue === 'number'
+        ? priceValue
+        : typeof priceValue === 'string'
+          ? Number(String(priceValue).replace(/[^\d.-]/g, '')) || 0
+          : 0;
+
+    entries.push({ label, price: numericPrice });
+  }
+
+  return entries.length ? entries : undefined;
+}
+
+/**
+ * Rp 0 di katalog = sentinel "belum ada harga final, tunggu quotation admin"
+ * (fulfillment-praorder-plan.md §2.1) — bukan produk gratis. Kembalikan
+ * priceLabel kosong (falsy) supaya template pakai fallback "KONSULTASI"
+ * yang sudah ada, bukan menampilkan "Rp 0" yang membingungkan.
+ */
 export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
   return {
     id: product.id,
@@ -196,12 +288,15 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     slug: product.slug,
     description: product.description ?? undefined,
     detail: product.detail ?? undefined,
-    priceLabel: formatIDR(product.price),
+    specifications: normalizeProductSpecifications(product.specifications),
+    estimation: normalizeProductEstimation(product.estimation),
+    priceLabel: product.price > 0 ? formatIDR(product.price) : '',
     image: product.images?.[0],
     images: product.images,
     videoUrl: product.video_url ?? undefined,
     model3dUrl: product.model3d_url ?? undefined,
     parentProductId: product.parent_product_id ?? undefined,
+    locationIds: product.location_ids ?? [],
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
     stock: parseStock(product.metadata?.stock),
     paymentMeta: product.payment_meta,
@@ -263,7 +358,7 @@ function buildCatalogFromSeed(
       name: item.name,
       slug: id,
       description,
-      priceLabel: formatIDR(item.price),
+      priceLabel: item.price > 0 ? formatIDR(item.price) : '',
       image: images?.[0],
       images,
       parentProductId: parent ? (parent.key ?? undefined) : undefined,
