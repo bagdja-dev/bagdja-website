@@ -50,6 +50,24 @@ export async function backendFetch<T = unknown>(
   }
 }
 
+export async function backendFetchFormData<T = unknown>(path: string, formData: FormData): Promise<{ data: T | null; status: number; error?: string }> {
+  const { token } = await getSession();
+  if (!token) return { data: null, status: 401, error: 'Not authenticated' };
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    const data = text ? (JSON.parse(text) as T) : null;
+    return res.ok ? { data, status: res.status } : { data: null, status: res.status, error: (data as { message?: string; error?: string } | null)?.message ?? (data as { error?: string } | null)?.error ?? text };
+  } catch (error) {
+    return { data: null, status: 500, error: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
+
 /**
  * Trigger user upsert di bagdja-website-api setelah OAuth callback,
  * supaya users table terisi (pola admin syncUserToBackend — tapi Website
