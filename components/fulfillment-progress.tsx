@@ -19,6 +19,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { ConfirmDialog } from './confirm-dialog';
+import { FulfillmentFieldInput } from './fulfillment-field-input';
+import { FulfillmentFieldValue } from './fulfillment-field-value';
 import type { OrderFulfillmentProgress, OrderFulfillmentStepProgress, TransactionItem } from './order-detail-content';
 
 function formatIDR(n: number): string {
@@ -321,13 +323,13 @@ export function FulfillmentProgress({
                         )}
 
                         {sampleFormData && Object.keys(sampleFormData).length > 0 && (
-                          <div className="mt-2 space-y-0.5 text-xs">
+                          <div className="mt-2 space-y-2 text-xs">
                             {(step.formSchema ?? []).map((f) =>
                               sampleFormData?.[f.key] != null && sampleFormData[f.key] !== '' ? (
-                                <p key={f.key}>
-                                  <span style={{ color: 'var(--brand-muted)' }}>{f.label}:</span>{' '}
-                                  {String(sampleFormData?.[f.key])}
-                                </p>
+                                <div key={f.key}>
+                                  <p style={{ color: 'var(--brand-muted)' }}>{f.label}</p>
+                                  <FulfillmentFieldValue field={f} value={sampleFormData[f.key]} />
+                                </div>
                               ) : null,
                             )}
                           </div>
@@ -435,25 +437,18 @@ export function FulfillmentProgress({
 
                               {!step.completed && priorCompleted && isStepBuyerOwned(step) && (() => {
                                 const key = buyerStepKey(gi.orderId, step.stepName);
-                                const buyerFields = (step.formSchema ?? []).filter((f) => f.filled_by === 'buyer');
+                                const buyerFields = step.formSchema ?? [];
                                 return buyerFormOpen === key ? (
                                   <div className="mt-2 flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--brand-border)' }}>
                                     {buyerFields.map((f) => (
-                                      <label key={f.key} className="flex flex-col gap-1 text-xs">
-                                        <span style={{ color: 'var(--brand-muted)' }}>
-                                          {f.label}
-                                          {f.required && ' *'}
-                                        </span>
-                                        <input
-                                          type="text"
-                                          value={buyerFormData[f.key] ?? ''}
-                                          onChange={(e) =>
-                                            setBuyerFormData((prev) => ({ ...prev, [f.key]: e.target.value }))
-                                          }
-                                          className="rounded-md border px-2 py-1.5 text-sm"
-                                          style={{ borderColor: 'var(--brand-border)' }}
-                                        />
-                                      </label>
+                                      <FulfillmentFieldInput
+                                        key={f.key}
+                                        field={f}
+                                        value={buyerFormData[f.key] ?? ''}
+                                        onChange={(value) =>
+                                          setBuyerFormData((prev) => ({ ...prev, [f.key]: value }))
+                                        }
+                                      />
                                     ))}
                                     {buyerStepError[key] && (
                                       <p className="text-xs" style={{ color: 'crimson' }}>{buyerStepError[key]}</p>
@@ -491,13 +486,13 @@ export function FulfillmentProgress({
                               })()}
 
                               {step.completed && step.formData && Object.keys(step.formData).length > 0 && (
-                                <div className="mt-2 space-y-0.5 text-xs">
+                                <div className="mt-2 space-y-2 text-xs">
                                   {(step.formSchema ?? []).map((f) =>
                                     step.formData?.[f.key] != null && step.formData[f.key] !== '' ? (
-                                      <p key={f.key}>
-                                        <span style={{ color: 'var(--brand-muted)' }}>{f.label}:</span>{' '}
-                                        {String(step.formData?.[f.key])}
-                                      </p>
+                                      <div key={f.key}>
+                                        <p style={{ color: 'var(--brand-muted)' }}>{f.label}</p>
+                                        <FulfillmentFieldValue field={f} value={step.formData[f.key]} />
+                                      </div>
                                     ) : null,
                                   )}
                                 </div>

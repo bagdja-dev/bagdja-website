@@ -41,7 +41,7 @@ export type FulfillmentStepFormFieldFilledBy = 'seller' | 'buyer';
 export interface FulfillmentStepFormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea' | 'select';
+  type: 'text' | 'number' | 'textarea' | 'select' | 'pdf' | 'foto' | 'video' | 'lokasi';
   required?: boolean;
   filled_by?: FulfillmentStepFormFieldFilledBy;
   options?: string[];
@@ -149,6 +149,12 @@ export interface OrderDetail {
   status: string;
   checkout_url: string | null;
   created_at: string;
+  quoteTermins?: Array<{
+    sequence: number;
+    label: string;
+    amount: number;
+    status: 'SCHEDULED' | 'ISSUED' | 'PAID' | 'CANCELLED';
+  }>;
   /** fulfillment-praorder-plan.md §2.1 — cuma ada kalau produknya punya step Praorder & order belum checkout. */
   praorderProgress?: OrderFulfillmentProgress | null;
 }
@@ -482,6 +488,57 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
 
       {order.praorderProgress && (
         <PraorderStepList orderId={order.id} progress={order.praorderProgress} />
+      )}
+
+      {order.praorderProgress && (
+        <section
+          className="mt-6 rounded-xl border p-5"
+          style={{
+            borderColor: 'var(--brand-accent)',
+            backgroundColor: 'var(--brand-surface)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
+                Harga Penawaran
+              </h2>
+              <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                Harga final setelah proses survey dan quotation.
+              </p>
+            </div>
+            <p className="text-xl font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
+              {awaitingQuote ? '-' : `Rp ${order.total_amount.toLocaleString('id-ID')}`}
+            </p>
+          </div>
+          {!awaitingQuote && order.quantity > 1 && (
+            <p className="mt-2 text-right text-xs" style={{ color: 'var(--brand-muted)' }}>
+              Rp {order.unit_price.toLocaleString('id-ID')} × {order.quantity}
+            </p>
+          )}
+          {!awaitingQuote && (
+            <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--brand-border)' }}>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span style={{ color: 'var(--brand-muted)' }}>Skema pembayaran</span>
+                <span className="font-semibold">
+                  {order.quoteTermins && order.quoteTermins.length > 1
+                    ? `Termin (${order.quoteTermins.length} tahap)`
+                    : 'Bayar penuh'}
+                </span>
+              </div>
+              {order.quoteTermins && order.quoteTermins.length > 1 && (
+                <div className="mt-3 space-y-2 text-xs">
+                  {order.quoteTermins.map((termin) => (
+                    <div key={termin.sequence} className="flex items-center justify-between gap-4">
+                      <span style={{ color: 'var(--brand-muted)' }}>{termin.label}</span>
+                      <span className="font-semibold">Rp {termin.amount.toLocaleString('id-ID')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       )}
 
       {order.status === 'PENDING' && order.checkout_url && !awaitingQuote && (

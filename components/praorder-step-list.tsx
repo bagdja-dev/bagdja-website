@@ -14,6 +14,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { FulfillmentFieldInput } from './fulfillment-field-input';
+import { FulfillmentFieldValue } from './fulfillment-field-value';
 import type { OrderFulfillmentProgress, OrderFulfillmentStepProgress } from './order-detail-content';
 
 function stepKey(orderId: string, stepName: string): string {
@@ -114,13 +116,13 @@ export function PraorderStepList({
               )}
 
               {step.completed && step.formData && Object.keys(step.formData).length > 0 && (
-                <div className="mt-2 space-y-0.5 text-xs">
+                <div className="mt-2 space-y-2 text-xs">
                   {(step.formSchema ?? []).map((f) =>
                     step.formData?.[f.key] != null && step.formData[f.key] !== '' ? (
-                      <p key={f.key}>
-                        <span style={{ color: 'var(--brand-muted)' }}>{f.label}:</span>{' '}
-                        {String(step.formData?.[f.key])}
-                      </p>
+                      <div key={f.key}>
+                        <p style={{ color: 'var(--brand-muted)' }}>{f.label}</p>
+                        <FulfillmentFieldValue field={f} value={step.formData[f.key]} />
+                      </div>
                     ) : null,
                   )}
                 </div>
@@ -131,19 +133,13 @@ export function PraorderStepList({
                 (openKey === key ? (
                   <div className="mt-2 flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--brand-border)' }}>
                     {(step.formSchema ?? []).map((f) => (
-                      <label key={f.key} className="flex flex-col gap-1 text-xs">
-                        <span style={{ color: 'var(--brand-muted)' }}>
-                          {f.label}
-                          {f.required && ' *'}
-                        </span>
-                        <input
-                          type="text"
-                          value={formData[f.key] ?? ''}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                          className="rounded-md border px-2 py-1.5 text-sm"
-                          style={{ borderColor: 'var(--brand-border)' }}
-                        />
-                      </label>
+                      <FulfillmentFieldInput
+                        key={f.key}
+                        field={f}
+                        orderId={orderId}
+                        value={formData[f.key] ?? ''}
+                        onChange={(value) => setFormData((prev) => ({ ...prev, [f.key]: value }))}
+                      />
                     ))}
                     {errorByKey[key] && (
                       <p className="text-xs" style={{ color: 'crimson' }}>{errorByKey[key]}</p>

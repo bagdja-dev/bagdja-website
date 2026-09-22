@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { backendFetch } from '../../../../lib/backend-api';
+import { backendFetch, backendFetchFormData } from '../../../../lib/backend-api';
 
 /**
  * BFF route /api/orders/:id — update qty / hapus draft PENDING milik buyer.
@@ -64,5 +64,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       { status: result.status },
     );
   }
+  return NextResponse.json(result.data, { status: 200 });
+}
+
+export async function POST(request: NextRequest, { params }: RouteContext) {
+  const incoming = await request.formData();
+  const file = incoming.get('file');
+  if (!(file instanceof Blob)) return NextResponse.json({ message: 'File wajib diunggah' }, { status: 400 });
+  const outgoing = new FormData();
+  outgoing.append('file', file, file instanceof File ? file.name : 'fulfillment-asset');
+  const result = await backendFetchFormData(`/api/orders/${params.id}/fulfillment-assets`, outgoing);
+  if (!result.data || result.status >= 400) return NextResponse.json({ message: result.error ?? 'Upload gagal' }, { status: result.status });
   return NextResponse.json(result.data, { status: 200 });
 }

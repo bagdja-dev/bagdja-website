@@ -18,6 +18,7 @@
  * Qty editable (PATCH via BFF) + hapus (DELETE via BFF).
  */
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ServerOrder {
@@ -69,7 +70,25 @@ function CartIcon({ className = '' }: { className?: string }) {
   );
 }
 
+function ViewOrderIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6-9.75-6-9.75-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </svg>
+  );
+}
+
+function RemoveIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m9 9 .5 9m5-9-.5 9M5 6h14m-9-3h4l1 3H9l1-3Zm-3 3 .7 13h8.6L17 6" />
+    </svg>
+  );
+}
+
 export function CartContent({ basePath }: { basePath: string }) {
+  const router = useRouter();
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -314,7 +333,20 @@ export function CartContent({ basePath }: { basePath: string }) {
             return (
               <li
                 key={line.key}
-                className="flex gap-4 rounded-xl border p-4 transition-colors"
+                className="flex cursor-pointer gap-4 rounded-xl border p-4 transition-colors hover:shadow-sm"
+                role="link"
+                tabIndex={0}
+                onClick={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest('a,button,input,select,textarea')) return;
+                  router.push(`${basePath}/order/${line.orderId}`);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    router.push(`${basePath}/order/${line.orderId}`);
+                  }
+                }}
                 style={{
                   backgroundColor: 'var(--brand-surface)',
                   borderColor: isSelected ? 'var(--brand-accent)' : 'var(--brand-border)',
@@ -371,16 +403,28 @@ export function CartContent({ basePath }: { basePath: string }) {
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeServerItem(line)}
-                      disabled={isBusy}
-                      className="shrink-0 text-xs font-medium hover:opacity-70 disabled:opacity-50"
-                      style={{ color: 'var(--brand-muted)' }}
-                      aria-label={`Hapus ${line.name}`}
-                    >
-                      Hapus
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`${basePath}/order/${line.orderId}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/5"
+                        style={{ color: 'var(--brand-muted)' }}
+                        aria-label={`Lihat detail order ${line.name}`}
+                        title="Lihat detail order"
+                      >
+                        <ViewOrderIcon />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => removeServerItem(line)}
+                        disabled={isBusy}
+                        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/5 disabled:opacity-50"
+                        style={{ color: 'var(--brand-muted)' }}
+                        aria-label={`Hapus ${line.name}`}
+                        title="Hapus item"
+                      >
+                        <RemoveIcon />
+                      </button>
+                    </div>
                   </div>
 
                   {line.description && (
