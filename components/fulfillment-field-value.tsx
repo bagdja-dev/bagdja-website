@@ -1,5 +1,23 @@
 import type { FulfillmentStepFormField } from './order-detail-content';
 
+interface MediaValue {
+  url: string;
+  description: string;
+}
+
+function normalizeMediaValues(value: unknown): MediaValue[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (typeof item === 'string' && item) return [{ url: item, description: '' }];
+      if (item && typeof item === 'object' && 'url' in item && typeof item.url === 'string') {
+        return [{ url: item.url, description: typeof item.description === 'string' ? item.description : '' }];
+      }
+      return [];
+    });
+  }
+  return typeof value === 'string' && value ? [{ url: value, description: '' }] : [];
+}
+
 export function FulfillmentFieldValue({
   field,
   value,
@@ -7,28 +25,21 @@ export function FulfillmentFieldValue({
   field: FulfillmentStepFormField;
   value: unknown;
 }) {
-  const text = String(value ?? '').trim();
-  if (!text) return null;
+  const values = normalizeMediaValues(value);
+  if (values.length === 0) return null;
+  const text = values[0].url;
 
   if (field.type === 'foto') {
-    return (
-      <a href={text} target="_blank" rel="noreferrer" className="mt-1 block overflow-hidden rounded-lg border" style={{ borderColor: 'var(--brand-border)' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={text} alt={field.label} className="max-h-56 w-full object-cover" />
-      </a>
-    );
+    return <div className="mt-1 flex flex-col gap-2">{values.map((item, index) => <div key={`${item.url}-${index}`} className="flex items-center gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="inline-flex h-16 w-16 shrink-0 self-start overflow-hidden rounded-lg border bg-white" style={{ borderColor: 'var(--brand-border)' }}><img src={item.url} alt={`${field.label} ${index + 1}`} className="h-full w-full object-cover" /></a>{item.description && <span className="text-xs">{item.description}</span>}</div>)}</div>;
   }
 
   if (field.type === 'video') {
-    return <video src={text} controls className="mt-1 max-h-64 w-full rounded-lg border bg-black" style={{ borderColor: 'var(--brand-border)' }} />;
+    return <div className="mt-1 flex flex-col gap-2">{values.map((item, index) => <div key={`${item.url}-${index}`} className="flex items-center gap-3"><video src={item.url} controls className="h-16 w-16 shrink-0 rounded-lg border bg-black object-cover" style={{ borderColor: 'var(--brand-border)' }} />{item.description && <span className="text-xs">{item.description}</span>}</div>)}</div>;
   }
 
   if (field.type === 'pdf') {
     return (
-      <a href={text} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-2 font-medium" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
-        <span aria-hidden="true">PDF</span>
-        <span className="max-w-xs truncate">Buka dokumen</span>
-      </a>
+      <div className="mt-1 flex flex-col gap-2">{values.map((item, index) => <div key={`${item.url}-${index}`} className="flex items-center gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border text-xs font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)', backgroundColor: 'var(--brand-surface)' }}><span aria-hidden="true">PDF {index + 1}</span></a>{item.description && <span className="text-xs">{item.description}</span>}</div>)}</div>
     );
   }
 

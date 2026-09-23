@@ -15,6 +15,7 @@ export function ConfirmDialog({
   cancelLabel = 'Batal',
   variant = 'primary',
   loading = false,
+  showCancel = true,
   onConfirm,
   onCancel,
 }: {
@@ -26,6 +27,7 @@ export function ConfirmDialog({
   cancelLabel?: string;
   variant?: 'primary' | 'danger';
   loading?: boolean;
+  showCancel?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -69,20 +71,22 @@ export function ConfirmDialog({
           </p>
         )}
         <div className="mt-6 flex gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className="flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-          >
-            {cancelLabel}
-          </button>
+          {showCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 rounded-full px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`${showCancel ? 'flex-1' : 'w-full'} rounded-full px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50`}
             style={
               variant === 'danger'
                 ? { backgroundColor: 'crimson', color: '#fff' }

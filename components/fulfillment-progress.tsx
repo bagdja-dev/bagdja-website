@@ -103,10 +103,12 @@ export function FulfillmentProgress({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [buyerFormData, setBuyerFormData] = useState<Record<string, string>>({});
+  const [buyerFormData, setBuyerFormData] = useState<Record<string, unknown>>({});
   const [buyerFormOpen, setBuyerFormOpen] = useState<string | null>(null);
   const [buyerStepBusy, setBuyerStepBusy] = useState<string | null>(null);
   const [buyerStepError, setBuyerStepError] = useState<Record<string, string>>({});
+  const [savedMessage, setSavedMessage] = useState('');
+  const [savingBuyerKey, setSavingBuyerKey] = useState<string | null>(null);
   const [terminBusy, setTerminBusy] = useState<string | null>(null);
   const [terminError, setTerminError] = useState<Record<string, string>>({});
 
@@ -136,7 +138,8 @@ export function FulfillmentProgress({
     // per-field lagi (field.filled_by di formSchema sudah tidak dipakai).
     const buyerFields = step.formSchema ?? [];
     for (const field of buyerFields) {
-      if (field.required && !buyerFormData[field.key]?.trim()) {
+      const fieldValue = buyerFormData[field.key];
+      if (field.required && (!fieldValue || (typeof fieldValue === 'string' && !fieldValue.trim()) || (Array.isArray(fieldValue) && fieldValue.length === 0))) {
         setBuyerStepError((prev) => ({ ...prev, [key]: `Field "${field.label}" wajib diisi` }));
         return;
       }
@@ -144,9 +147,12 @@ export function FulfillmentProgress({
     setBuyerStepBusy(key);
     setBuyerStepError((prev) => ({ ...prev, [key]: '' }));
     try {
-      const formData: Record<string, string> = {};
+      const formData: Record<string, unknown> = {};
       for (const field of buyerFields) {
-        if (buyerFormData[field.key]?.trim()) formData[field.key] = buyerFormData[field.key].trim();
+        const fieldValue = buyerFormData[field.key];
+        if (Array.isArray(fieldValue) ? fieldValue.length > 0 : typeof fieldValue === 'string' && fieldValue.trim()) {
+          formData[field.key] = Array.isArray(fieldValue) ? fieldValue : String(fieldValue).trim();
+        }
       }
       const res = await fetch(`/api/transactions/${transactionId}/orders/${orderId}/steps/complete`, {
         method: 'POST',
@@ -167,6 +173,25 @@ export function FulfillmentProgress({
       }));
     } finally {
       setBuyerStepBusy(null);
+    }
+  }
+
+  async function saveBuyerDraft(orderId: string, step: OrderFulfillmentStepProgress) {
+    const key = buyerStepKey(orderId, step.stepName);
+    setSavingBuyerKey(key);
+    try {
+      const res = await fetch(`/api/transactions/${transactionId}/orders/${orderId}/steps/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_name: step.stepName, form_data: buyerFormData }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message ?? 'Gagal menyimpan draft');
+      setSavedMessage(`${step.stepName} berhasil disimpan.`);
+    } catch (err) {
+      setBuyerStepError((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : 'Gagal menyimpan draft' }));
+    } finally {
+      setSavingBuyerKey(null);
     }
   }
 
@@ -464,19 +489,31 @@ export function FulfillmentProgress({
                                       </button>
                                       <button
                                         type="button"
+                                        disabled={savingBuyerKey === key || buyerStepBusy === key}
+                                        onClick={() => void saveBuyerDraft(gi.orderId, step)}
+                                        className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                                        style={{ border: '1px solid var(--brand-border)' }}
+                                      >
+                                        {savingBuyerKey === key ? 'Menyimpan…' : 'Simpan'}
+                                      </button>
+                                      <button
+                                        type="button"
                                         disabled={buyerStepBusy === key}
                                         onClick={() => submitBuyerStep(gi.orderId, step)}
                                         className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                                         style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                                       >
-                                        {buyerStepBusy === key ? 'Menyimpan…' : 'Tandai Selesai'}
+                                        {buyerStepBusy === key ? 'Mengirim…' : 'Kirim'}
                                       </button>
                                     </div>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => setBuyerFormOpen(key)}
+                                    onClick={() => {
+                                      setBuyerFormData(step.formData ?? {});
+                                      setBuyerFormOpen(key);
+                                    }}
                                     className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
                                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                                   >
@@ -634,6 +671,15 @@ export function FulfillmentProgress({
         loading={loading}
         onConfirm={handleConfirm}
         onCancel={handleCancelDialog}
+      />
+      <ConfirmDialog
+        open={Boolean(savedMessage)}
+        title="Tersimpan"
+        message={savedMessage}
+        confirmLabel="Tutup"
+        showCancel={false}
+        onConfirm={() => setSavedMessage('')}
+        onCancel={() => setSavedMessage('')}
       />
     </section>
   );

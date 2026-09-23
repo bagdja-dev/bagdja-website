@@ -32,10 +32,14 @@ interface ServerOrder {
     price?: number;
     parent_product_id?: string | null;
     metadata?: { variant_attributes?: Record<string, string> };
+    quotable?: boolean;
+    uom?: { symbol?: string } | null;
   };
   quantity: number;
   unit_price: number;
   total_amount: number;
+  quoted_total_amount: number | null;
+  quoteTermins?: Array<{ sequence: number; label: string; amount: number }>;
   status: string;
   transaction_id: string | null;  payment_mode: string;
   /** Ada kalau produknya punya step Praorder di Fulfillment Flow-nya — TERLEPAS dari harga (bisa produk harga fix yang tetap butuh survey/denah sebelum produksi). */
@@ -56,6 +60,10 @@ interface CartLine {
   variantAttributes?: Record<string, string>;
   isVariant: boolean;
   hasIncompletePraorderSteps: boolean;
+  isQuotable: boolean;
+  quotedTotal: number | null;
+  uomSymbol?: string;
+  quoteTermins?: Array<{ sequence: number; label: string; amount: number }>;
 }
 
 function CartIcon({ className = '' }: { className?: string }) {
@@ -100,12 +108,14 @@ export function CartContent({ basePath }: { basePath: string }) {
       const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
       if (!res.ok) {
         setServerError('Gagal memuat keranjang dari server');
+        setServerOrders([]);
         return;
       }
       const data = (await res.json()) as { data?: ServerOrder[] };
       setServerOrders(data?.data ?? []);
     } catch {
       setServerError('Gagal memuat keranjang dari server');
+      setServerOrders([]);
     }
   }, []);
 
@@ -135,6 +145,10 @@ export function CartContent({ basePath }: { basePath: string }) {
         variantAttributes: o.product?.metadata?.variant_attributes,
         isVariant: Boolean(o.product?.parent_product_id),
         hasIncompletePraorderSteps: Boolean(o.praorderProgress?.steps?.some((s) => !s.completed)),
+        isQuotable: Boolean(o.product?.quotable),
+        quotedTotal: o.quoted_total_amount != null ? Number(o.quoted_total_amount) : null,
+        uomSymbol: o.product?.uom?.symbol,
+        quoteTermins: o.quoteTermins,
       })),
     [serverOrders],
   );
@@ -256,6 +270,22 @@ export function CartContent({ basePath }: { basePath: string }) {
     );
   }, []);
 
+  if (serverOrders === null) {
+    return (
+      <main className="mx-auto flex max-w-3xl flex-col items-center px-4 py-16 text-center">
+        <span
+          className="h-10 w-10 animate-spin rounded-full border-4 border-current border-t-transparent"
+          style={{ color: 'var(--brand-accent)' }}
+          role="status"
+          aria-label="Memuat keranjang"
+        />
+        <p className="mt-4 text-sm" style={{ color: 'var(--brand-muted)' }}>
+          Memuat keranjang...
+        </p>
+      </main>
+    );
+  }
+
   if (lines.length === 0) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16 text-center">
@@ -286,7 +316,7 @@ export function CartContent({ basePath }: { basePath: string }) {
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Keranjang
+          Pesanan
           <span className="ml-2 text-sm font-normal" style={{ color: 'var(--brand-muted)' }}>
             ({displayCount} item)
           </span>
@@ -302,9 +332,9 @@ export function CartContent({ basePath }: { basePath: string }) {
         </p>
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Daftar item */}
-        <div>
+        <div className="min-w-0">
           <button
             type="button"
             onClick={toggleAll}
@@ -329,6 +359,7 @@ export function CartContent({ basePath }: { basePath: string }) {
           {lines.map((line) => {
             const isBusy = busyKey === line.key;
             const lineTotal = line.unitPrice * line.quantity;
+            const quantityLocked = line.isQuotable && line.quotedTotal !== null;
             const isSelected = selectedKeys.has(line.key);
             return (
               <li
@@ -441,7 +472,7 @@ export function CartContent({ basePath }: { basePath: string }) {
                       <button
                         type="button"
                         onClick={() => changeServerQty(line, line.quantity - 1)}
-                        disabled={isBusy || line.quantity <= 1}
+                        disabled={isBusy || quantityLocked || line.quantity <= 1}
                         className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
                         style={{ borderColor: 'var(--brand-border)' }}
                         aria-label="Kurangi"
@@ -454,7 +485,7 @@ export function CartContent({ basePath }: { basePath: string }) {
                       <button
                         type="button"
                         onClick={() => changeServerQty(line, line.quantity + 1)}
-                        disabled={isBusy}
+                        disabled={isBusy || quantityLocked}
                         className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
                         style={{ borderColor: 'var(--brand-border)' }}
                         aria-label="Tambah"
@@ -474,12 +505,41 @@ export function CartContent({ basePath }: { basePath: string }) {
                         </Link>
                       ) : (
                         <>
-                          <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
-                            Rp {line.unitPrice.toLocaleString('id-ID')} × {line.quantity}
-                          </p>
-                          <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-                            Rp {lineTotal.toLocaleString('id-ID')}
-                          </p>
+                          {line.quotedTotal !== null ? (
+                            <>
+                              <p
+                                className="text-[11px] font-medium uppercase tracking-wide"
+                                style={{ color: 'var(--brand-muted)' }}
+                              >
+                                Harga final
+                              </p>
+                              <p className="text-lg font-bold leading-tight" style={{ color: 'var(--brand-accent-muted)' }}>
+                                Rp {line.quotedTotal.toLocaleString('id-ID')}
+                              </p>
+                              <div className="mt-1.5 space-y-0.5 text-xs">
+                                {(line.quoteTermins ?? []).map((termin) => (
+                                  <p
+                                    key={termin.sequence}
+                                    className={termin.sequence === 1 ? 'font-semibold' : undefined}
+                                    style={{
+                                      color: termin.sequence === 1 ? 'var(--brand-text)' : 'var(--brand-muted)',
+                                    }}
+                                  >
+                                    {termin.label} — Rp {termin.amount.toLocaleString('id-ID')}
+                                  </p>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                                Rp {line.unitPrice.toLocaleString('id-ID')}{line.uomSymbol ? `/${line.uomSymbol}` : ''} × {line.quantity}{line.uomSymbol ? ` ${line.uomSymbol}` : ''}
+                              </p>
+                              <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
+                                Rp {lineTotal.toLocaleString('id-ID')}
+                              </p>
+                            </>
+                          )}
                           {line.hasIncompletePraorderSteps && (
                             <Link
                               href={`${basePath}/order/${line.orderId}`}
@@ -488,6 +548,11 @@ export function CartContent({ basePath }: { basePath: string }) {
                             >
                               Lengkapi Data Praorder
                             </Link>
+                          )}
+                          {quantityLocked && (
+                            <p className="mt-2 text-[11px]" style={{ color: 'var(--brand-muted)' }}>
+                              Jumlah terkunci setelah quotation
+                            </p>
                           )}
                         </>
                       )}
@@ -502,7 +567,7 @@ export function CartContent({ basePath }: { basePath: string }) {
 
         {/* Ringkasan */}
         <aside
-          className="h-fit rounded-xl border p-5"
+          className="h-fit min-w-0 rounded-xl border p-5"
           style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
         >
           <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>

@@ -20,6 +20,7 @@ export interface TransactionProduct {
   name?: string;
   images?: string[];
   description?: string | null;
+  uom?: { symbol?: string } | null;
 }
 
 export interface TransactionItem {
@@ -45,6 +46,7 @@ export interface FulfillmentStepFormField {
   required?: boolean;
   filled_by?: FulfillmentStepFormFieldFilledBy;
   options?: string[];
+  max_files?: number;
 }
 
 export interface OrderFulfillmentStepProgress {
@@ -140,10 +142,11 @@ export interface TransactionDetail {
 export interface OrderDetail {
   id: string;
   product_id: string;
-  product?: { name: string; images?: string[] } | null;
+  product?: { name: string; images?: string[]; quotable?: boolean; uom?: { symbol?: string } | null } | null;
   quantity: number;
   unit_price: number;
   total_amount: number;
+  quoted_total_amount: number | null;
   currency: string;
   payment_mode: 'ADD_TO_CART' | 'ESCROW';
   status: string;
@@ -287,7 +290,7 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
                       </p>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span className="text-sm font-semibold">
-                          {item.quantity} × Rp {Number(item.unit_price).toLocaleString('id-ID')}
+                          {item.quantity}{item.order?.product?.uom?.symbol ? ` ${item.order.product.uom.symbol}` : ''} × Rp {Number(item.unit_price).toLocaleString('id-ID')}{item.order?.product?.uom?.symbol ? `/${item.order.product.uom.symbol}` : ''}
                         </span>
                         <span className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
                           Rp {Number(item.total_amount).toLocaleString('id-ID')}
@@ -448,7 +451,8 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
   // fulfillment-praorder-plan.md Q5 — harga 0 = belum ada penawaran (seller
   // belum isi harga final), tampilkan "-" dulu, jangan "Rp 0" mentah
   // (terlihat seperti gratis/rusak).
-  const awaitingQuote = order.total_amount <= 0;
+  const finalQuoteAmount = order.quoted_total_amount ?? order.total_amount;
+  const awaitingQuote = Boolean(order.product?.quotable && order.quoted_total_amount == null);
   const image = order.product?.images?.[0];
 
   return (
@@ -475,7 +479,7 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
           <Row label="Jumlah" value={String(order.quantity)} />
           <Row
             label="Total"
-            value={awaitingQuote ? '-' : `Rp ${order.total_amount.toLocaleString('id-ID')}`}
+            value={awaitingQuote ? '-' : `Rp ${finalQuoteAmount.toLocaleString('id-ID')}`}
           />
           <Row
             label="Mode"
@@ -508,12 +512,12 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
               </p>
             </div>
             <p className="text-xl font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-              {awaitingQuote ? '-' : `Rp ${order.total_amount.toLocaleString('id-ID')}`}
+              {awaitingQuote ? '-' : `Rp ${finalQuoteAmount.toLocaleString('id-ID')}`}
             </p>
           </div>
           {!awaitingQuote && order.quantity > 1 && (
             <p className="mt-2 text-right text-xs" style={{ color: 'var(--brand-muted)' }}>
-              Rp {order.unit_price.toLocaleString('id-ID')} × {order.quantity}
+              Rp {order.unit_price.toLocaleString('id-ID')}{order.product?.uom?.symbol ? `/${order.product.uom.symbol}` : ''} × {order.quantity}{order.product?.uom?.symbol ? ` ${order.product.uom.symbol}` : ''}
             </p>
           )}
           {!awaitingQuote && (

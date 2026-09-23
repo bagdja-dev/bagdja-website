@@ -96,7 +96,7 @@ export function StoreClassicHeader({
           )}
         </a>
 
-        <nav className="hidden flex-1 items-center justify-start gap-8 sm:ml-8 sm:flex">
+        <nav className="hidden min-w-0 flex-1 items-center justify-start gap-8 overflow-x-auto sm:ml-8 sm:flex">
           {navLinks.map((link) => (
             <a
               key={link.href}

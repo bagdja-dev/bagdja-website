@@ -62,12 +62,22 @@ interface WebsiteTransactionRow {
   items?: TransactionItemRow[];
 }
 
+interface CancelledPreorderRow {
+  id: string;
+  status: 'CANCELLED';
+  created_at: string;
+  total_amount: number | string;
+  quoted_total_amount: number | string | null;
+  product?: { name?: string | null; images?: string[] | null } | null;
+  quantity: number;
+}
+
 interface OrdersContentProps {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
 }
 
-type TabKey = 'all' | 'awaiting' | 'process' | 'done' | 'cancelled';
+type TabKey = 'all' | 'awaiting' | 'process' | 'done' | 'cancelled' | 'preorder-cancelled';
 
 const TABS: Array<{ key: TabKey; label: string; match?: (s: string) => boolean }> = [
   { key: 'all', label: 'Semua' },
@@ -91,6 +101,7 @@ const TABS: Array<{ key: TabKey; label: string; match?: (s: string) => boolean }
     label: 'Dibatalkan',
     match: (s) => s === 'CANCELLED' || s === 'CLOSED' || s === 'REFUNDED',
   },
+  { key: 'preorder-cancelled', label: 'Praorder Dibatalkan' },
 ];
 
 function pillBg(tone: StatusPillTone): { bg: string; color: string } {
@@ -135,6 +146,7 @@ function shortId(id: string): string {
 
 export function OrdersContent({ basePath }: OrdersContentProps) {
   const [rows, setRows] = useState<WebsiteTransactionRow[]>([]);
+  const [cancelledPreorders, setCancelledPreorders] = useState<CancelledPreorderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('all');
@@ -173,6 +185,11 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
             : [];
         list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         if (!cancelled) setRows(list);
+        const preorderResponse = await fetch('/api/orders/preorders/cancelled', { credentials: 'include' });
+        if (preorderResponse.ok) {
+          const preorderData = (await preorderResponse.json()) as CancelledPreorderRow[];
+          if (!cancelled) setCancelledPreorders(preorderData);
+        }
       } catch (e) {
         if (!cancelled) setError('Terjadi kesalahan jaringan. Coba sebentar lagi.');
       } finally {
@@ -185,13 +202,14 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
   }, []);
 
   const filtered = useMemo(() => {
+    if (tab === 'preorder-cancelled') return [];
     const t = TABS.find((x) => x.key === tab);
     if (!t || !t.match) return rows;
     return rows.filter((r) => t.match!(r.status));
   }, [rows, tab]);
 
   const tabCounts = useMemo(() => {
-    const cnt: Record<TabKey, number> = { all: rows.length, awaiting: 0, process: 0, done: 0, cancelled: 0 };
+    const cnt: Record<TabKey, number> = { all: rows.length + cancelledPreorders.length, awaiting: 0, process: 0, done: 0, cancelled: 0, 'preorder-cancelled': cancelledPreorders.length };
     for (const r of rows) {
       for (const t of TABS) {
         if (t.match?.(r.status)) {
@@ -200,7 +218,7 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
       }
     }
     return cnt;
-  }, [rows]);
+  }, [rows, cancelledPreorders]);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -279,11 +297,29 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && tab === 'preorder-cancelled' && cancelledPreorders.length === 0 && (
         <EmptyState tab={tab} basePath={basePath} hasAny={rows.length > 0} />
       )}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && tab === 'preorder-cancelled' && cancelledPreorders.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {cancelledPreorders.map((row) => (
+            <article key={row.id} className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{row.product?.name ?? 'Produk'}</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{formatDate(row.created_at)} • {row.quantity} item</p>
+                </div>
+                <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(107,114,128,0.14)', color: 'rgb(75,85,99)' }}>Dibatalkan</span>
+              </div>
+              <p className="mt-3 font-semibold">Harga quotation: {formatMoney(row.quoted_total_amount ?? row.total_amount)}</p>
+              <a href={`${basePath}/order/${row.id}`} className="mt-3 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Detail</a>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {!loading && !error && tab !== 'preorder-cancelled' && filtered.length > 0 && (
         <div className="flex flex-col gap-3">
           {filtered.map((row) => (
             <TransactionCard key={row.id} row={row} basePath={basePath} />

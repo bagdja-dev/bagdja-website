@@ -34,6 +34,7 @@ interface DraftProduct {
   description?: string | null;
   /** fulfillment-praorder-plan.md §2.6/§0.1 (Q10) — independen dari `type`/vendor-routing. */
   requires_shipping?: boolean;
+  uom?: { symbol?: string } | null;
 }
 
 interface ServerOrder {
@@ -183,6 +184,7 @@ export function CheckoutContent({
         description: o.product?.description ?? undefined,
         qty: o.quantity,
         price: Number(o.unit_price),
+        uomSymbol: o.product?.uom?.symbol,
         mode: o.payment_mode,
       })),
     [draftOrders],
@@ -443,7 +445,7 @@ export function CheckoutContent({
                     </p>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold">
-                        {item.qty} × Rp {item.price.toLocaleString('id-ID')}
+                        {item.qty}{item.uomSymbol ? ` ${item.uomSymbol}` : ''} × Rp {item.price.toLocaleString('id-ID')}{item.uomSymbol ? `/${item.uomSymbol}` : ''}
                       </span>
                       <span className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
                         Rp {(item.price * item.qty).toLocaleString('id-ID')}

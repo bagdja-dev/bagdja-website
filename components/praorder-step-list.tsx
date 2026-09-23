@@ -16,6 +16,7 @@ import { useState } from 'react';
 
 import { FulfillmentFieldInput } from './fulfillment-field-input';
 import { FulfillmentFieldValue } from './fulfillment-field-value';
+import { ConfirmDialog } from './confirm-dialog';
 import type { OrderFulfillmentProgress, OrderFulfillmentStepProgress } from './order-detail-content';
 
 function stepKey(orderId: string, stepName: string): string {
@@ -30,16 +31,19 @@ export function PraorderStepList({
   progress: OrderFulfillmentProgress;
 }) {
   const router = useRouter();
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorByKey, setErrorByKey] = useState<Record<string, string>>({});
+  const [savedMessage, setSavedMessage] = useState('');
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   async function submitStep(step: OrderFulfillmentStepProgress) {
     const key = stepKey(orderId, step.stepName);
     const fields = step.formSchema ?? [];
     for (const field of fields) {
-      if (field.required && !formData[field.key]?.trim()) {
+      const fieldValue = formData[field.key];
+      if (field.required && (!fieldValue || (typeof fieldValue === 'string' && !fieldValue.trim()) || (Array.isArray(fieldValue) && fieldValue.length === 0))) {
         setErrorByKey((prev) => ({ ...prev, [key]: `Field "${field.label}" wajib diisi` }));
         return;
       }
@@ -47,9 +51,12 @@ export function PraorderStepList({
     setBusyKey(key);
     setErrorByKey((prev) => ({ ...prev, [key]: '' }));
     try {
-      const payload: Record<string, string> = {};
+      const payload: Record<string, unknown> = {};
       for (const field of fields) {
-        if (formData[field.key]?.trim()) payload[field.key] = formData[field.key].trim();
+        const fieldValue = formData[field.key];
+        if (Array.isArray(fieldValue) ? fieldValue.length > 0 : typeof fieldValue === 'string' && fieldValue.trim()) {
+          payload[field.key] = Array.isArray(fieldValue) ? fieldValue : String(fieldValue).trim();
+        }
       }
       const res = await fetch(`/api/orders/${orderId}/steps/complete`, {
         method: 'POST',
@@ -70,6 +77,25 @@ export function PraorderStepList({
       }));
     } finally {
       setBusyKey(null);
+    }
+  }
+
+  async function saveDraft(step: OrderFulfillmentStepProgress) {
+    const key = stepKey(orderId, step.stepName);
+    setSavingKey(key);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/steps/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_name: step.stepName, form_data: formData }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message ?? 'Gagal menyimpan draft');
+      setSavedMessage(`${step.stepName} berhasil disimpan.`);
+    } catch (err) {
+      setErrorByKey((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : 'Gagal menyimpan draft' }));
+    } finally {
+      setSavingKey(null);
     }
   }
 
@@ -155,19 +181,31 @@ export function PraorderStepList({
                       </button>
                       <button
                         type="button"
+                        disabled={savingKey === key || busyKey === key}
+                        onClick={() => void saveDraft(step)}
+                        className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                        style={{ border: '1px solid var(--brand-border)' }}
+                      >
+                        {savingKey === key ? 'Menyimpan…' : 'Simpan'}
+                      </button>
+                      <button
+                        type="button"
                         disabled={busyKey === key}
                         onClick={() => submitStep(step)}
                         className="rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                         style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                       >
-                        {busyKey === key ? 'Menyimpan…' : 'Tandai Selesai'}
+                        {busyKey === key ? 'Mengirim…' : 'Kirim'}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setOpenKey(key)}
+                    onClick={() => {
+                      setFormData(step.formData ?? {});
+                      setOpenKey(key);
+                    }}
                     className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                   >
@@ -178,6 +216,15 @@ export function PraorderStepList({
           );
         })}
       </ol>
+      <ConfirmDialog
+        open={Boolean(savedMessage)}
+        title="Tersimpan"
+        message={savedMessage}
+        confirmLabel="Tutup"
+        showCancel={false}
+        onConfirm={() => setSavedMessage('')}
+        onCancel={() => setSavedMessage('')}
+      />
     </section>
   );
 }

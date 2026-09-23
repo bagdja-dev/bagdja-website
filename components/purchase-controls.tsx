@@ -14,6 +14,7 @@
  * cart lokal dengan orderId. Pesan hasil/error ditampilkan inline.
  */
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AddToCartButton } from './cart-button';
 import type { LocationItem } from '../lib/template-data';
 
@@ -37,6 +38,7 @@ export interface PurchaseControlsProps {
 }
 
 export function PurchaseControls({ slug, basePath, websiteId, product, paymentMode, locationIds = [], locations = [], cartLabel = '+ Keranjang' }: PurchaseControlsProps) {
+  const router = useRouter();
   const [qty, setQty] = useState(1);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string; href?: string } | null>(null);
@@ -55,11 +57,11 @@ export function PurchaseControls({ slug, basePath, websiteId, product, paymentMo
   const plus = () => setQty((q) => (max !== undefined ? Math.min(max, q + 1) : q + 1));
 
   const handleAdded = (orderId: string) => {
-    setFeedback(
-      isQuoteRequest
-        ? { ok: true, message: 'Permintaan penawaran terkirim.', href: `${basePath ?? ''}/order/${orderId}` }
-        : { ok: true, message: 'Ditambahkan ke keranjang' },
-    );
+    if (isQuoteRequest) {
+      router.push(`${basePath ?? ''}/order/${orderId}`);
+      return;
+    }
+    setFeedback({ ok: true, message: 'Ditambahkan ke keranjang' });
   };
   const handleError = (message: string) => {
     setFeedback({ ok: false, message });
