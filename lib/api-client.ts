@@ -90,6 +90,7 @@ export interface ApiWebsiteProduct {
   specifications?: Record<string, string> | null;
   estimation?: Array<{ label: string; price: number | string | null }> | null;
   price: number;
+  uom?: { code: string; label: string; symbol: string } | null;
   images: string[];
   video_url?: string | null;
   model3d_url?: string | null;

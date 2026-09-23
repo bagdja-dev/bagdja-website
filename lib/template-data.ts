@@ -27,6 +27,7 @@ export interface CatalogItem {
   specifications?: Record<string, string>;
   estimation?: Array<{ label: string; price: number | string }>;
   priceLabel: string;
+  uomSymbol?: string;
   image?: string;
   images?: string[];
   /** Video produk (opsional), diupload lewat bagdja-storage-service. */
@@ -290,7 +291,8 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     detail: product.detail ?? undefined,
     specifications: normalizeProductSpecifications(product.specifications),
     estimation: normalizeProductEstimation(product.estimation),
-    priceLabel: product.price > 0 ? formatIDR(product.price) : '',
+    priceLabel: product.price > 0 ? `${formatIDR(product.price)}${product.uom?.symbol ? `/${product.uom.symbol}` : ''}` : '',
+    uomSymbol: product.uom?.symbol,
     image: product.images?.[0],
     images: product.images,
     videoUrl: product.video_url ?? undefined,
