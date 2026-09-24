@@ -13,22 +13,23 @@ import Link from 'next/link';
 export interface TagihanBadgeProps {
   href: string;
   isLoggedIn: boolean;
+  websiteId: string;
   label?: string;
 }
 
-export function TagihanBadge({ href, isLoggedIn, label = 'Tagihan' }: TagihanBadgeProps) {
+export function TagihanBadge({ href, isLoggedIn, websiteId, label = 'Tagihan' }: TagihanBadgeProps) {
   const [count, setCount] = useState(0);
 
   const loadCount = useCallback(async () => {
     try {
-      const res = await fetch('/api/transactions/termins/count?status=ISSUED', { cache: 'no-store' });
+      const res = await fetch(`/api/transactions/termins/count?status=ISSUED&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = (await res.json()) as { count?: number };
       setCount(Number(data?.count ?? 0));
     } catch {
       // biarkan count apa adanya (nilai terakhir yang berhasil dimuat)
     }
-  }, []);
+  }, [websiteId]);
 
   useEffect(() => {
     if (!isLoggedIn) return;

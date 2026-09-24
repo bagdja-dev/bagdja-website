@@ -72,6 +72,7 @@ export interface StoreClassicViewProps {
   locations: LocationItem[];
   faqs: FaqItem[];
   websiteSlug?: string;
+  websiteId?: string;
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
@@ -1007,6 +1008,7 @@ export function StoreClassicView({
   faqs,
   websiteSlug,
   tenantSlug,
+  websiteId,
   pages = [],
   blogPosts = [],
   auth,
@@ -1098,6 +1100,7 @@ export function StoreClassicView({
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
           auth={auth}
+          websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
         />
 
@@ -1282,7 +1285,7 @@ export function StoreClassicView({
                 return <BlogArticleSection key={key} post={post} allPosts={blogPosts} websiteSlug={websiteSlug} />;
               }
               case 'cart': {
-                return <CartContent key={key} basePath={websiteSlug ?? ''} />;
+                return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'checkout': {
                 const websiteId =
@@ -1301,10 +1304,10 @@ export function StoreClassicView({
                 );
               }
               case 'orders': {
-                return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+                return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'tagihan': {
-                return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
+                return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;

@@ -79,6 +79,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
       websiteSlug={resolveTenantLinkBase(website.slug)}
+      websiteId={website.id}
       tenantSlug={website.slug}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}

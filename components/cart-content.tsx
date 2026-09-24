@@ -95,7 +95,7 @@ function RemoveIcon() {
   );
 }
 
-export function CartContent({ basePath }: { basePath: string }) {
+export function CartContent({ basePath, websiteId }: { basePath: string; websiteId: string }) {
   const router = useRouter();
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function CartContent({ basePath }: { basePath: string }) {
 
   const loadServerOrders = useCallback(async () => {
     try {
-      const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
+      const res = await fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
       if (!res.ok) {
         setServerError('Gagal memuat keranjang dari server');
         setServerOrders([]);
@@ -117,7 +117,7 @@ export function CartContent({ basePath }: { basePath: string }) {
       setServerError('Gagal memuat keranjang dari server');
       setServerOrders([]);
     }
-  }, []);
+  }, [websiteId]);
 
   useEffect(() => {
     void loadServerOrders();

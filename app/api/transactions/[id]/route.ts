@@ -9,8 +9,10 @@ interface RouteContext {
   params: { id: string };
 }
 
-export async function GET(_request: NextRequest, { params }: RouteContext) {
-  const result = await backendFetch(`/api/transactions/${params.id}`);
+export async function GET(request: NextRequest, { params }: RouteContext) {
+  const websiteId = request.nextUrl.searchParams.get('website_id');
+  const query = websiteId ? `?website_id=${encodeURIComponent(websiteId)}` : '';
+  const result = await backendFetch(`/api/transactions/${params.id}${query}`);
 
   if (result.status === 401) {
     return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });

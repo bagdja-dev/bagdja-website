@@ -9,7 +9,11 @@ import { backendFetch } from '../../../../../lib/backend-api';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
-  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const websiteId = searchParams.get('website_id');
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (websiteId) params.set('website_id', websiteId);
+  const qs = params.toString() ? `?${params.toString()}` : '';
 
   const result = await backendFetch(`/api/transactions/termins/count${qs}`);
 

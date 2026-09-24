@@ -91,7 +91,7 @@ const TABS: Array<{ key: TabKey; label: string; match?: (s: string) => boolean }
   { key: 'cancelled', label: 'Dibatalkan', match: (s) => s === 'CANCELLED' },
 ];
 
-export function TagihanContent({ basePath }: TagihanContentProps) {
+export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { websiteId: string }) {
   const [rows, setRows] = useState<TagihanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +107,7 @@ export function TagihanContent({ basePath }: TagihanContentProps) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/transactions/termins?size=100', { method: 'GET', credentials: 'include' });
+        const res = await fetch(`/api/transactions/termins?size=100&website_id=${encodeURIComponent(websiteId)}`, { method: 'GET', credentials: 'include' });
         if (res.status === 401) {
           if (!cancelled) setError('Silakan login untuk melihat Tagihan Anda.');
           return;
@@ -135,7 +135,7 @@ export function TagihanContent({ basePath }: TagihanContentProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [websiteId]);
 
   const filtered = useMemo(() => {
     const t = TABS.find((x) => x.key === tab);

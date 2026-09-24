@@ -61,6 +61,7 @@ export interface WorkshopViewProps {
   faqs: FaqItem[];
   websiteSlug?: string;
   tenantSlug?: string;
+  websiteId?: string;
   pages?: NavPage[];
   auth?: {
     isLoggedIn: boolean;
@@ -727,6 +728,7 @@ export function WorkshopView({
   faqs,
   websiteSlug,
   tenantSlug,
+  websiteId,
   pages = [],
   auth,
 }: WorkshopViewProps) {
@@ -775,6 +777,7 @@ export function WorkshopView({
               label: page.title,
             }))}
           auth={auth}
+          websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
           cartLabel="Pesanan"
         />
@@ -803,7 +806,7 @@ export function WorkshopView({
             case 'testimonial': return <WorkshopTestimonials key={key} content={section.content} />;
             case 'faq_list': return <WorkshopFaq key={key} faqs={faqs} content={section.content} />;
             case 'contact': return <WorkshopContact key={key} content={section.content} waHref={waHref} locations={locations} />;
-            case 'cart': return <CartContent key={key} basePath={websiteSlug ?? ''} />;
+            case 'cart': return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'checkout': {
               const websiteId = typeof section.content.websiteId === 'string' ? section.content.websiteId : '';
               const orderIds = Array.isArray(section.content.orderIds)
@@ -811,8 +814,8 @@ export function WorkshopView({
                 : [];
               return <CheckoutContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId} initialOrderIds={orderIds} locations={locations} />;
             }
-            case 'orders': return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
-            case 'tagihan': return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
+            case 'orders': return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+            case 'tagihan': return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'profile': return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;

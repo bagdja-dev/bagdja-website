@@ -19,6 +19,7 @@ import Link from 'next/link';
 export interface CartBadgeProps {
   href: string;
   isLoggedIn: boolean;
+  websiteId: string;
   label?: string;
 }
 
@@ -26,12 +27,12 @@ interface ServerOrder {
   quantity: number;
 }
 
-export function CartBadge({ href, isLoggedIn, label = 'Keranjang' }: CartBadgeProps) {
+export function CartBadge({ href, isLoggedIn, websiteId, label = 'Keranjang' }: CartBadgeProps) {
   const [count, setCount] = useState(0);
 
   const loadServerCount = useCallback(async () => {
     try {
-      const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
+      const res = await fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = (await res.json()) as { data?: ServerOrder[] };
       const total = (data?.data ?? []).reduce((acc, o) => acc + Number(o.quantity), 0);
@@ -39,7 +40,7 @@ export function CartBadge({ href, isLoggedIn, label = 'Keranjang' }: CartBadgePr
     } catch {
       // biarkan count apa adanya (nilai terakhir yang berhasil dimuat)
     }
-  }, []);
+  }, [websiteId]);
 
   useEffect(() => {
     if (!isLoggedIn) return;

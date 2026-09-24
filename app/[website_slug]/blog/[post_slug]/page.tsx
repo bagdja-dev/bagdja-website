@@ -73,6 +73,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
       locations={locations.map(toLocationItem)}
       faqs={faqs.map(toFaqItem)}
       websiteSlug={resolveTenantLinkBase(website.slug)}
+      websiteId={website.id}
       pages={website.pages.map(toNavPage)}
       blogPosts={blogPosts.map(toBlogPostItem)}
       auth={auth}

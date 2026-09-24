@@ -63,7 +63,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
   // Alur baru: id = transaction id. Fallback: order legacy.
   const { data: transaction, status: txStatus } =
-    await backendFetch<TransactionDetail>(`/api/transactions/${params.order_id}`);
+    await backendFetch<TransactionDetail>(`/api/transactions/${params.order_id}?website_id=${encodeURIComponent(website.id)}`);
 
   if (txStatus === 401) notFound();
 
@@ -98,6 +98,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
         locations={locations.map(toLocationItem)}
         faqs={faqs.map(toFaqItem)}
         websiteSlug={resolveTenantLinkBase(website.slug)}
+        websiteId={website.id}
         tenantSlug={website.slug}
         pages={website.pages.map(toNavPage)}
         blogPosts={blogPosts.map(toBlogPostItem)}

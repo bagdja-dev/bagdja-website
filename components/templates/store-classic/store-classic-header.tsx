@@ -38,6 +38,7 @@ interface StoreClassicHeaderProps {
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
   cartHref?: string;
+  websiteId: string;
   cartLabel?: string;
 }
 
@@ -52,6 +53,7 @@ export function StoreClassicHeader({
   socialLinks = [],
   auth,
   cartHref,
+  websiteId,
   cartLabel = 'Cart',
 }: StoreClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
@@ -113,10 +115,10 @@ export function StoreClassicHeader({
 
         <div className="flex shrink-0 items-center gap-3">
           {cartHref && auth?.isLoggedIn && (
-            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} label={cartLabel} />
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} label={cartLabel} />
           )}
           {auth?.tagihanHref && auth?.isLoggedIn && (
-            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} />
+            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
           )}
           {showWhatsappCta && waHref && (
             <a

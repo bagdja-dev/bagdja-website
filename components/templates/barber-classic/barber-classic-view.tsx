@@ -76,6 +76,7 @@ export interface BarberClassicViewProps {
    * pakai `websiteSlug !== undefined`.
    */
   websiteSlug?: string;
+  websiteId?: string;
   /** semua halaman website, dipakai untuk nav header/footer (filter by placement) */
   pages?: NavPage[];
   /** artikel blog terbit — dipakai section blog_list/blog_search/blog_collection */
@@ -978,6 +979,7 @@ export function BarberClassicView({
   faqs,
   websiteSlug,
   tenantSlug,
+  websiteId,
   pages = [],
   blogPosts = [],
   auth,
@@ -1063,6 +1065,7 @@ export function BarberClassicView({
           rightNavLinks={headerNavLinks}
           socialLinks={socialLinks}
           auth={auth}
+          websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
         />
 
@@ -1309,7 +1312,7 @@ export function BarberClassicView({
                 return <BlogArticleSection key={key} post={post} />;
               }
               case 'cart': {
-                return <CartContent key={key} basePath={websiteSlug ?? ''} />;
+                return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'checkout': {
                 const websiteId =
@@ -1331,10 +1334,10 @@ export function BarberClassicView({
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
               case 'orders': {
-                return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+                return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'tagihan': {
-                return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
+                return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;

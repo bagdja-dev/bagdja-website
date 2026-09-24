@@ -11,8 +11,10 @@ export async function GET(request: NextRequest) {
   const qs = new URLSearchParams();
   const page = searchParams.get('page');
   const size = searchParams.get('size');
+  const websiteId = searchParams.get('website_id');
   if (page) qs.set('page', page);
   if (size) qs.set('size', size);
+  if (websiteId) qs.set('website_id', websiteId);
 
   const result = await backendFetch(`/api/transactions${qs.toString() ? `?${qs.toString()}` : ''}`);
 

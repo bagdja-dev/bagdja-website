@@ -40,6 +40,7 @@ interface BarberClassicHeaderProps {
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
   cartHref?: string;
+  websiteId: string;
 }
 
 function HamburgerIcon() {
@@ -69,6 +70,7 @@ export function BarberClassicHeader({
   socialLinks = [],
   auth,
   cartHref,
+  websiteId,
 }: BarberClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -145,10 +147,10 @@ export function BarberClassicHeader({
 
         <div className="flex flex-1 items-center justify-end gap-3">
           {cartHref && auth?.isLoggedIn && (
-            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} />
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
           )}
           {auth?.tagihanHref && auth?.isLoggedIn && (
-            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} />
+            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
           )}
           <nav className="hidden items-center gap-6 sm:flex">
             {rightNavLinks.map((link) => (

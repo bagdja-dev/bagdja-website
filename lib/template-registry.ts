@@ -40,6 +40,7 @@ export interface TemplateRenderProps {
   locations: LocationItem[];
   faqs: FaqItem[];
   websiteSlug?: string;
+  websiteId?: string;
   /** Slug asli tenant (BUKAN basePath link) — dipakai fetch client-side (pagination/filter) ke API publik, karena `websiteSlug` di atas kosong untuk custom domain/subdomain. */
   tenantSlug?: string;
   pages?: NavPage[];

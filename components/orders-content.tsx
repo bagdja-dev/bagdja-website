@@ -165,7 +165,7 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-export function OrdersContent({ basePath }: OrdersContentProps) {
+export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { websiteId: string }) {
   const [rows, setRows] = useState<WebsiteTransactionRow[]>([]);
   const [cancelledPreorders, setCancelledPreorders] = useState<CancelledPreorderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +178,7 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/transactions?size=100', { method: 'GET', credentials: 'include' });
+        const res = await fetch(`/api/transactions?size=100&website_id=${encodeURIComponent(websiteId)}`, { method: 'GET', credentials: 'include' });
         if (res.status === 401) {
           // middleware harusnya sudah redirect, tapi fallback handle.
           if (!cancelled) setError('Silakan login untuk melihat daftar transaksi.');
@@ -220,7 +220,7 @@ export function OrdersContent({ basePath }: OrdersContentProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [websiteId]);
 
   const filtered = useMemo(() => {
     if (tab === 'preorder-cancelled') return [];

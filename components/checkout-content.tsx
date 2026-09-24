@@ -128,7 +128,7 @@ export function CheckoutContent({
   const loadDrafts = useCallback(async () => {
     setDraftsError(false);
     try {
-      const res = await fetch('/api/orders?cart=true', { cache: 'no-store' });
+      const res = await fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
       if (!res.ok) {
         setDraftsError(true);
         return;
@@ -138,7 +138,7 @@ export function CheckoutContent({
     } catch {
       setDraftsError(true);
     }
-  }, []);
+  }, [websiteId]);
 
   useEffect(() => {
     void loadDrafts();
