@@ -17,7 +17,7 @@
  * order-detail-content.tsx).
  */
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { backendFetch } from '../../../../lib/backend-api';
 import { getAuthViewState } from '../../../../lib/auth-view';
@@ -66,6 +66,12 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
     await backendFetch<TransactionDetail>(`/api/transactions/${params.order_id}?website_id=${encodeURIComponent(website.id)}`);
 
   if (txStatus === 401) notFound();
+
+  // Payment provider lama bisa tetap mengembalikan URL transaksi Termin.
+  // Renderer menormalkan URL tersebut ke transaksi induk sebelum merender.
+  if (transaction?.parent_transaction_id && transaction.parent_transaction_id !== params.order_id) {
+    redirect(`${resolveTenantLinkBase(params.website_slug)}/order/${transaction.parent_transaction_id}`);
+  }
 
   let order: OrderDetail | null = null;
   if (!transaction) {

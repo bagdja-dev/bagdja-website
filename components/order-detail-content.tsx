@@ -139,6 +139,7 @@ export interface TransactionDetail {
   /** `{ order_id: progress }` — hanya ada di response detail. */
   fulfillment?: Record<string, OrderFulfillmentProgress>;
   metadata?: { shipping?: TransactionShippingMetadata } | null;
+  parent_transaction_id?: string | null;
 }
 
 export interface OrderDetail {
