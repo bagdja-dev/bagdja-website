@@ -776,7 +776,7 @@ export function WorkshopView({
             }))}
           auth={auth}
           cartHref={auth?.cartHref}
-          cartLabel="Pesan"
+          cartLabel="Pesanan"
         />
         {isCatalogItem(productDetailItem) ? (
           <>
