@@ -35,6 +35,8 @@ export interface AddToCartButtonProps {
   onAdded?: (orderId: string) => void;
   /** Dipanggil saat error — terima pesan dari server. */
   onError?: (message: string) => void;
+  /** Dipanggil sebelum POST; return false membatalkan proses penambahan. */
+  onBeforeAdd?: () => boolean | void;
   disabled?: boolean;
 }
 
@@ -48,6 +50,7 @@ export function AddToCartButton({
   locationId,
   onAdded,
   onError,
+  onBeforeAdd,
   disabled = false,
 }: AddToCartButtonProps) {
   const [busy, setBusy] = useState(false);
@@ -61,6 +64,7 @@ export function AddToCartButton({
 
   const handleClick = async () => {
     if (busy) return;
+    if (onBeforeAdd?.() === false) return;
     setBusy(true);
     try {
       const res = await fetch('/api/orders', {

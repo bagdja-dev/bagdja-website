@@ -524,7 +524,7 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
   return <a href={entry.payment_link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex border-2 px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent)' }}>Beli via Lynk</a>;
 }
 
-function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, waHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; waHref?: string }) {
+function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, waHref, auth }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; waHref?: string; auth?: WorkshopViewProps['auth'] }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((product) => product.id === familyId || product.parentProductId === familyId);
@@ -622,7 +622,7 @@ function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tena
 
             {family.length > 1 ? <div><p className="text-xs font-bold uppercase tracking-wide">Pilihan varian</p><div className="mt-3 flex flex-wrap gap-2">{family.map((variant) => <a key={variant.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, variant.slug) : '#'} className={`border px-3 py-2 text-xs ${variant.id === item.id ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : ''}`} style={variant.id === item.id ? undefined : { borderColor: 'var(--brand-border)' }}>{variant.name}</a>)}</div></div> : null}
 
-            {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
+            {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
             {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
             {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
           </div>
@@ -781,7 +781,7 @@ export function WorkshopView({
         {isCatalogItem(productDetailItem) ? (
           <>
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
-            <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} waHref={waHref} />
+            <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} waHref={waHref} auth={auth} />
           </>
         ) : utilityPage || isCategoryListingPage ? null : <WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} />}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map((section, index) => {

@@ -47,7 +47,11 @@ interface TransactionItemRow {
   quantity: number;
   unit_price: number | string;
   total_amount: number | string;
-  order?: { product?: WebsiteProductLite | null } | null;
+  order?: {
+    product?: WebsiteProductLite | null;
+    /** Harga final quotation keseluruhan (beda dari `total_amount` item ini, yang cuma nilai DP kalau order-nya pakai skema Termin). */
+    quoted_total_amount?: number | string | null;
+  } | null;
 }
 
 interface WebsiteTransactionRow {
@@ -124,6 +128,23 @@ function formatMoney(v: number | string): string {
   const n = typeof v === 'string' ? parseFloat(v) : v;
   if (!Number.isFinite(n)) return '-';
   return `Rp ${n.toLocaleString('id-ID')}`;
+}
+
+/**
+ * Nilai total transaksi TERMASUK Termin 2..N — beda dari `row.total_amount`
+ * yang cuma nilai checkout pertama (DP kalau order-nya pakai skema Termin).
+ * Per item: pakai `quoted_total_amount` (harga final quotation keseluruhan)
+ * kalau ada, fallback ke `total_amount` item itu sendiri — aman diterapkan
+ * ke semua transaksi, bukan cuma yang punya Termin.
+ */
+function transactionGridTotal(row: WebsiteTransactionRow): number {
+  const items = row.items ?? [];
+  if (items.length === 0) return Number(row.total_amount) || 0;
+  return items.reduce((sum, item) => {
+    const quoted = item.order?.quoted_total_amount;
+    const value = quoted != null ? Number(quoted) : Number(item.total_amount);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
 }
 
 function formatDate(v: string): string {
@@ -467,7 +488,7 @@ function TransactionCard({ row, basePath }: { row: WebsiteTransactionRow; basePa
               className="text-lg font-bold"
               style={{ color: 'var(--brand-accent-muted)' }}
             >
-              {formatMoney(row.total_amount)}
+              {formatMoney(transactionGridTotal(row))}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -22,6 +22,9 @@ export interface PurchaseControlsProps {
   slug: string;
   /** Base path untuk link internal (root-relative kalau via subdomain/custom domain) — lihat `resolveTenantLinkBase`. Dipakai buat link "lihat progres penawaran". */
   basePath?: string;
+  /** Guest diarahkan ke login sebelum draft order dibuat. */
+  isLoggedIn?: boolean;
+  loginHref?: string;
   websiteId: string;
   product: {
     id: string;
@@ -39,7 +42,7 @@ export interface PurchaseControlsProps {
   cartLabel?: string;
 }
 
-export function PurchaseControls({ slug, basePath, websiteId, product, paymentMode, locationIds = [], locations = [], cartLabel = '+ Keranjang' }: PurchaseControlsProps) {
+export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref, websiteId, product, paymentMode, locationIds = [], locations = [], cartLabel = '+ Keranjang' }: PurchaseControlsProps) {
   const router = useRouter();
   const [qty, setQty] = useState(1);
   const [selectedLocationId, setSelectedLocationId] = useState('');
@@ -78,6 +81,18 @@ export function PurchaseControls({ slug, basePath, websiteId, product, paymentMo
   };
   const handleError = (message: string) => {
     setFeedback({ ok: false, message });
+  };
+
+  const handlePurchase = () => {
+    if (!isLoggedIn) {
+      if (loginHref) {
+        window.location.assign(loginHref);
+      } else {
+        setFeedback({ ok: false, message: 'Silakan login terlebih dahulu untuk melanjutkan.' });
+      }
+      return false;
+    }
+    return true;
   };
 
   const requiresLocation = locationIds.length > 0;
@@ -157,6 +172,7 @@ export function PurchaseControls({ slug, basePath, websiteId, product, paymentMo
         onAdded={handleAdded}
         onError={handleError}
         disabled={requiresLocation && !selectedLocationId}
+        onBeforeAdd={handlePurchase}
       />
 
       {feedback && (

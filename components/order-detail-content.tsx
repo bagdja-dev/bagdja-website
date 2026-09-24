@@ -13,6 +13,7 @@
  */
 import { FulfillmentProgress } from './fulfillment-progress';
 import { OrderActionButtons } from './order-action-buttons';
+import { OrderQuantityControl } from './order-quantity-control';
 import { PraorderStepList } from './praorder-step-list';
 import { RetryPaymentButton } from './retry-payment-button';
 
@@ -219,7 +220,6 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
   const itemsSubtotal = items.reduce((sum, i) => sum + Number(i.total_amount), 0);
   const shippingCost = transaction.shipping_cost ?? 0;
 
-  const statusLabel = STATUS_LABEL[transaction.status] ?? transaction.status;
   // Backend menormalisasi status escrow `PENDING` -> `PENDING_PAYMENT` saat
   // sync (lihat `normalizeEscrowStatus` di website-api), tapi cek juga
   // `PENDING` di sini sebagai jaga-jaga kalau ada transaksi lama yang belum
@@ -228,17 +228,32 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
   const unpaidTerminsCount = Object.values(transaction.fulfillment ?? {})
     .flatMap((f) => f.termins)
     .filter((t) => t.status === 'ISSUED').length;
+  // Transaksi (DP) sudah COMPLETED tapi masih ada Termin yang belum
+  // PAID/CANCELLED — dari sudut pandang pesanan keseluruhan belum tuntas.
+  // Cuma label tampilan, TIDAK mengubah `transaction.status` asli.
+  const partiallyCompleted =
+    transaction.status === 'COMPLETED' &&
+    Object.values(transaction.fulfillment ?? {})
+      .flatMap((f) => f.termins)
+      .some((t) => t.status !== 'PAID' && t.status !== 'CANCELLED');
+  const statusLabel = partiallyCompleted
+    ? 'Selesai Sebagian'
+    : STATUS_LABEL[transaction.status] ?? transaction.status;
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-end gap-3">
         <span
           className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wide"
-          style={{
-            backgroundColor: needsPayment ? 'var(--brand-surface)' : 'var(--brand-accent)',
-            color: needsPayment ? 'var(--brand-text)' : 'var(--brand-on-accent)',
-            border: needsPayment ? '1px solid var(--brand-border)' : 'none',
-          }}
+          style={
+            partiallyCompleted
+              ? { backgroundColor: 'rgba(245, 158, 11, 0.14)', color: 'rgb(180, 83, 9)' }
+              : {
+                  backgroundColor: needsPayment ? 'var(--brand-surface)' : 'var(--brand-accent)',
+                  color: needsPayment ? 'var(--brand-text)' : 'var(--brand-on-accent)',
+                  border: needsPayment ? '1px solid var(--brand-border)' : 'none',
+                }
+          }
         >
           {statusLabel}
         </span>
@@ -491,7 +506,11 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
         )}
         <div className="min-w-0 flex-1 space-y-3">
           <Row label="Produk" value={order.product?.name ?? order.product_id} />
-          <Row label="Jumlah" value={String(order.quantity)} />
+          <OrderQuantityControl
+            orderId={order.id}
+            initialQuantity={order.quantity}
+            locked={order.quoted_total_amount != null || order.status !== 'PENDING'}
+          />
           <Row
             label="Total"
             value={awaitingQuote ? '-' : `Rp ${finalQuoteAmount.toLocaleString('id-ID')}`}
