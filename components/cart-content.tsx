@@ -155,7 +155,7 @@ export function CartContent({ basePath }: { basePath: string }) {
 
   // Default: semua item terpilih saat list pertama dimuat.
   useEffect(() => {
-    setSelectedKeys(new Set(lines.map((l) => l.key)));
+    setSelectedKeys(new Set(lines.filter((l) => !l.isQuotable || l.quotedTotal !== null).map((l) => l.key)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length > 0 ? lines.map((l) => l.key).join('|') : '']);
 
@@ -165,6 +165,8 @@ export function CartContent({ basePath }: { basePath: string }) {
   );
 
   const toggleLine = useCallback((key: string) => {
+    const line = lines.find((item) => item.key === key);
+    if (!line || (line.isQuotable && line.quotedTotal === null)) return;
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -175,13 +177,16 @@ export function CartContent({ basePath }: { basePath: string }) {
 
   const toggleAll = useCallback(() => {
     setSelectedKeys((prev) => {
-      const allKeys = lines.map((l) => l.key);
+      const allKeys = lines
+        .filter((l) => !l.isQuotable || l.quotedTotal !== null)
+        .map((l) => l.key);
       const allSelected = allKeys.every((k) => prev.has(k));
       return allSelected ? new Set<string>() : new Set(allKeys);
     });
   }, [lines]);
 
-  const allSelected = lines.length > 0 && lines.every((l) => selectedKeys.has(l.key));
+  const selectableLines = lines.filter((l) => !l.isQuotable || l.quotedTotal !== null);
+  const allSelected = selectableLines.length > 0 && selectableLines.every((l) => selectedKeys.has(l.key));
   const selectedLines = useMemo(() => lines.filter((l) => selectedKeys.has(l.key)), [lines, selectedKeys]);
   const selectedCount = useMemo(
     () => selectedLines.reduce((acc, l) => acc + l.quantity, 0),
@@ -191,7 +196,7 @@ export function CartContent({ basePath }: { basePath: string }) {
     () => selectedLines.reduce((acc, l) => acc + l.unitPrice * l.quantity, 0),
     [selectedLines],
   );
-  const hasUnquotedSelected = selectedLines.some((line) => line.unitPrice <= 0);
+  const hasUnquotedSelected = selectedLines.some((line) => line.isQuotable && line.quotedTotal === null);
 
   // Item terpilih → order_ids utk checkout multi-item. `basePath` kosong
   // ('') di subdomain/custom domain, `/{slug}` cuma di path-based (local
@@ -360,6 +365,7 @@ export function CartContent({ basePath }: { basePath: string }) {
             const isBusy = busyKey === line.key;
             const lineTotal = line.unitPrice * line.quantity;
             const quantityLocked = line.isQuotable && line.quotedTotal !== null;
+            const quotationPending = line.isQuotable && line.quotedTotal === null;
             const isSelected = selectedKeys.has(line.key);
             return (
               <li
@@ -387,7 +393,8 @@ export function CartContent({ basePath }: { basePath: string }) {
                 <button
                   type="button"
                   onClick={() => toggleLine(line.key)}
-                  className="mt-1 shrink-0 self-start"
+                  disabled={quotationPending}
+                  className="mt-1 shrink-0 self-start disabled:cursor-not-allowed disabled:opacity-40"
                   role="checkbox"
                   aria-checked={isSelected}
                   aria-label={`Pilih ${line.name}`}
