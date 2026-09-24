@@ -12,6 +12,7 @@
  * fetch), kecuali tombol retry yang jadi island client tersendiri.
  */
 import { FulfillmentProgress } from './fulfillment-progress';
+import { DraftOrderCancelButton } from './draft-order-cancel-button';
 import { OrderActionButtons } from './order-action-buttons';
 import { OrderQuantityControl } from './order-quantity-control';
 import { PraorderStepList } from './praorder-step-list';
@@ -192,12 +193,14 @@ function Row({ label, value }: { label: string; value: string }) {
 export function OrderDetailContent({
   transaction,
   order,
+  basePath = '',
 }: {
   transaction?: TransactionDetail | null;
   order?: OrderDetail | null;
+  basePath?: string;
 }) {
   if (transaction) return <TransactionView transaction={transaction} />;
-  if (order) return <LegacyOrderView order={order} />;
+  if (order) return <LegacyOrderView order={order} basePath={basePath} />;
   return null;
 }
 
@@ -477,7 +480,7 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
 }
 
 /** Tampilan order legacy (sebelum W2.8 — escrow di level order). */
-function LegacyOrderView({ order }: { order: OrderDetail }) {
+function LegacyOrderView({ order, basePath }: { order: OrderDetail; basePath: string }) {
   // fulfillment-praorder-plan.md Q5 — harga 0 = belum ada penawaran (seller
   // belum isi harga final), tampilkan "-" dulu, jangan "Rp 0" mentah
   // (terlihat seperti gratis/rusak).
@@ -587,6 +590,9 @@ function LegacyOrderView({ order }: { order: OrderDetail }) {
         >
           Lanjutkan Pembayaran
         </a>
+      )}
+      {order.status === 'PENDING' && (
+        <DraftOrderCancelButton orderId={order.id} ordersHref={`${basePath}/orders`} />
       )}
     </section>
   );

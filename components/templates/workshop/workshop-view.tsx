@@ -817,7 +817,7 @@ export function WorkshopView({
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;
               const order = section.content.order as OrderDetail | null | undefined;
-              return <OrderDetailContent key={key} transaction={transaction} order={order} />;
+              return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} />;
             }
             default: return null;
           }
