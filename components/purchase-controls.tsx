@@ -28,6 +28,8 @@ export interface PurchaseControlsProps {
     slug: string;
     name: string;
     price: number;
+    /** Sumber kebenaran produk quotation (`website_products.quotable`) — dipakai bareng `price<=0` sebagai fallback. */
+    quotable?: boolean;
     image?: string;
     stock?: number;
   };
@@ -42,7 +44,10 @@ export function PurchaseControls({ slug, basePath, websiteId, product, paymentMo
   const [qty, setQty] = useState(1);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string; href?: string } | null>(null);
-  const isQuoteRequest = product.price <= 0;
+  // Field `quotable` (dari website_products) adalah sumber kebenaran —
+  // `price<=0` dipertahankan sebagai fallback untuk produk lama yang belum
+  // eksplisit ditandai quotable tapi harganya memang belum diisi.
+  const isQuoteRequest = product.quotable === true || product.price <= 0;
 
   const max = useMemo(() => {
     if (typeof product.stock === 'number' && product.stock > 0) return product.stock;
@@ -56,8 +61,16 @@ export function PurchaseControls({ slug, basePath, websiteId, product, paymentMo
   const minus = () => setQty((q) => Math.max(1, q - 1));
   const plus = () => setQty((q) => (max !== undefined ? Math.min(max, q + 1) : q + 1));
 
+  // `cartLabel` default ('+ Keranjang') = niat tambah banyak produk sekaligus
+  // sebelum checkout, jadi tetap silent add-to-cart. `cartLabel` lain (mis.
+  // "Pesan" di template workshop) = niat order 1 produk ini langsung, jadi
+  // harus langsung diarahkan ke halaman detail order setelah draft dibuat —
+  // sebelumnya cuma redirect untuk isQuoteRequest, produk harga tetap dengan
+  // cartLabel non-default diam saja (bug: tombol "Pesan" terasa tidak berefek).
+  const isDirectOrder = isQuoteRequest || cartLabel !== '+ Keranjang';
+
   const handleAdded = (orderId: string) => {
-    if (isQuoteRequest) {
+    if (isDirectOrder) {
       router.push(`${basePath ?? ''}/order/${orderId}`);
       return;
     }

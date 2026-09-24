@@ -21,6 +21,8 @@ export interface AddToCartButtonProps {
     slug: string;
     name: string;
     price: number;
+    /** Sumber kebenaran produk quotation (`website_products.quotable`) — dipakai bareng `price<=0` sebagai fallback. */
+    quotable?: boolean;
     image?: string;
     stock?: number;
   };
@@ -51,9 +53,11 @@ export function AddToCartButton({
   const [busy, setBusy] = useState(false);
   const qty = Math.max(1, Math.floor(quantity || 1));
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
+  // Field `quotable` (website_products.quotable) adalah sumber kebenaran.
   // Rp 0 = sentinel "belum ada harga final" (fulfillment-praorder-plan.md
-  // §2.1) — CTA-nya minta penawaran, bukan beli, walau paymentMode ESCROW.
-  const isQuoteRequest = product.price <= 0;
+  // §2.1) dipertahankan sebagai fallback — CTA-nya minta penawaran, bukan
+  // beli, walau paymentMode ESCROW.
+  const isQuoteRequest = product.quotable === true || product.price <= 0;
 
   const handleClick = async () => {
     if (busy) return;
@@ -111,7 +115,7 @@ export function AddToCartButton({
         : busy
           ? 'Menambah...'
           : isQuoteRequest
-            ? 'Minta Penawaran'
+            ? 'Dapatkan Penawaran'
             : paymentMode === 'ESCROW'
               ? 'Beli (Escrow)'
               : label}

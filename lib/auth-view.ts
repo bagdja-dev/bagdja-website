@@ -15,6 +15,7 @@ export interface AuthViewState {
   /** Menu dropdown akun (dipakai header template saat sudah login). */
   cartHref?: string;
   ordersHref?: string;
+  tagihanHref?: string;
   profileHref?: string;
 }
 
@@ -55,6 +56,7 @@ export async function getAuthViewState(
     // `ordersHref` = list daftar transaksi; `/order/:id` untuk detail.
     cartHref: `${linkBase}/cart`,
     ordersHref: `${linkBase}/orders`,
+    tagihanHref: `${linkBase}/tagihan`,
     profileHref: `${linkBase}/profile`,
   };
 }

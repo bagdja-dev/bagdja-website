@@ -225,6 +225,9 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
   // `PENDING` di sini sebagai jaga-jaga kalau ada transaksi lama yang belum
   // ke-sync ulang.
   const needsPayment = transaction.status === 'PENDING_PAYMENT' || transaction.status === 'PENDING';
+  const unpaidTerminsCount = Object.values(transaction.fulfillment ?? {})
+    .flatMap((f) => f.termins)
+    .filter((t) => t.status === 'ISSUED').length;
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -240,6 +243,18 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
           {statusLabel}
         </span>
       </div>
+
+      {unpaidTerminsCount > 0 && (
+        <div
+          className="mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm"
+          style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(245, 158, 11, 0.08)' }}
+        >
+          <span className="font-semibold" style={{ color: 'rgb(180, 83, 9)' }}>
+            {unpaidTerminsCount} Tagihan perlu dibayar
+          </span>
+          <span style={{ color: 'var(--brand-muted)' }}>— lihat bagian progres di bawah untuk membayarnya.</span>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_340px]">
         {/* Kolom kiri: detail pemesanan (read-only, mirip checkout) */}

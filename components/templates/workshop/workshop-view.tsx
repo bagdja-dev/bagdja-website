@@ -29,6 +29,7 @@ import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
+import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
@@ -70,6 +71,7 @@ export interface WorkshopViewProps {
     logoutHref?: string;
     cartHref?: string;
     ordersHref?: string;
+    tagihanHref?: string;
     profileHref?: string;
   };
 }
@@ -620,7 +622,7 @@ function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tena
 
             {family.length > 1 ? <div><p className="text-xs font-bold uppercase tracking-wide">Pilihan varian</p><div className="mt-3 flex flex-wrap gap-2">{family.map((variant) => <a key={variant.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, variant.slug) : '#'} className={`border px-3 py-2 text-xs ${variant.id === item.id ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : ''}`} style={variant.id === item.id ? undefined : { borderColor: 'var(--brand-border)' }}>{variant.name}</a>)}</div></div> : null}
 
-            {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
+            {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
             {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
             {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
           </div>
@@ -810,6 +812,7 @@ export function WorkshopView({
               return <CheckoutContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId} initialOrderIds={orderIds} locations={locations} />;
             }
             case 'orders': return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+            case 'tagihan': return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
             case 'profile': return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;

@@ -111,6 +111,8 @@ export function FulfillmentProgress({
   const [savingBuyerKey, setSavingBuyerKey] = useState<string | null>(null);
   const [terminBusy, setTerminBusy] = useState<string | null>(null);
   const [terminError, setTerminError] = useState<Record<string, string>>({});
+  /** Termin yang sedang dikonfirmasi lewat popup sebelum benar-benar dibayar — buyer harus sadar dana ini langsung ke penjual, tanpa Escrow (§lihat diskusi transparansi Tagihan). */
+  const [pendingTermin, setPendingTermin] = useState<{ id: string; label: string; amount: number } | null>(null);
 
   /** fulfillment-praorder-plan.md §2.4 — buyer bayar 1 Termin/Tagihan, redirect ke checkout_url seperti checkout biasa. */
   async function payTermin(terminId: string) {
@@ -121,6 +123,7 @@ export function FulfillmentProgress({
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.message ?? 'Gagal memproses pembayaran Termin');
       if (!json?.checkout_url) throw new Error('Gagal mendapatkan link pembayaran.');
+      window.dispatchEvent(new Event('bagdja:tagihan-changed'));
       window.location.href = json.checkout_url;
     } catch (err) {
       setTerminError((prev) => ({
@@ -635,7 +638,7 @@ export function FulfillmentProgress({
                                   <button
                                     type="button"
                                     disabled={terminBusy === termin.id}
-                                    onClick={() => payTermin(termin.id)}
+                                    onClick={() => setPendingTermin({ id: termin.id, label: termin.label, amount: termin.amount })}
                                     className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                                   >
@@ -680,6 +683,22 @@ export function FulfillmentProgress({
         showCancel={false}
         onConfirm={() => setSavedMessage('')}
         onCancel={() => setSavedMessage('')}
+      />
+      <ConfirmDialog
+        open={pendingTermin !== null}
+        title="Konfirmasi Pembayaran Tagihan"
+        message={
+          pendingTermin
+            ? `Anda akan membayar "${pendingTermin.label}" sebesar ${formatIDR(pendingTermin.amount)}. Dana ini ditransfer langsung ke penjual tanpa melalui Escrow — pastikan progres pesanan Anda sudah berjalan sesuai kesepakatan sebelum melanjutkan.`
+            : ''
+        }
+        error={pendingTermin ? terminError[pendingTermin.id] : null}
+        confirmLabel="Ya, Bayar"
+        loading={pendingTermin ? terminBusy === pendingTermin.id : false}
+        onConfirm={() => {
+          if (pendingTermin) void payTermin(pendingTermin.id);
+        }}
+        onCancel={() => setPendingTermin(null)}
       />
     </section>
   );

@@ -43,6 +43,7 @@ import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
+import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from './store-classic-icons';
@@ -903,6 +904,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                   slug: item.slug,
                   name: item.name,
                   price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0,
+                  quotable: item.quotable,
                   image: item.image ?? item.images?.[0],
                   stock: item.stock,
                 }}
@@ -1300,6 +1302,9 @@ export function StoreClassicView({
               }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+              }
+              case 'tagihan': {
+                return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
               }
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;

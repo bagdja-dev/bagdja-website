@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SocialLink } from '../../../lib/template-data';
 import { SocialIcon } from './barber-classic-icons';
 import { CartBadge } from '../../cart-badge';
+import { TagihanBadge } from '../../tagihan-badge';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -22,6 +23,7 @@ export interface HeaderAuthState {
   logoutHref?: string;
   cartHref?: string;
   ordersHref?: string;
+  tagihanHref?: string;
   profileHref?: string;
 }
 
@@ -145,6 +147,9 @@ export function BarberClassicHeader({
           {cartHref && auth?.isLoggedIn && (
             <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} />
           )}
+          {auth?.tagihanHref && auth?.isLoggedIn && (
+            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} />
+          )}
           <nav className="hidden items-center gap-6 sm:flex">
             {rightNavLinks.map((link) => (
               <a
@@ -198,6 +203,7 @@ export function BarberClassicHeader({
                     {[
                       { href: auth.cartHref, label: 'Keranjang' },
                       { href: auth.ordersHref, label: 'Transaksi' },
+                      { href: auth.tagihanHref, label: 'Tagihan' },
                       { href: auth.profileHref, label: 'Profil' },
                     ].map(
                       (item) =>
@@ -306,6 +312,7 @@ export function BarberClassicHeader({
                   {[
                     { href: auth.cartHref, label: 'Keranjang' },
                     { href: auth.ordersHref, label: 'Transaksi' },
+                    { href: auth.tagihanHref, label: 'Tagihan' },
                     { href: auth.profileHref, label: 'Profil' },
                   ].map(
                     (item) =>

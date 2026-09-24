@@ -39,6 +39,7 @@ import { SocialIcon } from './barber-classic-icons';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
+import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 
@@ -1331,6 +1332,9 @@ export function BarberClassicView({
               }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} />;
+              }
+              case 'tagihan': {
+                return <TagihanContent key={key} basePath={websiteSlug ?? ''} />;
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;

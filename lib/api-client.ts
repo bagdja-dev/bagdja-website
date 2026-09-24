@@ -90,6 +90,8 @@ export interface ApiWebsiteProduct {
   specifications?: Record<string, string> | null;
   estimation?: Array<{ label: string; price: number | string | null }> | null;
   price: number;
+  /** Produk butuh quotation dulu dari seller (harga custom, bukan tetap) — fulfillment-praorder-plan.md §2.1. Kolom `website_products.quotable`, sudah ikut ke response ini (entity di-spread apa adanya di public.service.ts), cuma belum dideklarasikan di sini sebelumnya. */
+  quotable?: boolean;
   uom?: { code: string; label: string; symbol: string } | null;
   images: string[];
   video_url?: string | null;

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SocialLink } from '../../../lib/template-data';
 import { CloseIcon, HamburgerIcon, SocialIcon } from './store-classic-icons';
 import { CartBadge } from '../../cart-badge';
+import { TagihanBadge } from '../../tagihan-badge';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -22,6 +23,7 @@ export interface HeaderAuthState {
   logoutHref?: string;
   cartHref?: string;
   ordersHref?: string;
+  tagihanHref?: string;
   profileHref?: string;
 }
 
@@ -113,6 +115,9 @@ export function StoreClassicHeader({
           {cartHref && auth?.isLoggedIn && (
             <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} label={cartLabel} />
           )}
+          {auth?.tagihanHref && auth?.isLoggedIn && (
+            <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} />
+          )}
           {showWhatsappCta && waHref && (
             <a
               href={waHref}
@@ -165,6 +170,7 @@ export function StoreClassicHeader({
                     {[
                       { href: auth.cartHref, label: cartLabel },
                       { href: auth.ordersHref, label: 'Transaction' },
+                      { href: auth.tagihanHref, label: 'Tagihan' },
                       { href: auth.profileHref, label: 'Profile' },
                     ].map(
                       (item) =>
@@ -297,6 +303,7 @@ export function StoreClassicHeader({
                   {[
                     { href: auth.cartHref, label: 'Cart' },
                     { href: auth.ordersHref, label: 'Transaction' },
+                    { href: auth.tagihanHref, label: 'Tagihan' },
                     { href: auth.profileHref, label: 'Profile' },
                   ].map(
                     (item) =>

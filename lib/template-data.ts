@@ -27,6 +27,8 @@ export interface CatalogItem {
   specifications?: Record<string, string>;
   estimation?: Array<{ label: string; price: number | string }>;
   priceLabel: string;
+  /** Produk butuh quotation dulu dari seller — sumber kebenaran utk CTA "Dapatkan Penawaran" (bukan tebak dari price<=0). */
+  quotable?: boolean;
   uomSymbol?: string;
   image?: string;
   images?: string[];
@@ -292,6 +294,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     specifications: normalizeProductSpecifications(product.specifications),
     estimation: normalizeProductEstimation(product.estimation),
     priceLabel: product.price > 0 ? `${formatIDR(product.price)}${product.uom?.symbol ? `/${product.uom.symbol}` : ''}` : '',
+    quotable: product.quotable,
     uomSymbol: product.uom?.symbol,
     image: product.images?.[0],
     images: product.images,
