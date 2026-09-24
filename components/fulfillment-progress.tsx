@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { ConfirmDialog } from './confirm-dialog';
 import { FulfillmentFieldInput } from './fulfillment-field-input';
 import { FulfillmentFieldValue } from './fulfillment-field-value';
-import type { OrderFulfillmentProgress, OrderFulfillmentStepProgress, TransactionItem } from './order-detail-content';
+import type { OrderFulfillmentProgress, OrderFulfillmentStepProgress, TerminSummary, TransactionItem } from './order-detail-content';
 
 function formatIDR(n: number): string {
   return `Rp ${Math.round(n).toLocaleString('id-ID')}`;
@@ -266,6 +266,64 @@ export function FulfillmentProgress({
       ? 'Dana untuk tahap ini akan langsung dicairkan ke penjual dan tidak bisa dibatalkan.'
       : 'Penjual tidak bisa lanjut ke tahap berikutnya sampai komplain ini Anda selesaikan sendiri (dengan menyetujui pelepasan dana di bawah kalau masalahnya sudah beres).';
 
+  /** 1 kartu Termin — dipakai baik di ringkasan grup (default, tanpa perlu "Lihat per produk") maupun di rincian per produk. */
+  function renderTerminCard(termin: TerminSummary, productName?: string) {
+    return (
+      <div
+        key={termin.id}
+        className="rounded-lg border p-3 text-sm"
+        style={{ borderColor: 'var(--brand-border)' }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-medium">
+            {termin.label}
+            {productName && (
+              <span className="ml-1 text-xs font-normal" style={{ color: 'var(--brand-muted)' }}>
+                — {productName}
+              </span>
+            )}
+            {termin.anchorStepName && (
+              <span className="ml-1 text-xs font-normal" style={{ color: 'var(--brand-muted)' }}>
+                (setelah {termin.anchorStepName})
+              </span>
+            )}
+          </span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>
+            {formatIDR(termin.amount)}
+          </span>
+        </div>
+        {termin.status === 'PAID' && (
+          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--brand-accent-muted)' }}>
+            ✓ Sudah dibayar
+          </p>
+        )}
+        {termin.status === 'ISSUED' && (
+          <>
+            {terminError[termin.id] && (
+              <p className="mt-1 text-xs" style={{ color: 'crimson' }}>
+                {terminError[termin.id]}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={terminBusy === termin.id}
+              onClick={() => setPendingTermin({ id: termin.id, label: termin.label, amount: termin.amount })}
+              className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+            >
+              {terminBusy === termin.id ? 'Memproses…' : 'Bayar'}
+            </button>
+          </>
+        )}
+        {termin.status === 'SCHEDULED' && (
+          <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+            Menunggu diterbitkan penjual.
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <section>
       <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -302,6 +360,7 @@ export function FulfillmentProgress({
               </div>
 
               {!isExpanded ? (
+                <>
                 <ol className="mt-3 flex flex-col gap-2">
                   {groupSteps.map((step) => {
                     const allCompleted = step.completedCount === step.totalCount;
@@ -420,9 +479,24 @@ export function FulfillmentProgress({
                     );
                   })}
                 </ol>
-              ) : (
-                <div className="mt-3 flex flex-col gap-4">
-                  {group.items.map((gi) => (
+
+                {(() => {
+                  const groupTermins = group.items.flatMap((gi) =>
+                    gi.progress.termins.map((termin) => ({ termin, productName: gi.productName })),
+                  );
+                  if (groupTermins.length === 0) return null;
+                  return (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {groupTermins.map(({ termin, productName }) =>
+                        renderTerminCard(termin, group.items.length > 1 ? productName : undefined),
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <div className="mt-3 flex flex-col gap-4">
+                {group.items.map((gi) => (
                     <div key={gi.orderId}>
                       <p className="text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
                         {gi.productName}
@@ -604,55 +678,7 @@ export function FulfillmentProgress({
 
                       {gi.progress.termins.length > 0 && (
                         <div className="mt-3 flex flex-col gap-2">
-                          {gi.progress.termins.map((termin) => (
-                            <div
-                              key={termin.id}
-                              className="rounded-lg border p-3 text-sm"
-                              style={{ borderColor: 'var(--brand-border)' }}
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="font-medium">
-                                  {termin.label}
-                                  {termin.anchorStepName && (
-                                    <span className="ml-1 text-xs font-normal" style={{ color: 'var(--brand-muted)' }}>
-                                      (setelah {termin.anchorStepName})
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="text-xs font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>
-                                  {formatIDR(termin.amount)}
-                                </span>
-                              </div>
-                              {termin.status === 'PAID' && (
-                                <p className="mt-1 text-xs font-medium" style={{ color: 'var(--brand-accent-muted)' }}>
-                                  ✓ Sudah dibayar
-                                </p>
-                              )}
-                              {termin.status === 'ISSUED' && (
-                                <>
-                                  {terminError[termin.id] && (
-                                    <p className="mt-1 text-xs" style={{ color: 'crimson' }}>
-                                      {terminError[termin.id]}
-                                    </p>
-                                  )}
-                                  <button
-                                    type="button"
-                                    disabled={terminBusy === termin.id}
-                                    onClick={() => setPendingTermin({ id: termin.id, label: termin.label, amount: termin.amount })}
-                                    className="mt-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
-                                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-                                  >
-                                    {terminBusy === termin.id ? 'Memproses…' : 'Bayar'}
-                                  </button>
-                                </>
-                              )}
-                              {termin.status === 'SCHEDULED' && (
-                                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                                  Menunggu diterbitkan penjual.
-                                </p>
-                              )}
-                            </div>
-                          ))}
+                          {gi.progress.termins.map((termin) => renderTerminCard(termin))}
                         </div>
                       )}
                     </div>
