@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import { formatChatThreadTitle, formatLastChatPreview } from '../lib/chat-thread-display';
 import { ChatReferenceCard } from './chat-reference-card';
@@ -105,8 +106,11 @@ export function CustomerChatContent({
   whatsapp?: string;
   email?: string;
 }) {
+  const searchParams = useSearchParams();
+  const requestedThreadId = searchParams.get('thread');
   const chatRootRef = useRef<HTMLElement | null>(null);
   const messagesPaneRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedThreadIdRef = useRef<string | null>(null);
   const threadsRef = useRef<Thread[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -146,7 +150,24 @@ export function CustomerChatContent({
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const maxHeight = 160;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [composer]);
+
   const ensureSupportThread = useCallback(async (nextThreads: Thread[]) => {
+    if (requestedThreadId) {
+      const matchingThread = nextThreads.find((thread) => thread.id === requestedThreadId);
+      if (matchingThread) {
+        setSelectedThreadId((current) => current && nextThreads.some((thread) => thread.id === current) ? current : matchingThread.id);
+        return;
+      }
+    }
+
     const adminThread = nextThreads.find((thread) => thread.channel_type === 'support' || thread.channel_label === 'Admin');
     if (adminThread) {
       setSelectedThreadId((current) => current ?? adminThread.id);
@@ -176,7 +197,7 @@ export function CustomerChatContent({
     } finally {
       setInitializing(false);
     }
-  }, [websiteId]);
+  }, [requestedThreadId, websiteId]);
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!websiteId) return;
@@ -191,10 +212,14 @@ export function CustomerChatContent({
       const result = await fetchJson<ApiData<Thread[]>>(`/api/chat/threads?${params.toString()}`);
       const nextThreads = Array.isArray(result.data) ? result.data : [];
       setThreads(nextThreads);
+
+      const preferredThreadId = requestedThreadId && nextThreads.some((thread) => thread.id === requestedThreadId)
+        ? requestedThreadId
+        : null;
       const preferredAdminThread = nextThreads.find((thread) => thread.channel_type === 'support' || thread.channel_label === 'Admin');
       setSelectedThreadId((current) => {
         if (current && nextThreads.some((thread) => thread.id === current)) return current;
-        return preferredAdminThread?.id ?? null;
+        return preferredThreadId ?? preferredAdminThread?.id ?? null;
       });
       if (!isSearch) await ensureSupportThread(nextThreads);
     } catch (err) {
@@ -202,7 +227,7 @@ export function CustomerChatContent({
     } finally {
       if (!silent && !isSearch) setLoading(false);
     }
-  }, [debouncedSearch, ensureSupportThread, websiteId]);
+  }, [debouncedSearch, ensureSupportThread, requestedThreadId, websiteId]);
 
   const loadMessages = useCallback(async (threadId: string, silent = false) => {
     if (!threadId) return;
@@ -330,6 +355,13 @@ export function CustomerChatContent({
               : undefined,
             createdAt,
           };
+
+          if (!body) {
+            void loadMessages(matched.id, true);
+            void markThreadRead(matched.id);
+            return;
+          }
+
           setMessages((current) => (current.some((message) => message.id === incoming.id) ? current : [...current, incoming]));
           void markThreadRead(matched.id);
         });
@@ -526,6 +558,7 @@ export function CustomerChatContent({
                 </div>
                 <form onSubmit={handleSendMessage} className="flex shrink-0 items-end gap-2 border-t border-black/10 p-3 sm:p-4">
                   <textarea
+                    ref={composerRef}
                     value={composer}
                     onChange={(event) => setComposer(event.target.value)}
                     onKeyDown={(event) => {

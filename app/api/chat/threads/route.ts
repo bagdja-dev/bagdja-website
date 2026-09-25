@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   const result = await backendFetch(`/api/chat/${body.website_id}/threads`, {
     method: 'POST',
     body: JSON.stringify({
-      channel_type: body.channel_type === 'transaction' ? 'transaction' : body.channel_type ?? 'support',
+      channel_type: body.channel_type === 'transaction' ? 'order' : (body.channel_type ?? 'support'),
       channel_label: body.channel_label ?? 'Support',
       initial_message: body.initial_message,
       product_id: body.product_id,

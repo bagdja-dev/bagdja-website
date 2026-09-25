@@ -145,10 +145,9 @@ export function OrderActionButtons({
     </ChatReferenceButton>
   ) : null;
 
-  const buttons =
+  const actionButtons =
     status === 'PENDING_PAYMENT' || status === 'PENDING' ? (
       <div className="mt-3 flex flex-col gap-3">
-        {discussionButton}
         <button
           type="button"
           onClick={() => setPending('cancel')}
@@ -160,7 +159,6 @@ export function OrderActionButtons({
       </div>
     ) : status === 'HELD' ? (
       <div className="mt-5 flex flex-col gap-3">
-        {discussionButton}
         <button
           type="button"
           disabled={!fulfillmentComplete}
@@ -185,6 +183,13 @@ export function OrderActionButtons({
         </button>
       </div>
     ) : null;
+
+  const buttons = (
+    <div className="mt-3 flex flex-col gap-3">
+      {discussionButton}
+      {actionButtons}
+    </div>
+  );
 
   return (
     <>

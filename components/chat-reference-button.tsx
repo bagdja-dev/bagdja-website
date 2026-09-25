@@ -64,7 +64,12 @@ export function ChatReferenceButton({
       }
       if (!response.ok) throw new Error('Gagal menyiapkan percakapan');
 
-      window.location.href = `${basePath}/chat`;
+      const payload = (await response.json()) as { data?: { id?: string } };
+      const threadId = payload.data?.id;
+      const targetUrl = threadId
+        ? `${basePath}/chat?thread=${encodeURIComponent(threadId)}`
+        : `${basePath}/chat`;
+      window.location.href = targetUrl;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal membuka chat');
     } finally {
