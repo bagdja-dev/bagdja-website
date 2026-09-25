@@ -62,11 +62,18 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
   const [initializing, setInitializing] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [selectedThreadId, threads],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const ensureSupportThread = useCallback(async (nextThreads: Thread[]) => {
     if (nextThreads.length > 0) {
@@ -104,20 +111,26 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
   const loadThreads = useCallback(async () => {
     if (!websiteId) return;
 
-    setLoading(true);
+    const isSearch = Boolean(debouncedSearch);
+    if (!isSearch) setLoading(true);
     setError(null);
 
     try {
-      const result = await fetchJson<ApiData<Thread[]>>(`/api/chat/threads?website_id=${encodeURIComponent(websiteId)}`);
+      const params = new URLSearchParams({ website_id: websiteId });
+      if (isSearch) params.set('search', debouncedSearch);
+      const result = await fetchJson<ApiData<Thread[]>>(`/api/chat/threads?${params.toString()}`);
       const nextThreads = Array.isArray(result.data) ? result.data : [];
       setThreads(nextThreads);
-      await ensureSupportThread(nextThreads);
+      setSelectedThreadId((current) => (
+        current && nextThreads.some((thread) => thread.id === current) ? current : nextThreads[0]?.id ?? null
+      ));
+      if (!isSearch) await ensureSupportThread(nextThreads);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat chat');
     } finally {
       setLoading(false);
     }
-  }, [ensureSupportThread, websiteId]);
+  }, [debouncedSearch, ensureSupportThread, websiteId]);
 
   const loadMessages = useCallback(async (threadId: string) => {
     if (!threadId) return;
@@ -277,31 +290,42 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
         {initializing && <div className="shrink-0 border-b border-black/10 bg-white/70 px-4 py-3 text-sm opacity-70 sm:mb-3 sm:rounded-lg">Menyiapkan percakapan...</div>}
 
         <div className="flex min-h-0 flex-1 overflow-hidden border-y border-black/10 bg-white sm:rounded-xl sm:border sm:shadow-sm">
-          <aside className={`w-full shrink-0 overflow-y-auto border-black/10 sm:block sm:w-80 sm:border-r ${selectedThreadId ? 'hidden' : 'block'}`}>
-            <div className="border-b border-black/10 px-4 py-4">
+          <aside className={`min-h-0 w-full shrink-0 flex-col border-black/10 sm:w-80 sm:border-r ${selectedThreadId ? 'hidden sm:flex' : 'flex'}`}>
+            <div className="sticky top-0 z-10 shrink-0 border-b border-black/10 bg-white px-4 py-3">
               <p className="text-sm font-semibold">Percakapan</p>
-              <p className="mt-1 text-xs opacity-60">Pesan Anda dengan admin</p>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                type="search"
+                placeholder="Cari percakapan..."
+                aria-label="Cari percakapan"
+                className="mt-2 w-full rounded-xl border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--brand-accent,#17202a)]"
+              />
             </div>
-            {loading ? (
-              <p className="p-4 text-sm opacity-60">Memuat...</p>
-            ) : threads.length === 0 ? (
-              <p className="p-4 text-sm opacity-60">Menyiapkan channel Admin...</p>
-            ) : (
-              <ul className="divide-y divide-black/10">
-                {threads.map((thread) => (
-                  <li key={thread.id}>
-                    <button type="button" onClick={() => setSelectedThreadId(thread.id)} className={`flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-black/[0.03] ${selectedThreadId === thread.id ? 'bg-black/[0.04]' : ''}`}>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-accent,#17202a)] text-sm font-semibold text-[var(--brand-on-accent,#fff)]">H</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{formatChatThreadTitle(thread)}</span>
-                        <span className="mt-1 block truncate text-xs opacity-60">{formatLastChatPreview(thread.last_message_preview)}</span>
-                      </span>
-                      {Number(thread.unread_count ?? 0) > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">{Number(thread.unread_count) > 99 ? '99+' : thread.unread_count}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {loading ? (
+                <p className="p-4 text-sm opacity-60">Memuat...</p>
+              ) : threads.length === 0 ? (
+                <p className="p-4 text-sm opacity-60">
+                  {debouncedSearch ? 'Tidak ada percakapan yang cocok.' : 'Menyiapkan channel Admin...'}
+                </p>
+              ) : (
+                <ul className="divide-y divide-black/10">
+                  {threads.map((thread) => (
+                    <li key={thread.id}>
+                      <button type="button" onClick={() => setSelectedThreadId(thread.id)} className={`flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-black/[0.03] ${selectedThreadId === thread.id ? 'bg-black/[0.04]' : ''}`}>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-accent,#17202a)] text-sm font-semibold text-[var(--brand-on-accent,#fff)]">H</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">{formatChatThreadTitle(thread)}</span>
+                          <span className="mt-1 block truncate text-xs opacity-60">{formatLastChatPreview(thread.last_message_preview)}</span>
+                        </span>
+                        {Number(thread.unread_count ?? 0) > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">{Number(thread.unread_count) > 99 ? '99+' : thread.unread_count}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </aside>
 
           <section className={`min-w-0 flex-1 flex-col ${selectedThreadId ? 'flex' : 'hidden sm:flex'}`}>
