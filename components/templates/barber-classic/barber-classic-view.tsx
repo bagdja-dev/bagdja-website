@@ -41,7 +41,10 @@ import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
+import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
+import { ChatReferenceButton } from '../../chat-reference-button';
+import { buildChatReferenceHref } from '../../chat-reference';
 
 export interface BarberClassicProfile {
   name?: string;
@@ -92,6 +95,7 @@ export interface BarberClassicViewProps {
     cartHref?: string;
     ordersHref?: string;
     profileHref?: string;
+    chatHref?: string;
   };
 }
 
@@ -852,11 +856,15 @@ function ProductDetailSection({
   allProducts,
   waHref,
   websiteSlug,
+  websiteId,
+  loginHref,
 }: {
   item: CatalogItem;
   allProducts: CatalogItem[];
   waHref?: string;
   websiteSlug?: string;
+  websiteId?: string;
+  loginHref?: string;
 }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
@@ -956,6 +964,18 @@ function ProductDetailSection({
           </a>
         </div>
       )}
+      {websiteId && (
+        <ChatReferenceButton
+          websiteId={websiteId}
+          basePath={websiteSlug}
+          loginHref={loginHref}
+          productId={item.id}
+          reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+          className="mt-3 inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+        >
+          Tanya Produk
+        </ChatReferenceButton>
+      )}
       {item.paymentMeta && item.paymentMeta.length > 0 && (
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           {item.paymentMeta.map((entry, index) => (
@@ -1005,6 +1025,7 @@ export function BarberClassicView({
   const ordersSection = sections.find((s) => s.type === 'orders');
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
   const profileSection = sections.find((s) => s.type === 'profile');
+  const chatSection = sections.find((s) => s.type === 'chat');
   const pageHeroLabel = checkoutSection
     ? 'Checkout'
     : cartSection
@@ -1015,7 +1036,9 @@ export function BarberClassicView({
           ? 'Status Pesanan'
           : profileSection
             ? 'Profil Saya'
-            : undefined;
+            : chatSection
+              ? 'Chat Pelanggan'
+              : undefined;
   const categoryListingLabel =
     typeof categoryListingContent?.category_label === 'string' ? categoryListingContent.category_label : undefined;
   const categoryListingImage = categoryListingLabel
@@ -1067,6 +1090,7 @@ export function BarberClassicView({
           auth={auth}
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
+          chatHref={auth?.chatHref}
         />
 
         {categoryListingLabel && (
@@ -1333,6 +1357,9 @@ export function BarberClassicView({
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
+              case 'chat': {
+                return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
+              }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
@@ -1342,13 +1369,13 @@ export function BarberClassicView({
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
                 const order = section.content.order as OrderDetail | null | undefined;
-                return <OrderDetailContent key={key} transaction={transaction} order={order} />;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
                 return (
-                  <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} />
+                  <ProductDetailSection key={key} item={item} allProducts={products} waHref={waHref} websiteSlug={websiteSlug} websiteId={websiteId} loginHref={auth?.loginHref} />
                 );
               }
               default:

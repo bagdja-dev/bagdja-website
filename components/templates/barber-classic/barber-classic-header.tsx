@@ -25,6 +25,7 @@ export interface HeaderAuthState {
   ordersHref?: string;
   tagihanHref?: string;
   profileHref?: string;
+  chatHref?: string;
 }
 
 interface BarberClassicHeaderProps {
@@ -40,6 +41,7 @@ interface BarberClassicHeaderProps {
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
   cartHref?: string;
+  chatHref?: string;
   websiteId: string;
 }
 
@@ -70,6 +72,7 @@ export function BarberClassicHeader({
   socialLinks = [],
   auth,
   cartHref,
+  chatHref,
   websiteId,
 }: BarberClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
@@ -206,6 +209,7 @@ export function BarberClassicHeader({
                       { href: auth.cartHref, label: 'Keranjang' },
                       { href: auth.ordersHref, label: 'Transaksi' },
                       { href: auth.tagihanHref, label: 'Tagihan' },
+                      { href: auth.chatHref, label: 'Inbox' },
                       { href: auth.profileHref, label: 'Profil' },
                     ].map(
                       (item) =>

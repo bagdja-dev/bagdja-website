@@ -31,7 +31,10 @@ import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
+import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
+import { ChatReferenceButton } from '../../chat-reference-button';
+import { buildChatReferenceHref } from '../../chat-reference';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
 import {
   getGoogleFontsUrl,
@@ -74,6 +77,7 @@ export interface WorkshopViewProps {
     ordersHref?: string;
     tagihanHref?: string;
     profileHref?: string;
+    chatHref?: string;
   };
 }
 
@@ -525,7 +529,7 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
   return <a href={entry.payment_link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex border-2 px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent)' }}>Beli via Lynk</a>;
 }
 
-function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, waHref, auth }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; waHref?: string; auth?: WorkshopViewProps['auth'] }) {
+  function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, websiteId, waHref, auth }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; websiteId?: string; waHref?: string; auth?: WorkshopViewProps['auth'] }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((product) => product.id === familyId || product.parentProductId === familyId);
@@ -625,6 +629,9 @@ function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tena
 
             {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
             {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
+            {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
+              Tanya Produk
+            </ChatReferenceButton> : null}
             {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
           </div>
         </div>
@@ -744,7 +751,7 @@ export function WorkshopView({
     platformName: name,
     fallbackTitle: 'Produk',
   });
-  const utilityPage = sections.some((section) => ['cart', 'checkout', 'orders', 'profile', 'order_detail'].includes(section.type));
+  const utilityPage = sections.some((section) => ['cart', 'checkout', 'orders', 'profile', 'order_detail', 'chat'].includes(section.type));
   const isCategoryListingPage = sections.some((section) => section.type === 'category_listing');
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
   const waHref = buildWhatsAppHref(profile.whatsapp);
@@ -779,12 +786,13 @@ export function WorkshopView({
           auth={auth}
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
+          chatHref={auth?.chatHref}
           cartLabel="Pesanan"
         />
         {isCatalogItem(productDetailItem) ? (
           <>
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
-            <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} waHref={waHref} auth={auth} />
+            <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
         ) : utilityPage || isCategoryListingPage ? null : <WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} />}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map((section, index) => {
@@ -817,10 +825,11 @@ export function WorkshopView({
             case 'orders': return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'tagihan': return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'profile': return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
+            case 'chat': return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;
               const order = section.content.order as OrderDetail | null | undefined;
-              return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} />;
+              return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
             }
             default: return null;
           }

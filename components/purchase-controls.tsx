@@ -74,7 +74,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
 
   const handleAdded = (orderId: string) => {
     if (isDirectOrder) {
-      router.push(`${basePath ?? ''}/order/${orderId}`);
+      router.push(`${basePath ?? ''}/cart/order/${orderId}`);
       return;
     }
     setFeedback({ ok: true, message: 'Ditambahkan ke keranjang' });

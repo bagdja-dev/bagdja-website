@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { CartProvider } from '../../../../lib/cart';
@@ -25,7 +25,7 @@ interface ProductDetailPageProps {
 
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
-  const product = tenant?.products.find((p) => p.slug === params.product_slug);
+  const product = tenant?.products.find((p) => p.slug === params.product_slug || p.id === params.product_slug);
   if (!product) return {};
 
   return {
@@ -44,8 +44,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   );
 
   const { website, products, locations, faqs, blogPosts } = tenant;
-  const product = products.find((p) => p.slug === params.product_slug);
+  const product = products.find((p) => p.slug === params.product_slug || p.id === params.product_slug);
   if (!product) notFound();
+  if (product.slug && product.slug !== params.product_slug) {
+    redirect(`${resolveTenantLinkBase(params.website_slug)}/products/${product.slug}`);
+  }
 
   const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
   if (!Renderer) notFound();

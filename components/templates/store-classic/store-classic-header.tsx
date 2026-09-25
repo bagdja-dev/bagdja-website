@@ -25,6 +25,7 @@ export interface HeaderAuthState {
   ordersHref?: string;
   tagihanHref?: string;
   profileHref?: string;
+  chatHref?: string;
 }
 
 interface StoreClassicHeaderProps {
@@ -38,6 +39,7 @@ interface StoreClassicHeaderProps {
   socialLinks?: SocialLink[];
   auth?: HeaderAuthState;
   cartHref?: string;
+  chatHref?: string;
   websiteId: string;
   cartLabel?: string;
 }
@@ -53,6 +55,7 @@ export function StoreClassicHeader({
   socialLinks = [],
   auth,
   cartHref,
+  chatHref,
   websiteId,
   cartLabel = 'Cart',
 }: StoreClassicHeaderProps) {
@@ -173,6 +176,7 @@ export function StoreClassicHeader({
                       { href: auth.cartHref, label: cartLabel },
                       { href: auth.ordersHref, label: 'Transaction' },
                       { href: auth.tagihanHref, label: 'Tagihan' },
+                      { href: auth.chatHref, label: 'Inbox' },
                       { href: auth.profileHref, label: 'Profile' },
                     ].map(
                       (item) =>

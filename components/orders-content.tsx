@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { ChatReferenceButton } from './chat-reference-button';
+import { buildChatReferenceHref } from './chat-reference';
 
 /**
  * Daftar transaksi buyer (client component).
@@ -44,6 +46,7 @@ interface WebsiteProductLite {
 
 interface TransactionItemRow {
   id: string;
+  order_id: string;
   quantity: number;
   unit_price: number | string;
   total_amount: number | string;
@@ -334,7 +337,7 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
                 <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(107,114,128,0.14)', color: 'rgb(75,85,99)' }}>Dibatalkan</span>
               </div>
               <p className="mt-3 font-semibold">Harga quotation: {formatMoney(row.quoted_total_amount ?? row.total_amount)}</p>
-              <a href={`${basePath}/order/${row.id}`} className="mt-3 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Detail</a>
+              <a href={`${basePath}/cart/order/${row.id}`} className="mt-3 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Detail Pesanan</a>
             </article>
           ))}
         </div>
@@ -343,7 +346,7 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
       {!loading && !error && tab !== 'preorder-cancelled' && filtered.length > 0 && (
         <div className="flex flex-col gap-3">
           {filtered.map((row) => (
-            <TransactionCard key={row.id} row={row} basePath={basePath} />
+            <TransactionCard key={row.id} row={row} basePath={basePath} websiteId={websiteId} />
           ))}
         </div>
       )}
@@ -406,7 +409,7 @@ function EmptyState({
   );
 }
 
-function TransactionCard({ row, basePath }: { row: WebsiteTransactionRow; basePath: string }) {
+function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransactionRow; basePath: string; websiteId: string }) {
   const tone = STATUS_TONE[row.status] ?? 'muted';
   const toneStyle = pillBg(tone);
   const items = row.items ?? [];
@@ -497,8 +500,26 @@ function TransactionCard({ row, basePath }: { row: WebsiteTransactionRow; basePa
               className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
               style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
             >
-              Detail
+              Detail Transaksi
             </a>
+            {firstItem?.order_id && (
+              <ChatReferenceButton
+                websiteId={websiteId}
+                basePath={basePath}
+                orderId={firstItem.order_id}
+                reference={{
+                  type: 'transaction',
+                  id: row.id,
+                  title: `TRX ${shortId(row.id)}`,
+                  imageUrl: productImage,
+                  meta: productName,
+                  href: buildChatReferenceHref('transaction', basePath, { entityId: row.id }),
+                }}
+                className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
+              >
+                Chat Order
+              </ChatReferenceButton>
+            )}
             {needPayment && row.checkout_url && (
               <a
                 href={row.checkout_url}

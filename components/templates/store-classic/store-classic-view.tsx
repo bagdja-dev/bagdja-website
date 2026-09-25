@@ -45,11 +45,14 @@ import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
 import { ProfileContent } from '../../profile-content';
+import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from './store-classic-icons';
 import { AddToCartButton } from '../../cart-button';
 import { CartBadge } from '../../cart-badge';
 import { PurchaseControls } from '../../purchase-controls';
+import { ChatReferenceButton } from '../../chat-reference-button';
+import { buildChatReferenceHref } from '../../chat-reference';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -87,6 +90,7 @@ export interface StoreClassicViewProps {
     cartHref?: string;
     ordersHref?: string;
     profileHref?: string;
+    chatHref?: string;
   };
 }
 
@@ -849,7 +853,7 @@ function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   }
 }
 
-function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string }) {
+function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; loginHref?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
@@ -925,6 +929,18 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
               >
                 Pesan via WhatsApp
               </a>
+            )}
+            {websiteId && (
+              <ChatReferenceButton
+                websiteId={websiteId}
+                basePath={websiteSlug}
+                loginHref={loginHref}
+                productId={item.id}
+                reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                className="mt-3 inline-flex rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+              >
+                Tanya Produk
+              </ChatReferenceButton>
             )}
             {/* Mode external (LYNK) — dirender setelah WhatsApp */}
             {item.paymentMeta?.map((entry, index) => (
@@ -1046,6 +1062,7 @@ export function StoreClassicView({
   const ordersSection = sections.find((s) => s.type === 'orders');
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
   const profileSection = sections.find((s) => s.type === 'profile');
+  const chatSection = sections.find((s) => s.type === 'chat');
   const pageBannerLabel = checkoutSection
     ? 'Checkout'
     : cartSection
@@ -1056,7 +1073,9 @@ export function StoreClassicView({
           ? 'Status Pesanan'
           : profileSection
             ? 'Profil Saya'
-            : undefined;
+            : chatSection
+              ? 'Chat Pelanggan'
+              : undefined;
 
   const toLink = (page: NavPage): HeaderNavLink => ({
     href: websiteSlug !== undefined ? buildPageHref(websiteSlug, page) : '#',
@@ -1102,6 +1121,7 @@ export function StoreClassicView({
           auth={auth}
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
+          chatHref={auth?.chatHref}
         />
 
         {productDetailItem ? (
@@ -1312,15 +1332,18 @@ export function StoreClassicView({
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
+              case 'chat': {
+                return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
+              }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
                 const order = section.content.order as OrderDetail | null | undefined;
-                return <OrderDetailContent key={key} transaction={transaction} order={order} />;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} />;
+                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} loginHref={auth?.loginHref} />;
               }
               default:
                 return null;

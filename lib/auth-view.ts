@@ -17,6 +17,7 @@ export interface AuthViewState {
   ordersHref?: string;
   tagihanHref?: string;
   profileHref?: string;
+  chatHref?: string;
 }
 
 /**
@@ -58,5 +59,6 @@ export async function getAuthViewState(
     ordersHref: `${linkBase}/orders`,
     tagihanHref: `${linkBase}/tagihan`,
     profileHref: `${linkBase}/profile`,
+    chatHref: `${linkBase}/chat`,
   };
 }

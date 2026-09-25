@@ -7,7 +7,7 @@
  * checkout.
  *
  * Data (`transaction`/`order`) sudah di-fetch server-side oleh
- * `app/[website_slug]/order/[order_id]/page.tsx` dan dilewatkan lewat
+ * `/order/:transactionId` atau `/cart/order/:orderId` dan dilewatkan lewat
  * `section.content` — komponen ini murni presentational (bukan client
  * fetch), kecuali tombol retry yang jadi island client tersendiri.
  */
@@ -16,6 +16,8 @@ import { DraftOrderCancelButton } from './draft-order-cancel-button';
 import { OrderActionButtons } from './order-action-buttons';
 import { OrderQuantityControl } from './order-quantity-control';
 import { PraorderStepList } from './praorder-step-list';
+import { ChatReferenceButton } from './chat-reference-button';
+import { buildChatReferenceHref } from './chat-reference';
 import { RetryPaymentButton } from './retry-payment-button';
 
 export interface TransactionProduct {
@@ -154,6 +156,7 @@ export interface OrderDetail {
   payment_mode: 'ADD_TO_CART' | 'ESCROW';
   status: string;
   checkout_url: string | null;
+  transaction_id?: string | null;
   created_at: string;
   quoteTermins?: Array<{
     sequence: number;
@@ -195,18 +198,22 @@ export function OrderDetailContent({
   transaction,
   order,
   basePath = '',
+  websiteId,
+  loginHref,
 }: {
   transaction?: TransactionDetail | null;
   order?: OrderDetail | null;
   basePath?: string;
+  websiteId?: string;
+  loginHref?: string;
 }) {
-  if (transaction) return <TransactionView transaction={transaction} />;
-  if (order) return <LegacyOrderView order={order} basePath={basePath} />;
+  if (transaction) return <TransactionView transaction={transaction} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
+  if (order) return <LegacyOrderView order={order} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
   return null;
 }
 
 /** Tampilan transaksi (alur baru W2.8) — read-only, mirip layout checkout. */
-function TransactionView({ transaction }: { transaction: TransactionDetail }) {
+function TransactionView({ transaction, basePath, websiteId, loginHref }: { transaction: TransactionDetail; basePath: string; websiteId?: string; loginHref?: string }) {
   const items = transaction.items ?? [];
 
   const shippingLines = [
@@ -246,17 +253,21 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Transaksi</h1>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Sudah checkout</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span
           className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wide"
           style={
             partiallyCompleted
               ? { backgroundColor: 'rgba(245, 158, 11, 0.14)', color: 'rgb(180, 83, 9)' }
               : {
-                  backgroundColor: needsPayment ? 'var(--brand-surface)' : 'var(--brand-accent)',
-                  color: needsPayment ? 'var(--brand-text)' : 'var(--brand-on-accent)',
-                  border: needsPayment ? '1px solid var(--brand-border)' : 'none',
-                }
+                backgroundColor: needsPayment ? 'var(--brand-surface)' : 'var(--brand-accent)',
+                color: needsPayment ? 'var(--brand-text)' : 'var(--brand-on-accent)',
+                border: needsPayment ? '1px solid var(--brand-border)' : 'none',
+              }
           }
         >
           {statusLabel}
@@ -473,6 +484,12 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
             transactionId={transaction.id}
             status={transaction.status}
             fulfillmentComplete={allFulfillmentStepsCompleted(transaction)}
+            websiteId={websiteId}
+            basePath={basePath}
+            orderId={items[0]?.order_id}
+            orderTitle={items[0]?.order?.product?.name}
+            orderImage={items[0]?.order?.product?.images?.[0]}
+            loginHref={loginHref}
           />
         </aside>
       </div>
@@ -481,7 +498,7 @@ function TransactionView({ transaction }: { transaction: TransactionDetail }) {
 }
 
 /** Tampilan order legacy (sebelum W2.8 — escrow di level order). */
-function LegacyOrderView({ order, basePath }: { order: OrderDetail; basePath: string }) {
+function LegacyOrderView({ order, basePath, websiteId, loginHref }: { order: OrderDetail; basePath: string; websiteId?: string; loginHref?: string }) {
   // fulfillment-praorder-plan.md Q5 — harga 0 = belum ada penawaran (seller
   // belum isi harga final), tampilkan "-" dulu, jangan "Rp 0" mentah
   // (terlihat seperti gratis/rusak).
@@ -491,6 +508,10 @@ function LegacyOrderView({ order, basePath }: { order: OrderDetail; basePath: st
 
   return (
     <section className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Pesanan</h1>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Belum checkout</span>
+      </div>
       <div
         className="flex gap-4 rounded-xl border p-5 text-sm"
         style={{ borderColor: 'var(--brand-border)' }}
@@ -583,6 +604,25 @@ function LegacyOrderView({ order, basePath }: { order: OrderDetail; basePath: st
         </section>
       )}
 
+      {websiteId && (
+        <ChatReferenceButton
+          websiteId={websiteId}
+          basePath={basePath}
+          loginHref={loginHref}
+          orderId={order.id}
+          reference={{
+            type: 'order',
+            id: order.id,
+            title: `Order ${order.id.slice(0, 8)}`,
+            imageUrl: image,
+            meta: order.product?.name ?? `Produk ${order.product_id}`,
+            href: buildChatReferenceHref('order', basePath, { entityId: order.id }),
+          }}
+          className="mt-6 flex w-full items-center justify-center rounded-full border px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-opacity hover:opacity-80"
+        >
+          Diskusikan Pesanan
+        </ChatReferenceButton>
+      )}
       {order.status === 'PENDING' && order.checkout_url && !awaitingQuote && (
         <a
           href={order.checkout_url}

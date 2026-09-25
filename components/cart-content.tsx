@@ -376,12 +376,12 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                 onClick={(event) => {
                   const target = event.target as HTMLElement;
                   if (target.closest('a,button,input,select,textarea')) return;
-                  router.push(`${basePath}/order/${line.orderId}`);
+                  router.push(`${basePath}/cart/order/${line.orderId}`);
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    router.push(`${basePath}/order/${line.orderId}`);
+                    router.push(`${basePath}/cart/order/${line.orderId}`);
                   }
                 }}
                 style={{
@@ -443,11 +443,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                     </div>
                     <div className="flex items-center gap-1">
                       <Link
-                        href={`${basePath}/order/${line.orderId}`}
+                        href={`${basePath}/cart/order/${line.orderId}`}
                         className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/5"
                         style={{ color: 'var(--brand-muted)' }}
                         aria-label={`Lihat detail order ${line.name}`}
-                        title="Lihat detail order"
+                        title="Lihat detail pesanan draft"
                       >
                         <ViewOrderIcon />
                       </Link>
@@ -504,7 +504,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                     <div className="text-right">
                       {line.unitPrice <= 0 ? (
                         <Link
-                          href={`${basePath}/order/${line.orderId}`}
+                          href={`${basePath}/cart/order/${line.orderId}`}
                           className="text-sm font-semibold underline"
                           style={{ color: 'var(--brand-accent-muted)' }}
                         >
@@ -549,7 +549,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                           )}
                           {line.hasIncompletePraorderSteps && (
                             <Link
-                              href={`${basePath}/order/${line.orderId}`}
+                              href={`${basePath}/cart/order/${line.orderId}`}
                               className="mt-1 block text-xs font-semibold underline"
                               style={{ color: 'var(--brand-accent-muted)' }}
                             >

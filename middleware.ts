@@ -35,9 +35,9 @@ const RESERVED_TOP_LEVEL_PATHS = new Set(['templates']);
 const SUBDOMAIN_PATTERN = new RegExp(`^([a-z0-9-]+)\\.${PLATFORM_HOST.replace(/\./g, '\\.')}$`);
 
 // ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
-// Path dalam tenant: `/{slug}/cart`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`
+// Path dalam tenant: `/{slug}/cart`, `/{slug}/cart/order/...`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`, `/{slug}/chat`
 const PROTECTED_PATH_PATTERN =
-  /^\/([a-z0-9-]+)\/(cart|checkout|orders|tagihan|profile)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
+  /^\/([a-z0-9-]+)\/(cart|checkout|orders|tagihan|profile|chat)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
 
 function shouldProtect(pathname: string): boolean {
   return PROTECTED_PATH_PATTERN.test(pathname);

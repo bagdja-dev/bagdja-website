@@ -20,6 +20,8 @@ import { useRouter } from 'next/navigation';
 import { useState, type CSSProperties } from 'react';
 
 import { ConfirmDialog } from './confirm-dialog';
+import { ChatReferenceButton } from './chat-reference-button';
+import { buildChatReferenceHref } from './chat-reference';
 
 type ActionKind = 'cancel' | 'complete' | 'dispute';
 
@@ -70,11 +72,23 @@ export function OrderActionButtons({
   transactionId,
   status,
   fulfillmentComplete = true,
+  websiteId,
+  basePath = '',
+  orderId,
+  orderTitle,
+  orderImage,
+  loginHref,
 }: {
   transactionId: string;
   status: string;
   /** Order Handling Phase 3 §3.0 — gate "Selesai — Terima Barang": harus semua step fulfillment selesai dulu. */
   fulfillmentComplete?: boolean;
+  websiteId?: string;
+  basePath?: string;
+  orderId?: string;
+  orderTitle?: string;
+  orderImage?: string;
+  loginHref?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<ActionKind | null>(null);
@@ -111,9 +125,30 @@ export function OrderActionButtons({
 
   const dialogConfig = pending ? ACTION_CONFIG[pending] : null;
 
+  const discussionButton = websiteId && orderId ? (
+    <ChatReferenceButton
+      websiteId={websiteId}
+      basePath={basePath}
+      loginHref={loginHref}
+      orderId={orderId}
+      reference={{
+        type: 'transaction',
+        id: transactionId,
+        title: `TRX ${transactionId.slice(0, 8)}`,
+        imageUrl: orderImage,
+        meta: orderTitle,
+        href: buildChatReferenceHref('transaction', basePath, { entityId: transactionId }),
+      }}
+      className="flex w-full items-center justify-center rounded-full border px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95"
+    >
+      Diskusikan Pesanan
+    </ChatReferenceButton>
+  ) : null;
+
   const buttons =
     status === 'PENDING_PAYMENT' || status === 'PENDING' ? (
-      <div className="mt-3">
+      <div className="mt-3 flex flex-col gap-3">
+        {discussionButton}
         <button
           type="button"
           onClick={() => setPending('cancel')}
@@ -125,6 +160,7 @@ export function OrderActionButtons({
       </div>
     ) : status === 'HELD' ? (
       <div className="mt-5 flex flex-col gap-3">
+        {discussionButton}
         <button
           type="button"
           disabled={!fulfillmentComplete}
