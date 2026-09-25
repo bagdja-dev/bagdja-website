@@ -1009,6 +1009,7 @@ export function BarberClassicView({
     profile.tagline?.trim() ||
     'Barbershop terpercaya dengan layanan potong rambut, cukur, dan grooming premium.';
   const waHref = buildWhatsAppHref(profile.whatsapp);
+  const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
 
   const resolved = resolveTheme(templateTheme, websiteTheme);
   const cssVars = themeToCssVariables(resolved);
@@ -1090,7 +1091,7 @@ export function BarberClassicView({
           auth={auth}
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
-          chatHref={auth?.chatHref}
+          chatHref={chatHref}
         />
 
         {categoryListingLabel && (
@@ -1120,30 +1121,18 @@ export function BarberClassicView({
           </p>
           {showWhatsappCta && (
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              {waHref ? (
-                <a
-                  href={waHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: 'var(--brand-accent)',
-                    color: 'var(--brand-on-accent)',
-                  }}
-                >
-                  Booking via WhatsApp
-                </a>
-              ) : (
-                <span
-                  className="inline-flex rounded-full px-6 py-3 text-sm font-medium"
-                  style={{
-                    backgroundColor: 'var(--brand-accent)',
-                    color: 'var(--brand-on-accent)',
-                  }}
-                >
-                  Booking via WhatsApp
-                </span>
-              )}
+              <a
+                href={chatHref || waHref || '#'}
+                target={chatHref ? undefined : '_blank'}
+                rel={chatHref ? undefined : 'noopener noreferrer'}
+                className="inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: 'var(--brand-accent)',
+                  color: 'var(--brand-on-accent)',
+                }}
+              >
+                Hubungi Kami
+              </a>
             </div>
           )}
           {(profile.phone || profile.email) && (
@@ -1358,7 +1347,15 @@ export function BarberClassicView({
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
               case 'chat': {
-                return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
+                return (
+                  <CustomerChatContent
+                    key={key}
+                    websiteId={websiteId ?? ''}
+                    basePath={websiteSlug ?? ''}
+                    whatsapp={profile.whatsapp}
+                    email={profile.email}
+                  />
+                );
               }
               case 'orders': {
                 return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
@@ -1383,19 +1380,19 @@ export function BarberClassicView({
             }
           })}
 
-        {waHref && (
+        {(chatHref || waHref) && (
           <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">
             <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={chatHref || waHref || '#'}
+              target={chatHref ? undefined : '_blank'}
+              rel={chatHref ? undefined : 'noopener noreferrer'}
               className="flex w-full items-center justify-center rounded-full py-3.5 text-sm font-semibold shadow-lg"
               style={{
                 backgroundColor: 'var(--brand-accent)',
                 color: 'var(--brand-on-accent)',
               }}
             >
-              Booking via WhatsApp
+              Hubungi Kami
             </a>
           </div>
         )}

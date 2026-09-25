@@ -119,7 +119,7 @@ function WorkshopProductBanner({ label, imageUrl }: { label: string; imageUrl?: 
   );
 }
 
-function WorkshopHero({ tagline, content, waHref }: { tagline: string; content: Record<string, unknown>; waHref?: string }) {
+function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string; content: Record<string, unknown>; waHref?: string; chatHref?: string }) {
   const subtitle = getString(content, 'subtitle') ?? 'KONSTRUKSI BAJA · WELDING · ALUMINIUM';
   const headline = getString(content, 'headline') ?? 'Dibangun untuk bertahan.';
   const lede = getString(content, 'lede') ?? tagline;
@@ -142,7 +142,15 @@ function WorkshopHero({ tagline, content, waHref }: { tagline: string; content: 
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg">{lede}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)' }}>Mulai Konsultasi</a> : null}
+            <a
+              href={chatHref || waHref || '#'}
+              target={chatHref ? undefined : '_blank'}
+              rel={chatHref ? undefined : 'noopener noreferrer'}
+              className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]"
+              style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)' }}
+            >
+              Hubungi Kami
+            </a>
             <a href="#layanan" className="border-2 border-white/40 px-5 py-3 text-center text-sm font-bold text-white hover:border-white">Lihat Layanan</a>
           </div>
           {stats.length > 0 ? (
@@ -755,6 +763,7 @@ export function WorkshopView({
   const isCategoryListingPage = sections.some((section) => section.type === 'category_listing');
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
   const waHref = buildWhatsAppHref(profile.whatsapp);
+  const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
 
   return (
     <>
@@ -794,7 +803,7 @@ export function WorkshopView({
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
             <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
-        ) : utilityPage || isCategoryListingPage ? null : <WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} />}
+        ) : utilityPage || isCategoryListingPage ? null : <WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} chatHref={chatHref} />}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map((section, index) => {
           const key = `${section.type}-${index}`;
           switch (section.type) {
@@ -825,7 +834,7 @@ export function WorkshopView({
             case 'orders': return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'tagihan': return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'profile': return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
-            case 'chat': return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
+            case 'chat': return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} whatsapp={profile.whatsapp} email={profile.email} />;
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;
               const order = section.content.order as OrderDetail | null | undefined;

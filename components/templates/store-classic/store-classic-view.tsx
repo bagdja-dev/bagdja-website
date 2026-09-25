@@ -112,6 +112,7 @@ function HeroSection({
   subtitle,
   imageUrl,
   waHref,
+  chatHref,
   showWhatsappCta,
 }: {
   title: string;
@@ -119,6 +120,7 @@ function HeroSection({
   subtitle?: string;
   imageUrl?: string;
   waHref?: string;
+  chatHref?: string;
   showWhatsappCta: boolean;
 }) {
   return (
@@ -143,11 +145,11 @@ function HeroSection({
           <p className="mt-5 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
             {tagline}
           </p>
-          {showWhatsappCta && waHref && (
+          {showWhatsappCta && (chatHref || waHref) && (
             <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={chatHref || waHref || '#'}
+              target={chatHref ? undefined : '_blank'}
+              rel={chatHref ? undefined : 'noopener noreferrer'}
               className="mt-8 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
@@ -1032,6 +1034,7 @@ export function StoreClassicView({
   const title = profile.name?.trim() || 'Nama Toko Anda';
   const tagline = profile.tagline?.trim() || 'Belanja produk pilihan dengan kualitas terbaik.';
   const waHref = buildWhatsAppHref(profile.whatsapp);
+  const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
 
   const resolved = resolveTheme(templateTheme, websiteTheme);
   const cssVars = themeToCssVariables(resolved);
@@ -1121,7 +1124,7 @@ export function StoreClassicView({
           auth={auth}
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
-          chatHref={auth?.chatHref}
+          chatHref={chatHref}
         />
 
         {productDetailItem ? (
@@ -1137,6 +1140,7 @@ export function StoreClassicView({
             subtitle={heroSubtitle}
             imageUrl={heroImageUrl}
             waHref={waHref}
+            chatHref={chatHref}
             showWhatsappCta={showWhatsappCta}
           />
         )}
@@ -1333,7 +1337,15 @@ export function StoreClassicView({
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
               }
               case 'chat': {
-                return <CustomerChatContent key={key} websiteId={websiteId ?? ''} basePath={websiteSlug ?? ''} />;
+                return (
+                  <CustomerChatContent
+                    key={key}
+                    websiteId={websiteId ?? ''}
+                    basePath={websiteSlug ?? ''}
+                    whatsapp={profile.whatsapp}
+                    email={profile.email}
+                  />
+                );
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
@@ -1350,12 +1362,12 @@ export function StoreClassicView({
             }
           })}
 
-        {waHref && (
+        {(chatHref || waHref) && (
           <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">
             <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={chatHref || waHref || '#'}
+              target={chatHref ? undefined : '_blank'}
+              rel={chatHref ? undefined : 'noopener noreferrer'}
               className="flex w-full items-center justify-center rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide shadow-lg"
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >

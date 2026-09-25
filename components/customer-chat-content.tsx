@@ -8,6 +8,7 @@ import { parseChatReference } from './chat-reference';
 
 interface Thread {
   id: string;
+  topic_id?: string | null;
   website_id: string;
   channel_type: 'product' | 'support' | 'order' | 'transaction';
   channel_label?: string;
@@ -35,6 +36,47 @@ interface ApiData<T> {
   data?: T;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function parseRealtimeEvent(event: Record<string, unknown>) {
+  const envelope = asRecord(event.data) ?? event;
+  const eventName = typeof event.eventName === 'string'
+    ? event.eventName
+    : typeof envelope.eventName === 'string'
+      ? envelope.eventName
+      : '';
+  const nested = asRecord(envelope.data);
+  return { eventName, data: nested ?? envelope };
+}
+
+function eventString(data: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+}
+
+function matchesThread(thread: Thread, threadId: string, topicId: string) {
+  return Boolean((threadId && thread.id === threadId) || (topicId && thread.topic_id === topicId));
+}
+
+function readSiteUserId() {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)site_user=([^;]*)/);
+  if (!match?.[1]) return null;
+  try {
+    const user = JSON.parse(decodeURIComponent(match[1])) as { userId?: string };
+    return user.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
     ...init,
@@ -50,8 +92,23 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: string; basePath?: string }) {
+export function CustomerChatContent({
+  websiteId,
+  basePath = '',
+  chatHref,
+  whatsapp,
+  email,
+}: {
+  websiteId: string;
+  basePath?: string;
+  chatHref?: string;
+  whatsapp?: string;
+  email?: string;
+}) {
   const chatRootRef = useRef<HTMLElement | null>(null);
+  const messagesPaneRef = useRef<HTMLDivElement | null>(null);
+  const selectedThreadIdRef = useRef<string | null>(null);
+  const threadsRef = useRef<Thread[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -70,16 +127,29 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
     [selectedThreadId, threads],
   );
 
+  const adminWhatsappHref = whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D+/g, '')}` : undefined;
+  const adminEmailHref = email ? `mailto:${email}` : undefined;
+
+  selectedThreadIdRef.current = selectedThreadId;
+  threadsRef.current = threads;
+
+  const scrollMessagesToBottom = useCallback(() => {
+    const pane = messagesPaneRef.current;
+    if (!pane) return;
+    requestAnimationFrame(() => {
+      pane.scrollTop = pane.scrollHeight;
+    });
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
     return () => window.clearTimeout(timer);
   }, [search]);
 
   const ensureSupportThread = useCallback(async (nextThreads: Thread[]) => {
-    if (nextThreads.length > 0) {
-      if (!selectedThreadId) {
-        setSelectedThreadId(nextThreads[0].id);
-      }
+    const adminThread = nextThreads.find((thread) => thread.channel_type === 'support' || thread.channel_label === 'Admin');
+    if (adminThread) {
+      setSelectedThreadId((current) => current ?? adminThread.id);
       return;
     }
 
@@ -106,14 +176,14 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
     } finally {
       setInitializing(false);
     }
-  }, [selectedThreadId, websiteId]);
+  }, [websiteId]);
 
-  const loadThreads = useCallback(async () => {
+  const loadThreads = useCallback(async (silent = false) => {
     if (!websiteId) return;
 
     const isSearch = Boolean(debouncedSearch);
-    if (!isSearch) setLoading(true);
-    setError(null);
+    if (!silent && !isSearch) setLoading(true);
+    if (!silent) setError(null);
 
     try {
       const params = new URLSearchParams({ website_id: websiteId });
@@ -121,21 +191,23 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
       const result = await fetchJson<ApiData<Thread[]>>(`/api/chat/threads?${params.toString()}`);
       const nextThreads = Array.isArray(result.data) ? result.data : [];
       setThreads(nextThreads);
-      setSelectedThreadId((current) => (
-        current && nextThreads.some((thread) => thread.id === current) ? current : nextThreads[0]?.id ?? null
-      ));
+      const preferredAdminThread = nextThreads.find((thread) => thread.channel_type === 'support' || thread.channel_label === 'Admin');
+      setSelectedThreadId((current) => {
+        if (current && nextThreads.some((thread) => thread.id === current)) return current;
+        return preferredAdminThread?.id ?? null;
+      });
       if (!isSearch) await ensureSupportThread(nextThreads);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat chat');
+      if (!silent) setError(err instanceof Error ? err.message : 'Gagal memuat chat');
     } finally {
-      setLoading(false);
+      if (!silent && !isSearch) setLoading(false);
     }
   }, [debouncedSearch, ensureSupportThread, websiteId]);
 
-  const loadMessages = useCallback(async (threadId: string) => {
+  const loadMessages = useCallback(async (threadId: string, silent = false) => {
     if (!threadId) return;
 
-    setLoadingMessages(true);
+    if (!silent) setLoadingMessages(true);
     try {
       const result = await fetchJson<ApiData<{ items?: ThreadMessage[] } | ThreadMessage[]>>(
         `/api/chat/threads/${threadId}/messages?website_id=${encodeURIComponent(websiteId)}`,
@@ -144,19 +216,20 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
       const items = Array.isArray(payload) ? payload : payload?.items ?? [];
       setMessages(items.slice().reverse());
     } catch (err) {
-      setMessages([]);
+      if (!silent) setMessages([]);
       console.error('Failed to load chat messages', err);
     } finally {
-      setLoadingMessages(false);
+      if (!silent) setLoadingMessages(false);
     }
   }, [websiteId]);
 
   const markThreadRead = useCallback(async (threadId: string) => {
+    setThreads((current) => current.map((thread) => (thread.id === threadId ? { ...thread, unread_count: 0 } : thread)));
     try {
       await fetchJson(`/api/chat/threads/${threadId}/read?website_id=${encodeURIComponent(websiteId)}`, {
         method: 'POST',
       });
-      setThreads((current) => current.map((thread) => (thread.id === threadId ? { ...thread, unread_count: 0 } : thread)));
+      window.dispatchEvent(new CustomEvent('website-notifications-refresh'));
     } catch {
       // Read state is best-effort; the message history remains usable if it fails.
     }
@@ -174,8 +247,7 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
   }, [loadMessages, markThreadRead, selectedThreadId]);
 
   useEffect(() => {
-    const threadId = selectedThreadId;
-    if (!threadId) return;
+    if (!websiteId) return;
 
     let cancelled = false;
     let socket: ReturnType<typeof io> | null = null;
@@ -195,18 +267,71 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
         });
 
         socket.on('event', (event: Record<string, unknown>) => {
-          const eventName = typeof event.eventName === 'string' ? event.eventName : '';
-          const rawData = event.data;
-          const eventData = rawData && typeof rawData === 'object' && 'data' in rawData
-            ? (rawData as { data?: unknown }).data
-            : rawData;
-          if (eventName !== 'website.chat.message.created' || !eventData || typeof eventData !== 'object') return;
+          const { eventName, data } = parseRealtimeEvent(event);
+          const eventWebsiteId = eventString(data, 'websiteId', 'website_id');
+          if (eventWebsiteId && websiteId && eventWebsiteId !== websiteId) return;
 
-          const data = eventData as Record<string, unknown>;
-          if (data.websiteId !== websiteId || data.threadId !== threadId) return;
+          if (eventName === 'website.chat.unread.updated') {
+            const eventUserId = eventString(data, 'userId', 'user_id');
+            const currentUserId = readSiteUserId();
+            if (!currentUserId || !eventUserId || eventUserId !== currentUserId) return;
 
-          void loadMessages(threadId);
-          void markThreadRead(threadId);
+            const eventThreadId = eventString(data, 'threadId', 'thread_id');
+            const eventTopicId = eventString(data, 'topicId', 'topic_id');
+            const unreadCount = Number(data.unreadCount ?? data.unread_count ?? 0);
+            if (!eventThreadId && !eventTopicId) return;
+            setThreads((current) => current.map((thread) => (
+              matchesThread(thread, eventThreadId, eventTopicId)
+                ? { ...thread, unread_count: Number.isFinite(unreadCount) ? unreadCount : 0 }
+                : thread
+            )));
+            return;
+          }
+
+          if (eventName !== 'website.chat.message.created' && eventName !== 'bagdja.chat.message.created') return;
+
+          const eventThreadId = eventString(data, 'threadId', 'thread_id');
+          const eventTopicId = eventString(data, 'topicId', 'topic_id');
+          if (!eventThreadId && !eventTopicId) return;
+
+          const body = eventString(data, 'body', 'message');
+          const preview = body.replace(/\s+/g, ' ').trim().slice(0, 140);
+          const createdAt = eventString(data, 'createdAt', 'created_at') || new Date().toISOString();
+          const messageId = eventString(data, 'messageId', 'id') || `evt-${createdAt}`;
+          const matched = threadsRef.current.find((thread) => matchesThread(thread, eventThreadId, eventTopicId));
+          const openThreadId = selectedThreadIdRef.current;
+          const isOpen = Boolean(matched && openThreadId && matched.id === openThreadId);
+
+          if (!matched) {
+            void loadThreads(true);
+            return;
+          }
+
+          setThreads((current) => current.map((thread) => (
+            matchesThread(thread, eventThreadId, eventTopicId)
+              ? {
+                  ...thread,
+                  last_message_preview: preview || thread.last_message_preview,
+                  last_message_at: createdAt,
+                  unread_count: isOpen ? 0 : Number(thread.unread_count ?? 0) + 1,
+                }
+              : thread
+          )));
+
+          if (!isOpen) return;
+
+          const incoming: ThreadMessage = {
+            id: messageId,
+            body,
+            senderUserId: eventString(data, 'senderUserId', 'sender_user_id') || undefined,
+            senderDisplayName: eventString(data, 'senderDisplayName', 'sender_display_name') || undefined,
+            senderType: data.senderType === 'admin' || data.senderType === 'customer'
+              ? data.senderType
+              : undefined,
+            createdAt,
+          };
+          setMessages((current) => (current.some((message) => message.id === incoming.id) ? current : [...current, incoming]));
+          void markThreadRead(matched.id);
         });
       } catch (error) {
         console.error('[CustomerChat] realtime connection failed:', error);
@@ -219,7 +344,12 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
       cancelled = true;
       socket?.disconnect();
     };
-  }, [loadMessages, markThreadRead, selectedThreadId, websiteId]);
+  }, [loadThreads, markThreadRead, websiteId]);
+
+  useEffect(() => {
+    if (loadingMessages) return;
+    scrollMessagesToBottom();
+  }, [loadingMessages, messages, selectedThreadId, scrollMessagesToBottom]);
 
   useEffect(() => {
     const root = chatRootRef.current;
@@ -266,7 +396,11 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
       if (!response.data) throw new Error('Pesan tidak diterima server');
       setMessages((current) => [...current, response.data as ThreadMessage]);
       setComposer('');
-      await loadThreads();
+      setThreads((current) => current.map((thread) => (
+        thread.id === selectedThreadId
+          ? { ...thread, last_message_preview: text.replace(/\s+/g, ' ').slice(0, 140), last_message_at: new Date().toISOString() }
+          : thread
+      )));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal mengirim pesan');
     } finally {
@@ -333,12 +467,42 @@ export function CustomerChatContent({ websiteId, basePath = '' }: { websiteId: s
               <div className="flex flex-1 items-center justify-center px-4 text-center text-sm opacity-60">Pilih percakapan di sebelah kiri.</div>
             ) : (
               <>
-                <div className="flex shrink-0 items-center gap-3 border-b border-black/10 px-4 py-4">
-                  <button type="button" onClick={() => setSelectedThreadId(null)} aria-label="Kembali ke daftar percakapan" className="text-xl opacity-60 sm:hidden">←</button>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-accent,#17202a)] text-xs font-semibold text-[var(--brand-on-accent,#fff)]">H</span>
-                  <div><p className="text-sm font-semibold">{formatChatThreadTitle(selectedThread)}</p><p className="truncate text-xs opacity-60">{formatLastChatPreview(selectedThread.last_message_preview)}</p></div>
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 py-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <button type="button" onClick={() => setSelectedThreadId(null)} aria-label="Kembali ke daftar percakapan" className="text-xl opacity-60 sm:hidden">←</button>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-accent,#17202a)] text-xs font-semibold text-[var(--brand-on-accent,#fff)]">H</span>
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold">{formatChatThreadTitle(selectedThread)}</p><p className="truncate text-xs opacity-60">{formatLastChatPreview(selectedThread.last_message_preview)}</p></div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {adminWhatsappHref && (
+                      <a
+                        href={adminWhatsappHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Hubungi WhatsApp admin"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-[var(--brand-accent,#17202a)] transition hover:opacity-80"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+                          <path d="M12.04 2C6.58 2 2.16 6.39 2.16 11.84c0 1.92.55 3.8 1.58 5.43L2 22l4.89-1.54A9.8 9.8 0 0 0 12.04 21C17.5 21 21.92 16.61 21.92 11.16S17.5 2 12.04 2Zm5.24 14.08c-.2.58-1.15 1.06-1.59 1.12-.42.05-.95.08-3.06-.66-2.58-.9-4.26-3.23-4.39-3.38-.13-.15-1.07-1.43-1.07-2.72s.67-1.92.91-2.18c.2-.21.47-.32.76-.32h.54c.18 0 .43.02.67.5l.94 2.26c.08.2.15.43.04.7-.06.18-.14.29-.28.45-.13.15-.27.33-.41.48-.13.13-.27.27-.11.52.15.25.7 1.17 1.5 1.89.99.9 1.83 1.18 2.09 1.3.27.13.42.1.57-.06.15-.16.65-.76.83-1.03.18-.27.37-.22.62-.13.25.08 1.65.78 1.93.36.13.64.19.92.19.28 0 .58-.07.94-.2.36-.13 1.16-.65 1.32-1.26.17-.61.17-1.14.12-1.25Z"/>
+                        </svg>
+                      </a>
+                    )}
+                    {adminEmailHref && (
+                      <a
+                        href={adminEmailHref}
+                        aria-label="Kirim email ke admin"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-[var(--brand-accent,#17202a)] transition hover:opacity-80"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-[1.8]">
+                          <rect x="3" y="5" width="18" height="14" rx="2" />
+                          <path d="m4 7 8 6 8-6" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                <div ref={messagesPaneRef} className="flex-1 space-y-3 overflow-y-auto p-4">
                   {loadingMessages ? <p className="py-8 text-center text-sm opacity-60">Memuat pesan...</p> : messages.length === 0 ? <p className="py-8 text-center text-sm opacity-60">Belum ada pesan. Mulai percakapan!</p> : messages.map((message) => {
                     const isCustomer = message.senderUserId === selectedThread.customer_user_id || message.senderType === 'customer';
                     const reference = parseChatReference(message.body);

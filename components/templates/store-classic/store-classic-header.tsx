@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SocialLink } from '../../../lib/template-data';
 import { CloseIcon, HamburgerIcon, SocialIcon } from './store-classic-icons';
 import { CartBadge } from '../../cart-badge';
+import { NotificationBell } from '../../notification-bell';
 import { TagihanBadge } from '../../tagihan-badge';
 
 const DRAWER_TRANSITION_MS = 300;
@@ -82,6 +83,7 @@ export function StoreClassicHeader({
 
   const navLinks = [...leftNavLinks, ...rightNavLinks];
   const hasNav = navLinks.length > 0;
+  const basePath = (chatHref ?? homeHref ?? '').replace(/\/chat\/?$/, '').replace(/\/$/, '');
 
   return (
     <header
@@ -123,11 +125,14 @@ export function StoreClassicHeader({
           {auth?.tagihanHref && auth?.isLoggedIn && (
             <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
           )}
-          {showWhatsappCta && waHref && (
+          {auth?.isLoggedIn && (
+            <NotificationBell websiteId={websiteId} basePath={basePath} isLoggedIn={auth.isLoggedIn} />
+          )}
+          {showWhatsappCta && (chatHref || waHref) && (
             <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={chatHref || waHref || '#'}
+              target={chatHref ? undefined : '_blank'}
+              rel={chatHref ? undefined : 'noopener noreferrer'}
               className="hidden rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 sm:inline-flex"
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
@@ -274,11 +279,11 @@ export function StoreClassicHeader({
               ))}
             </nav>
 
-            {waHref && (
+            {(chatHref || waHref) && (
               <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={chatHref || waHref || '#'}
+                target={chatHref ? undefined : '_blank'}
+                rel={chatHref ? undefined : 'noopener noreferrer'}
                 className="mx-6 mb-4 rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
                 style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
               >

@@ -19,7 +19,7 @@
  */
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface ServerOrder {
   id: string;
@@ -85,6 +85,20 @@ function ViewOrderIcon() {
       <circle cx="12" cy="12" r="2.5" />
     </svg>
   );
+}
+
+function canCheckoutLine(line: CartLine) {
+  if (line.hasIncompletePraorderSteps) return false;
+  if (line.isQuotable && line.quotedTotal === null) return false;
+  if (line.unitPrice <= 0 && line.quotedTotal === null) return false;
+  return true;
+}
+
+function checkoutBlockedReason(line: CartLine) {
+  if (line.isQuotable && line.quotedTotal === null) return 'Menunggu penawaran';
+  if (line.hasIncompletePraorderSteps) return 'Lengkapi data praorder dulu';
+  if (line.unitPrice <= 0 && line.quotedTotal === null) return 'Harga belum tersedia';
+  return null;
 }
 
 function RemoveIcon() {
@@ -153,20 +167,28 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
     [serverOrders],
   );
 
-  // Default: semua item terpilih saat list pertama dimuat.
+  // Default: semua item yang bisa checkout terpilih saat list pertama dimuat.
+  // Item baru ikut terpilih; uncheck user pada item lama tidak di-reset.
+  const knownLineKeysRef = useRef(new Set<string>());
   useEffect(() => {
-    setSelectedKeys(new Set(lines.filter((l) => !l.isQuotable || l.quotedTotal !== null).map((l) => l.key)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines.length > 0 ? lines.map((l) => l.key).join('|') : '']);
+    const selectableKeys = lines.filter(canCheckoutLine).map((line) => line.key);
+    setSelectedKeys((prev) => {
+      const next = new Set<string>();
+      for (const key of selectableKeys) {
+        if (!knownLineKeysRef.current.has(key) || prev.has(key)) next.add(key);
+      }
+      return next;
+    });
+    knownLineKeysRef.current = new Set(lines.map((line) => line.key));
+  }, [lines]);
 
   const displayCount = useMemo(
     () => lines.reduce((acc, l) => acc + l.quantity, 0),
     [lines],
   );
 
-  const toggleLine = useCallback((key: string) => {
-    const line = lines.find((item) => item.key === key);
-    if (!line || (line.isQuotable && line.quotedTotal === null)) return;
+  const toggleLine = useCallback((key: string, allowed: boolean) => {
+    if (!allowed) return;
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -177,17 +199,18 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
   const toggleAll = useCallback(() => {
     setSelectedKeys((prev) => {
-      const allKeys = lines
-        .filter((l) => !l.isQuotable || l.quotedTotal !== null)
-        .map((l) => l.key);
-      const allSelected = allKeys.every((k) => prev.has(k));
+      const allKeys = lines.filter(canCheckoutLine).map((line) => line.key);
+      const allSelected = allKeys.length > 0 && allKeys.every((key) => prev.has(key));
       return allSelected ? new Set<string>() : new Set(allKeys);
     });
   }, [lines]);
 
-  const selectableLines = lines.filter((l) => !l.isQuotable || l.quotedTotal !== null);
+  const selectableLines = lines.filter(canCheckoutLine);
   const allSelected = selectableLines.length > 0 && selectableLines.every((l) => selectedKeys.has(l.key));
-  const selectedLines = useMemo(() => lines.filter((l) => selectedKeys.has(l.key)), [lines, selectedKeys]);
+  const selectedLines = useMemo(
+    () => lines.filter((line) => selectedKeys.has(line.key) && canCheckoutLine(line)),
+    [lines, selectedKeys],
+  );
   const selectedCount = useMemo(
     () => selectedLines.reduce((acc, l) => acc + l.quantity, 0),
     [selectedLines],
@@ -365,8 +388,9 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
             const isBusy = busyKey === line.key;
             const lineTotal = line.unitPrice * line.quantity;
             const quantityLocked = line.isQuotable && line.quotedTotal !== null;
-            const quotationPending = line.isQuotable && line.quotedTotal === null;
-            const isSelected = selectedKeys.has(line.key);
+            const isCheckoutable = canCheckoutLine(line);
+            const blockedReason = checkoutBlockedReason(line);
+            const isSelected = isCheckoutable && selectedKeys.has(line.key);
             return (
               <li
                 key={line.key}
@@ -387,17 +411,21 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                 style={{
                   backgroundColor: 'var(--brand-surface)',
                   borderColor: isSelected ? 'var(--brand-accent)' : 'var(--brand-border)',
-                  opacity: isSelected ? 1 : 0.6,
                 }}
               >
+                <div className="mt-1 flex shrink-0 flex-col items-center gap-1 self-start">
                 <button
                   type="button"
-                  onClick={() => toggleLine(line.key)}
-                  disabled={quotationPending}
-                  className="mt-1 shrink-0 self-start disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleLine(line.key, isCheckoutable);
+                  }}
+                  disabled={!isCheckoutable}
+                  className="disabled:cursor-not-allowed disabled:opacity-40"
                   role="checkbox"
                   aria-checked={isSelected}
-                  aria-label={`Pilih ${line.name}`}
+                  aria-disabled={!isCheckoutable}
+                  aria-label={isCheckoutable ? `Pilih ${line.name}` : `${line.name} belum bisa checkout`}
                 >
                   <span
                     className="flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold transition-colors"
@@ -410,6 +438,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                     ✓
                   </span>
                 </button>
+                </div>
                 {line.image ? (
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -438,6 +467,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                       {line.isVariant && (
                         <p className="mt-0.5 text-xs" style={{ color: 'var(--brand-muted)' }}>
                           Varian produk
+                        </p>
+                      )}
+                      {blockedReason && (
+                        <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                          {blockedReason}
                         </p>
                       )}
                     </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SocialLink } from '../../../lib/template-data';
 import { SocialIcon } from './barber-classic-icons';
 import { CartBadge } from '../../cart-badge';
+import { NotificationBell } from '../../notification-bell';
 import { TagihanBadge } from '../../tagihan-badge';
 
 const DRAWER_TRANSITION_MS = 300;
@@ -99,6 +100,7 @@ export function BarberClassicHeader({
 
   const drawerLinks = [...leftNavLinks, ...rightNavLinks];
   const hasNav = drawerLinks.length > 0;
+  const basePath = (chatHref ?? homeHref ?? '').replace(/\/chat\/?$/, '').replace(/\/$/, '');
 
   const linkStyle = { color: 'var(--brand-muted)' };
 
@@ -154,6 +156,9 @@ export function BarberClassicHeader({
           )}
           {auth?.tagihanHref && auth?.isLoggedIn && (
             <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
+          )}
+          {auth?.isLoggedIn && (
+            <NotificationBell websiteId={websiteId} basePath={basePath} isLoggedIn={auth.isLoggedIn} />
           )}
           <nav className="hidden items-center gap-6 sm:flex">
             {rightNavLinks.map((link) => (
