@@ -12,6 +12,7 @@ import {
   buildPageHref,
   buildCategoryHref,
   buildProductHref,
+  buildBlogPostHref,
   buildWhatsAppHref,
   formatIDR,
   parseGalleryImages,
@@ -43,6 +44,7 @@ import {
   type WebsiteTheme,
 } from '../../../lib/website-theme';
 import { resolvePageHeadingLabel } from '../../../lib/page-title';
+import { BlogRelatedProducts } from '../../blog-related-products';
 
 export interface WorkshopViewProps {
   isPreview: boolean;
@@ -59,6 +61,7 @@ export interface WorkshopViewProps {
   websiteTheme?: WebsiteTheme;
   sections: SectionEntry[];
   products: CatalogItem[];
+  blogPosts?: BlogPostItem[];
   categories?: CategoryItem[];
   locations: LocationItem[];
   faqs: FaqItem[];
@@ -115,6 +118,97 @@ function WorkshopProductBanner({ label, imageUrl }: { label: string; imageUrl?: 
       >
         {label}
       </h1>
+    </section>
+  );
+}
+
+function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websiteSlug?: string }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {posts.map((post) => (
+        <a
+          key={post.id}
+          href={websiteSlug !== undefined ? buildBlogPostHref(websiteSlug, post.slug) : '#'}
+          className="group overflow-hidden border transition-transform hover:-translate-y-1"
+          style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+        >
+          {post.coverImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+          ) : <div className="aspect-[16/9] bg-[var(--brand-accent)]/10" />}
+          <div className="p-4 sm:p-5">
+            {post.publishedAtLabel && <p className="text-[10px] font-semibold uppercase text-[var(--brand-muted)]">{post.publishedAtLabel}</p>}
+            <h3 className="mt-2 line-clamp-2 text-lg font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{post.title}</h3>
+            {post.excerpt && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[var(--brand-muted)]">{post.excerpt}</p>}
+            <span className="mt-4 inline-block text-xs font-bold uppercase text-[var(--brand-accent)]">Baca artikel →</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function WorkshopBlogCards({ title, posts, websiteSlug }: { title: string; posts: BlogPostItem[]; websiteSlug?: string }) {
+  if (posts.length === 0) return null;
+  return (
+    <section className="border-y py-12 sm:py-16" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="mb-7 flex items-end justify-between gap-4">
+          <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{title}</h2>
+          <span className="text-xs font-semibold uppercase text-[var(--brand-muted)]">{String(posts.length).padStart(2, '0')} artikel</span>
+        </div>
+        <WorkshopBlogGrid posts={posts} websiteSlug={websiteSlug} />
+      </div>
+    </section>
+  );
+}
+
+function WorkshopBlogArticle({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?: string }) {
+  return (
+    <article className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-16">
+      <header className="border-b pb-6 sm:pb-8" style={{ borderColor: 'var(--brand-border)' }}>
+        {post.publishedAtLabel && <p className="text-xs font-semibold uppercase text-[var(--brand-accent)]">{post.publishedAtLabel}</p>}
+        <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-5xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{post.title}</h1>
+        {post.excerpt && <p className="mt-4 max-w-3xl text-base leading-relaxed text-[var(--brand-muted)] sm:text-lg">{post.excerpt}</p>}
+      </header>
+      {post.coverImage && (
+        <div className="mt-7 overflow-hidden border" style={{ borderColor: 'var(--brand-border)' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+        </div>
+      )}
+      <div
+        className="prose prose-neutral mt-8 max-w-none text-sm leading-relaxed sm:text-base [&_a]:underline [&_h2]:mb-2 [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_img]:my-5 [&_img]:max-w-full [&_img]:border [&_li]:ml-5 [&_ol]:list-decimal [&_p]:mb-4 [&_ul]:list-disc"
+        style={{ color: 'var(--brand-text)' }}
+        dangerouslySetInnerHTML={{ __html: post.content }}
+      />
+      {post.relatedProducts && <BlogRelatedProducts products={post.relatedProducts} websiteSlug={websiteSlug} />}
+    </article>
+  );
+}
+
+function WorkshopBlogSearch({ title, posts, websiteSlug }: { title?: string; posts: BlogPostItem[]; websiteSlug?: string }) {
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredPosts = normalizedQuery
+    ? posts.filter((post) => `${post.title} ${post.excerpt ?? ''}`.toLocaleLowerCase().includes(normalizedQuery))
+    : posts;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>{title ?? 'Cari Artikel'}</h2>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Cari artikel..."
+          aria-label="Cari artikel"
+          className="w-full border bg-[var(--brand-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--brand-accent)] sm:max-w-sm"
+          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+        />
+      </div>
+      {filteredPosts.length ? <WorkshopBlogGrid posts={filteredPosts} websiteSlug={websiteSlug} /> : <p className="border-y py-8 text-sm text-[var(--brand-muted)]" style={{ borderColor: 'var(--brand-border)' }}>Tidak ada artikel yang cocok.</p>}
     </section>
   );
 }
@@ -527,9 +621,9 @@ function WorkshopFaq({ faqs, content }: { faqs: FaqItem[]; content: Record<strin
   return <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-3xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} />{faqs.map((faq) => <details key={faq.id} className="border-t py-4" style={{ borderColor: 'var(--brand-border)' }}><summary className="cursor-pointer font-bold">{faq.question}</summary><p className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)]">{faq.answer}</p></details>)}</div></section>;
 }
 
-function WorkshopContact({ content, waHref, locations }: { content: Record<string, unknown>; waHref?: string; locations: LocationItem[] }) {
+function WorkshopContact({ content, chatHref, locations }: { content: Record<string, unknown>; chatHref?: string; locations: LocationItem[] }) {
   const location = locations.find((item) => item.isPrimary) ?? locations[0];
-  return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">KIRIM KEBUTUHAN PROYEK →</a> : null}</div></section>;
+  return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{chatHref ? <a href={chatHref} className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">KIRIM KEBUTUHAN PROYEK →</a> : null}</div></section>;
 }
 
 function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
@@ -738,6 +832,7 @@ export function WorkshopView({
   websiteTheme = {},
   sections,
   products,
+  blogPosts = [],
   categories = [],
   locations,
   faqs,
@@ -822,7 +917,28 @@ export function WorkshopView({
             case 'about': return <WorkshopAbout key={key} content={section.content} />;
             case 'testimonial': return <WorkshopTestimonials key={key} content={section.content} />;
             case 'faq_list': return <WorkshopFaq key={key} faqs={faqs} content={section.content} />;
-            case 'contact': return <WorkshopContact key={key} content={section.content} waHref={waHref} locations={locations} />;
+            case 'blog_list': {
+              const title = getString(section.content, 'title') ?? 'Artikel Terbaru';
+              const limit = Number(section.content.limit);
+              const posts = Number.isFinite(limit) && limit > 0 ? blogPosts.slice(0, limit) : blogPosts;
+              return <WorkshopBlogCards key={key} title={title} posts={posts} websiteSlug={websiteSlug} />;
+            }
+            case 'blog_collection': {
+              const title = getString(section.content, 'title') ?? 'Artikel Pilihan';
+              const postIds = Array.isArray(section.content.post_ids)
+                ? (section.content.post_ids as unknown[]).filter((id): id is string => typeof id === 'string')
+                : [];
+              const postsById = new Map(blogPosts.map((post) => [post.id, post]));
+              const posts = postIds.map((id) => postsById.get(id)).filter((post): post is BlogPostItem => Boolean(post));
+              return <WorkshopBlogCards key={key} title={title} posts={posts} websiteSlug={websiteSlug} />;
+            }
+            case 'blog_search':
+              return <WorkshopBlogSearch key={key} title={getString(section.content, 'title')} posts={blogPosts} websiteSlug={websiteSlug} />;
+            case 'blog_article': {
+              const post = section.content.post as BlogPostItem | undefined;
+              return post ? <WorkshopBlogArticle key={key} post={post} websiteSlug={websiteSlug} /> : null;
+            }
+            case 'contact': return <WorkshopContact key={key} content={section.content} chatHref={chatHref} locations={locations} />;
             case 'cart': return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'checkout': {
               const websiteId = typeof section.content.websiteId === 'string' ? section.content.websiteId : '';

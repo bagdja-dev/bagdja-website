@@ -37,6 +37,7 @@ import {
 } from '../../../lib/website-theme';
 import { resolvePageHeadingLabel } from '../../../lib/page-title';
 import { StoreClassicBlogSidebar } from './store-classic-blog-sidebar';
+import { BlogRelatedProducts } from '../../blog-related-products';
 import { CategoryListingSection, ProductGridSection, VariantTreeSelector } from './store-classic-catalog';
 import { StoreClassicProductGallery } from './store-classic-gallery';
 import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
@@ -826,6 +827,7 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
             style={{ color: 'var(--brand-muted)' }}
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
+          {post.relatedProducts && <BlogRelatedProducts products={post.relatedProducts} websiteSlug={websiteSlug} />}
         </article>
         <StoreClassicBlogSidebar posts={allPosts} websiteSlug={websiteSlug} excludeId={post.id} />
       </div>

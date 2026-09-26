@@ -463,6 +463,13 @@ export interface BlogPostItem {
   content: string;
   coverImage?: string;
   publishedAtLabel?: string;
+  relatedProducts?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    priceLabel: string;
+    image?: string;
+  }>;
 }
 
 export function toBlogPostItem(post: ApiWebsiteBlogPost): BlogPostItem {
@@ -480,6 +487,13 @@ export function toBlogPostItem(post: ApiWebsiteBlogPost): BlogPostItem {
           year: 'numeric',
         })
       : undefined,
+      relatedProducts: post.related_products?.map((product) => ({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        priceLabel: product.price > 0 ? formatIDR(product.price) : 'Konsultasi',
+        image: product.images?.[0],
+      })),
   };
 }
 

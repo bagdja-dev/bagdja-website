@@ -183,6 +183,13 @@ export interface ApiWebsiteBlogPost {
   excerpt: string | null;
   content: string | null;
   cover_image: string | null;
+  related_products?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    price: number;
+    images: string[];
+  }>;
   is_published: boolean;
   published_at: string | null;
   created_at: string;

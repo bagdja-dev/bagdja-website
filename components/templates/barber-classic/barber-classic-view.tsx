@@ -32,6 +32,7 @@ import {
   type WebsiteTheme,
 } from '../../../lib/website-theme';
 import { BarberClassicBlogSearch } from './barber-classic-blog-search';
+import { BlogRelatedProducts } from '../../blog-related-products';
 import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from './barber-classic-catalog';
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
@@ -800,7 +801,7 @@ function BlogCollectionSection({
   );
 }
 
-function BlogArticleSection({ post }: { post: BlogPostItem }) {
+function BlogArticleSection({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?: string }) {
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       {post.publishedAtLabel && (
@@ -825,6 +826,7 @@ function BlogArticleSection({ post }: { post: BlogPostItem }) {
         style={{ color: 'var(--brand-muted)' }}
         dangerouslySetInnerHTML={{ __html: post.content }}
       />
+      {post.relatedProducts && <BlogRelatedProducts products={post.relatedProducts} websiteSlug={websiteSlug} />}
     </section>
   );
 }
@@ -1322,7 +1324,7 @@ export function BarberClassicView({
               case 'blog_article': {
                 const post = section.content.post as BlogPostItem | undefined;
                 if (!post) return null;
-                return <BlogArticleSection key={key} post={post} />;
+                return <BlogArticleSection key={key} post={post} websiteSlug={websiteSlug} />;
               }
               case 'cart': {
                 return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
