@@ -50,7 +50,10 @@ function redirectToLogin(request: NextRequest): NextResponse {
 }
 
 function hasSession(request: NextRequest): boolean {
-  return Boolean(request.cookies.get('site_token')?.value);
+  return Boolean(
+    request.cookies.get('site_token')?.value &&
+      request.cookies.get('site_auth_selected')?.value === '1',
+  );
 }
 
 async function resolveSlugForDomain(host: string): Promise<string | null> {

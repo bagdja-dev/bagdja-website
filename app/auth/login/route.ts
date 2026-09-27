@@ -6,6 +6,7 @@ import {
 } from '../../../lib/auth';
 import { generateStateId, saveOAuthState } from '../../../lib/oauth-state-store';
 import { resolveOrigin } from '../../../lib/resolve-origin';
+import { clearSessionCookies } from '../../../lib/session';
 
 function safeNextPath(next: string | null): string | null {
   if (!next || !next.startsWith('/') || next.startsWith('//')) return null;
@@ -39,5 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const authorizeUrl = buildAuthorizeUrl(stateId, codeChallenge);
-  return NextResponse.redirect(authorizeUrl);
+  const response = NextResponse.redirect(authorizeUrl);
+  clearSessionCookies(response, origin);
+  return response;
 }

@@ -54,6 +54,7 @@ import type { NextResponse } from 'next/server';
 
 const TOKEN_COOKIE = 'site_token';
 const USER_COOKIE = 'site_user';
+const AUTH_SELECTED_COOKIE = 'site_auth_selected';
 
 /** Sama seperti middleware.ts — host dev lokal, tidak pernah domain-match subdomain wildcard produksi. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -124,6 +125,7 @@ export function setSessionCookies(
   const hostname = new URL(targetOrigin).hostname;
   const cookieOptions = getCookieOptions(hostname);
   response.cookies.set(TOKEN_COOKIE, token, cookieOptions);
+  response.cookies.set(AUTH_SELECTED_COOKIE, '1', { ...cookieOptions, maxAge: 60 * 60 });
   response.cookies.set(USER_COOKIE, JSON.stringify(user), {
     ...cookieOptions,
     httpOnly: false, // client needs to read user info
@@ -141,6 +143,7 @@ export function clearSessionCookies(response: NextResponse, targetOrigin: string
   // dengan saat di-set — .delete(name) tanpa domain tidak akan match cookie
   // yang di-set dengan Domain attribute (browser treat sebagai cookie beda).
   response.cookies.set(TOKEN_COOKIE, '', { ...cookieOptions, maxAge: 0 });
+  response.cookies.set(AUTH_SELECTED_COOKIE, '', { ...cookieOptions, maxAge: 0 });
   response.cookies.set(USER_COOKIE, '', {
     ...cookieOptions,
     httpOnly: false,
@@ -153,7 +156,8 @@ export async function getSession(): Promise<{
   user: SessionUser | null;
 }> {
   const jar = await cookies();
-  const token = jar.get(TOKEN_COOKIE)?.value ?? null;
+  const hasSelectedAccount = jar.get(AUTH_SELECTED_COOKIE)?.value === '1';
+  const token = hasSelectedAccount ? jar.get(TOKEN_COOKIE)?.value ?? null : null;
   const userStr = jar.get(USER_COOKIE)?.value ?? null;
 
   let user: SessionUser | null = null;
@@ -166,8 +170,8 @@ export async function getSession(): Promise<{
   }
 
   console.log(
-    `[session] getSession all_cookie_names=[${jar.getAll().map((c) => c.name).join(', ')}] hasToken=${Boolean(token)} hasUser=${Boolean(user)}`,
+    `[session] getSession all_cookie_names=[${jar.getAll().map((c) => c.name).join(', ')}] hasToken=${Boolean(token)} accountSelected=${hasSelectedAccount} hasUser=${Boolean(user)}`,
   );
 
-  return { token, user };
+  return { token, user: hasSelectedAccount ? user : null };
 }

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'website_id is required' }, { status: 400 });
   }
 
-  const result = await backendFetch(`/api/chat/${body.website_id}/threads`, {
+  const result = await backendFetch(`/api/chat/${body.website_id}/customer-threads`, {
     method: 'POST',
     body: JSON.stringify({
       channel_type: body.channel_type === 'transaction' ? 'order' : (body.channel_type ?? 'support'),
@@ -34,8 +34,6 @@ export async function POST(request: NextRequest) {
       product_id: body.product_id,
       order_id: body.order_id,
       order_item_id: body.order_item_id,
-      customer_user_id: body.customer_user_id,
-      assigned_admin_user_id: body.assigned_admin_user_id,
     }),
   });
 
