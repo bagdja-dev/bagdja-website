@@ -113,6 +113,7 @@ export function CustomerChatContent({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedThreadIdRef = useRef<string | null>(null);
   const threadsRef = useRef<Thread[]>([]);
+  const recentMessageIdsRef = useRef<Set<string>>(new Set());
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -356,13 +357,23 @@ export function CustomerChatContent({
             createdAt,
           };
 
+          if (incoming.id && recentMessageIdsRef.current.has(incoming.id)) {
+            return;
+          }
+
           if (!body) {
             void loadMessages(matched.id, true);
             void markThreadRead(matched.id);
             return;
           }
 
-          setMessages((current) => (current.some((message) => message.id === incoming.id) ? current : [...current, incoming]));
+          setMessages((current) => {
+            const alreadyExists = current.some((message) => (
+              message.id === incoming.id
+              || (!message.id && message.body === incoming.body && message.senderUserId === incoming.senderUserId && message.createdAt === incoming.createdAt)
+            ));
+            return alreadyExists ? current : [...current, incoming];
+          });
           void markThreadRead(matched.id);
         });
       } catch (error) {
@@ -426,7 +437,12 @@ export function CustomerChatContent({
       });
 
       if (!response.data) throw new Error('Pesan tidak diterima server');
-      setMessages((current) => [...current, response.data as ThreadMessage]);
+      const serverMessage = response.data as ThreadMessage;
+      if (serverMessage.id) recentMessageIdsRef.current.add(serverMessage.id);
+      setMessages((current) => {
+        const alreadyExists = current.some((message) => message.id === serverMessage.id);
+        return alreadyExists ? current : [...current, serverMessage];
+      });
       setComposer('');
       setThreads((current) => current.map((thread) => (
         thread.id === selectedThreadId
