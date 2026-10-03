@@ -88,7 +88,7 @@ function ViewOrderIcon() {
 }
 
 function canCheckoutLine(line: CartLine) {
-  if (line.hasIncompletePraorderSteps) return false;
+  if (line.isQuotable && line.hasIncompletePraorderSteps) return false;
   if (line.isQuotable && line.quotedTotal === null) return false;
   if (line.unitPrice <= 0 && line.quotedTotal === null) return false;
   return true;
@@ -96,7 +96,7 @@ function canCheckoutLine(line: CartLine) {
 
 function checkoutBlockedReason(line: CartLine) {
   if (line.isQuotable && line.quotedTotal === null) return 'Menunggu penawaran';
-  if (line.hasIncompletePraorderSteps) return 'Lengkapi data praorder dulu';
+  if (line.isQuotable && line.hasIncompletePraorderSteps) return 'Lengkapi data praorder dulu';
   if (line.unitPrice <= 0 && line.quotedTotal === null) return 'Harga belum tersedia';
   return null;
 }
@@ -581,7 +581,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                               </p>
                             </>
                           )}
-                          {line.hasIncompletePraorderSteps && (
+                          {line.isQuotable && line.hasIncompletePraorderSteps && (
                             <Link
                               href={`${basePath}/cart/order/${line.orderId}`}
                               className="mt-1 block text-xs font-semibold underline"
