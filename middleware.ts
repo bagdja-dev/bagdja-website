@@ -46,11 +46,19 @@ function shouldProtect(pathname: string): boolean {
 function redirectToLogin(request: NextRequest): NextResponse {
   // Diagnostic: which host/path lost the session and which cookies arrived
   // (names only, never values).
+  const h = request.headers;
+  let refererOrigin = 'none';
+  try {
+    const referer = h.get('referer');
+    if (referer) refererOrigin = new URL(referer).origin;
+  } catch {
+    refererOrigin = 'invalid';
+  }
   console.log(
-    `[middleware] redirectToLogin host=${request.headers.get('host')} path=${request.nextUrl.pathname} cookie_names=[${request.cookies
+    `[middleware] redirectToLogin method=${request.method} host=${h.get('host')} proto=${h.get('x-forwarded-proto') ?? request.nextUrl.protocol} path=${request.nextUrl.pathname} cookie_names=[${request.cookies
       .getAll()
       .map((c) => c.name)
-      .join(', ')}] site_auth_selected=${request.cookies.get('site_auth_selected')?.value ?? 'missing'}`,
+      .join(', ')}] site_auth_selected=${request.cookies.get('site_auth_selected')?.value ?? 'missing'} has_cookie_header=${h.has('cookie')} referer=${refererOrigin} sec_fetch_site=${h.get('sec-fetch-site') ?? 'none'} sec_fetch_mode=${h.get('sec-fetch-mode') ?? 'none'} sec_fetch_dest=${h.get('sec-fetch-dest') ?? 'none'} rsc=${h.get('rsc') ?? 'none'} prefetch=${h.get('next-router-prefetch') ?? h.get('purpose') ?? h.get('sec-purpose') ?? 'none'} ua=${(h.get('user-agent') ?? 'none').slice(0, 120)}`,
   );
   const loginUrl = new URL('/auth/login', request.nextUrl.origin);
   loginUrl.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
