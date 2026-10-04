@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '../../../../lib/backend-api';
+import { resolveOrigin } from '../../../../lib/resolve-origin';
 
 /**
  * BFF route /api/transactions/checkout — buat transaction + transaction_items
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
   const result = await backendFetch('/api/transactions/checkout', {
     method: 'POST',
     body: JSON.stringify(body),
+    headers: { 'x-return-origin': resolveOrigin(request) },
   });
 
   if (result.status === 401) {
