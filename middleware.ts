@@ -44,6 +44,14 @@ function shouldProtect(pathname: string): boolean {
 }
 
 function redirectToLogin(request: NextRequest): NextResponse {
+  // Diagnostic: which host/path lost the session and which cookies arrived
+  // (names only, never values).
+  console.log(
+    `[middleware] redirectToLogin host=${request.headers.get('host')} path=${request.nextUrl.pathname} cookie_names=[${request.cookies
+      .getAll()
+      .map((c) => c.name)
+      .join(', ')}] site_auth_selected=${request.cookies.get('site_auth_selected')?.value ?? 'missing'}`,
+  );
   const loginUrl = new URL('/auth/login', request.nextUrl.origin);
   loginUrl.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
   return NextResponse.redirect(loginUrl);
