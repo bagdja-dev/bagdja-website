@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '../../../../../../lib/backend-api';
+import { resolveOrigin } from '../../../../../../lib/resolve-origin';
 
 /**
  * BFF route /api/transactions/termins/:terminId/pay — buyer bayar 1
@@ -11,9 +12,10 @@ interface RouteContext {
   params: { terminId: string };
 }
 
-export async function POST(_request: NextRequest, { params }: RouteContext) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
   const result = await backendFetch(`/api/transactions/termins/${params.terminId}/pay`, {
     method: 'POST',
+    headers: { 'x-return-origin': resolveOrigin(request) },
   });
 
   if (result.status === 401) {

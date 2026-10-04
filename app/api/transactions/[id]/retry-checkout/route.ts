@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '../../../../../lib/backend-api';
+import { resolveOrigin } from '../../../../../lib/resolve-origin';
 
 /**
  * BFF route /api/transactions/:id/retry-checkout — (re)inisialisasi
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     method: 'POST',
     headers: origin ? { 'x-return-origin': origin } : undefined,
     body: JSON.stringify(body ?? {}),
+    headers: { 'x-return-origin': resolveOrigin(request) },
   });
 
   if (result.status === 401) {
