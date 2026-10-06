@@ -31,6 +31,7 @@ export interface PurchaseControlsProps {
     slug: string;
     name: string;
     price: number;
+    type?: string;
     /** Sumber kebenaran produk quotation (`website_products.quotable`) — dipakai bareng `price<=0` sebagai fallback. */
     quotable?: boolean;
     image?: string;
@@ -58,6 +59,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
   }, [product.stock]);
 
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
+  const isDigital = product.type === 'digital';
   const displayStock = typeof product.stock === 'number' ? product.stock : undefined;
   const availableLocations = locations.filter((location) => locationIds.includes(location.id));
 
@@ -104,7 +106,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
           Harga belum ditentukan — kirim permintaan penawaran, tim kami akan menghubungi Anda.
         </p>
       )}
-      <div className="flex items-center gap-3">
+      {!isDigital && <div className="flex items-center gap-3">
         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
           Jumlah
         </span>
@@ -138,7 +140,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
             {outOfStock ? 'Stok habis' : `Stok: ${displayStock}`}
           </span>
         )}
-      </div>
+      </div>}
 
       {requiresLocation && (
         <label className="flex flex-col gap-1 text-sm" style={{ color: 'var(--brand-text)' }}>
@@ -166,7 +168,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
         websiteId={websiteId}
         product={product}
         paymentMode={paymentMode}
-        quantity={qty}
+        quantity={isDigital ? 1 : qty}
         locationId={selectedLocationId || undefined}
         label={paymentMode === 'ESCROW' ? 'Beli (Escrow)' : cartLabel}
         onAdded={handleAdded}
