@@ -4,9 +4,9 @@
   "private": true,
   "description": "Public website renderer for Bagdja Website Builder (Next.js App Router + Tailwind)",
   "scripts": {
-    "dev": "next dev -p 5005",
-    "build": "next build",
-    "start": "next start -p 5005",
+    "dev": "node init && next dev -p 5005",
+    "build": "node init && next build",
+    "start": "node init && next start -p 5005",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
