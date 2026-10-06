@@ -406,7 +406,7 @@ export function ProductCard({
               stock: item.stock,
             }}
             paymentMode={internalMode.payment_mode}
-            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : 'Masukkan ke Keranjang'}
+            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : '+ Keranjang'}
           />
         </div>
       </div>
@@ -857,7 +857,7 @@ function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   }
 }
 
-function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; loginHref?: string }) {
+function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, isLoggedIn, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; isLoggedIn: boolean; loginHref?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
@@ -882,7 +882,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
   return (
     <>
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="grid gap-10 sm:grid-cols-2">
+        <div className="grid items-start gap-10 sm:grid-cols-2">
           <StoreClassicProductGallery images={images} videoUrl={item.videoUrl} model3dUrl={item.model3dUrl} />
           <div>
             <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -893,12 +893,6 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 {item.priceLabel}
               </p>
             )}
-            {item.description && (
-              <p className="mt-4 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-                {item.description}
-              </p>
-            )}
-
             <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
 
             {/* Mode internal (ADD_TO_CART/ESCROW): quantity + stok + tombol cart
@@ -907,12 +901,14 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
               <PurchaseControls
                 slug={tenantSlug}
                 basePath={websiteSlug}
+                isLoggedIn={isLoggedIn}
                 websiteId={item.websiteId}
                 product={{
                   id: item.id,
                   slug: item.slug,
                   name: item.name,
                   price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0,
+                  type: item.type,
                   quotable: item.quotable,
                   image: item.image ?? item.images?.[0],
                   stock: item.stock,
@@ -928,7 +924,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 href={waHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-6 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                className="mt-6 flex w-full justify-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-[0.98]"
                 style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
               >
                 Pesan via WhatsApp
@@ -941,7 +937,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 loginHref={loginHref}
                 productId={item.id}
                 reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
-                className="mt-3 inline-flex rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                className="mt-3 flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 Tanya Produk
               </ChatReferenceButton>
@@ -950,8 +946,18 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {item.paymentMeta?.map((entry, index) => (
               <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
             ))}
+          </div>
+        </div>
+        {(item.description || specificationEntries.length > 0 || estimationEntries.length > 0 || item.detail) && (
+          <div className="mt-10 w-full border-t pt-8" style={{ borderColor: 'var(--brand-border)' }}>
+            {item.description && (
+              <p className="mb-8 w-full text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
+                {item.description}
+              </p>
+            )}
+
             {specificationEntries.length > 0 && (
-              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <div className="mb-8 w-full rounded-xl border p-4 sm:p-6" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
                 <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
                   Spesifikasi
                 </h2>
@@ -969,7 +975,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             )}
 
             {estimationEntries.length > 0 && (
-              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <div className="mb-8 w-full rounded-xl border p-4 sm:p-6" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
                 <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
                   Estimasi Harga
                 </h2>
@@ -988,19 +994,19 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             )}
 
             {item.detail && (
-              <details className="mt-8 rounded-xl border p-4" open style={{ borderColor: 'var(--brand-border)' }}>
+              <details className="w-full rounded-xl border p-4 sm:p-6" open style={{ borderColor: 'var(--brand-border)' }}>
                 <summary className="cursor-pointer font-semibold marker:content-none" style={{ fontFamily: 'var(--font-heading)' }}>
                   Detail Produk
                 </summary>
                 <div
-                  className="mt-3 text-sm leading-relaxed [&_a]:underline [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc"
+                  className="mt-3 w-full text-sm leading-relaxed [&_a]:underline [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc"
                   style={{ color: 'var(--brand-muted)' }}
                   dangerouslySetInnerHTML={{ __html: item.detail }}
                 />
               </details>
             )}
           </div>
-        </div>
+        )}
       </section>
       {related.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -1357,7 +1363,7 @@ export function StoreClassicView({
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} loginHref={auth?.loginHref} />;
+                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} isLoggedIn={auth?.isLoggedIn ?? false} loginHref={auth?.loginHref} />;
               }
               default:
                 return null;

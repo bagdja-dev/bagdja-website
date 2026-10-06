@@ -29,6 +29,7 @@ import type { LocationItem } from '../lib/template-data';
 
 interface DraftProduct {
   name?: string;
+  type?: string;
   images?: string[];
   price?: number;
   description?: string | null;
@@ -165,7 +166,9 @@ export function CheckoutContent({
   // di-checkout ini requires_shipping=false (mis. jasa on-site/digital), flow
   // ongkir (baik lama maupun baru) tidak relevan sama sekali, terlepas dari
   // apakah website ini punya lokasi shippable untuk produk fisiknya yang lain.
-  const cartNeedsShipping = draftOrders.some((o) => o.product?.requires_shipping !== false);
+  const cartNeedsShipping = draftOrders.some(
+    (o) => o.product?.type !== 'digital' && o.product?.requires_shipping !== false,
+  );
   const shippingEnabled = websiteHasShippableLocations && cartNeedsShipping;
 
   // Item yang sengaja TIDAK dicentang di cart tetap tinggal di keranjang.
@@ -340,17 +343,17 @@ export function CheckoutContent({
     setError(null);
     try {
       const orderIds = draftOrders.map((o) => o.id);
-      const payload: Record<string, unknown> = {
-        order_ids: orderIds,
-        shipping_address: {
+      const payload: Record<string, unknown> = { order_ids: orderIds };
+      if (cartNeedsShipping) {
+        payload.shipping_address = {
           recipient_name: shipping.recipient_name.trim(),
           phone: shipping.phone.trim(),
           address: shipping.address.trim(),
           city: shippingEnabled ? destinationArea?.name : shipping.city.trim(),
           district: shippingEnabled ? undefined : shipping.district.trim() || undefined,
           postal_code: shipping.postal_code.trim() || undefined,
-        },
-      };
+        };
+      }
       if (shippingEnabled && selectedCourierOption && selectedLocationId && destinationArea) {
         payload.shipping = {
           location_id: selectedLocationId,
@@ -359,7 +362,7 @@ export function CheckoutContent({
           courier_code: selectedCourierOption.courierCode,
           courier_service_name: selectedCourierOption.serviceName,
         };
-      } else {
+      } else if (cartNeedsShipping) {
         payload.courier = courier;
       }
 
@@ -498,8 +501,8 @@ export function CheckoutContent({
             </section>
           )}
 
-          {/* Alamat pengiriman */}
-          <section>
+          {/* Digital goods never need a shipping address or courier. */}
+          {cartNeedsShipping && <section>
             <h2
               className="text-sm font-bold uppercase tracking-wide"
               style={{ fontFamily: 'var(--font-heading)' }}
@@ -600,10 +603,10 @@ export function CheckoutContent({
                 />
               </label>
             </div>
-          </section>
+          </section>}
 
           {/* Kurir pengiriman */}
-          <section>
+          {cartNeedsShipping && <section>
             <h2
               className="text-sm font-bold uppercase tracking-wide"
               style={{ fontFamily: 'var(--font-heading)' }}
@@ -699,7 +702,7 @@ export function CheckoutContent({
                 </p>
               </>
             )}
-          </section>
+          </section>}
         </div>
 
         {/* Kolom kanan: ringkasan */}
@@ -719,16 +722,18 @@ export function CheckoutContent({
               </dt>
               <dd className="font-semibold">Rp {subtotal.toLocaleString('id-ID')}</dd>
             </div>
-            <div className="flex items-center justify-between">
-              <dt style={{ color: 'var(--brand-muted)' }}>Ongkir</dt>
-              <dd style={{ color: selectedCourierOption ? undefined : 'var(--brand-muted)' }}>
-                {shippingEnabled
-                  ? selectedCourierOption
-                    ? `Rp ${selectedCourierOption.cost.toLocaleString('id-ID')}`
-                    : 'Pilih kurir dulu'
-                  : 'Ditentukan penjual'}
-              </dd>
-            </div>
+            {cartNeedsShipping && (
+              <div className="flex items-center justify-between">
+                <dt style={{ color: 'var(--brand-muted)' }}>Ongkir</dt>
+                <dd style={{ color: selectedCourierOption ? undefined : 'var(--brand-muted)' }}>
+                  {shippingEnabled
+                    ? selectedCourierOption
+                      ? `Rp ${selectedCourierOption.cost.toLocaleString('id-ID')}`
+                      : 'Pilih kurir dulu'
+                    : 'Ditentukan penjual'}
+                </dd>
+              </div>
+            )}
             <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--brand-border)' }}>
               <dt className="font-semibold">Total</dt>
               <dd className="text-xl font-bold">Rp {total.toLocaleString('id-ID')}</dd>
@@ -745,19 +750,19 @@ export function CheckoutContent({
             {loading ? 'Memproses…' : 'Bayar Sekarang'}
           </button>
 
-          {shippingInvalid && (
+          {cartNeedsShipping && shippingInvalid && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
               {shippingEnabled
                 ? 'Lengkapi alamat pengiriman (nama, HP, alamat, kota/kecamatan tujuan) dulu.'
                 : 'Lengkapi alamat pengiriman (nama, HP, alamat, kota) dulu.'}
             </p>
           )}
-          {!shippingInvalid && shippingEnabled && !selectedCourierOption && (
+          {cartNeedsShipping && !shippingInvalid && shippingEnabled && !selectedCourierOption && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
               Pilih kurir pengiriman dulu.
             </p>
           )}
-          {!shippingInvalid && !shippingEnabled && !courier && (
+          {cartNeedsShipping && !shippingInvalid && !shippingEnabled && !courier && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
               Pilih kurir pengiriman dulu.
             </p>

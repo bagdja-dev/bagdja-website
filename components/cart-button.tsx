@@ -111,8 +111,8 @@ export function AddToCartButton({
       type="button"
       disabled={outOfStock || busy || disabled}
       onClick={handleClick}
-      className="mt-3 inline-flex justify-center text-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-      style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+      className="mt-3 flex w-full justify-center text-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+      style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)', width: '100%' }}
     >
       {outOfStock
         ? 'Stok Habis'
