@@ -131,16 +131,16 @@ export function StoreClassicProductGallery({
                 </>
               )}
               {slide.type === 'model' && (
-                <>
+                <div className="relative h-16 w-16 sm:h-20 sm:w-20">
                   <ModelViewerElement
                     src={slide.url}
-                    className="pointer-events-none h-16 w-16 sm:h-20 sm:w-20"
+                    className="pointer-events-none h-full w-full"
                     cameraControls={false}
                   />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
                     <CubeIcon />
                   </span>
-                </>
+                </div>
               )}
               {slide.type === 'image' && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -176,14 +176,16 @@ export function StoreClassicProductGallery({
           />
         )}
         {current.type === 'model' && (
-          <ModelViewerElement
-            key={current.url}
-            src={current.url}
-            className="aspect-square w-full"
-            cameraControls
-            autoRotate
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="relative aspect-square w-full">
+            <ModelViewerElement
+              key={current.url}
+              src={current.url}
+              className="absolute inset-0 h-full w-full"
+              cameraControls
+              autoRotate
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         )}
         {current.type === 'image' && (
           <>
@@ -282,14 +284,16 @@ export function StoreClassicProductGallery({
               />
             )}
             {current.type === 'model' && (
-              <ModelViewerElement
-                key={current.url}
-                src={current.url}
-                className="h-[70vh] w-full max-w-full rounded-lg"
-                cameraControls
-                autoRotate
-                ar
-              />
+              <div className="relative aspect-square w-[min(85vh,90vw)] max-w-full overflow-hidden rounded-lg">
+                <ModelViewerElement
+                  key={current.url}
+                  src={current.url}
+                  className="absolute inset-0 h-full w-full"
+                  cameraControls
+                  autoRotate
+                  ar
+                />
+              </div>
             )}
             {current.type === 'image' && (
               // eslint-disable-next-line @next/next/no-img-element

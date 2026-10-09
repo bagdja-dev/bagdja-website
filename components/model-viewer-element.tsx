@@ -37,7 +37,7 @@ export function ModelViewerElement({
     <model-viewer
       src={src}
       className={className}
-      style={style}
+      style={{ display: 'block', width: '100%', height: '100%', ...style }}
       onClick={onClick}
       camera-controls={cameraControls ? '' : undefined}
       auto-rotate={autoRotate ? '' : undefined}
