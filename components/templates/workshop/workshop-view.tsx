@@ -36,6 +36,7 @@ import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { buildChatReferenceHref } from '../../chat-reference';
+import { ModelViewerElement } from '../../model-viewer-element';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
 import {
   getGoogleFontsUrl,
@@ -646,6 +647,7 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
   const slides = [
     ...images.map((url) => ({ type: 'image' as const, url })),
     ...(item.videoUrl ? [{ type: 'video' as const, url: item.videoUrl }] : []),
+    ...(item.model3dUrl ? [{ type: 'model' as const, url: item.model3dUrl }] : []),
   ];
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -667,11 +669,23 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={activeSlide.url} alt={item.name} className="aspect-square w-full object-cover" />
                   </button>
-                ) : (
+                ) : activeSlide.type === 'video' ? (
                   <div className="relative">
                     <video src={activeSlide.url} controls className="aspect-square w-full object-cover" playsInline autoPlay muted loop>
                       <track kind="captions" />
                     </video>
+                    <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                      Fullscreen
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative aspect-square w-full">
+                    <ModelViewerElement
+                      src={activeSlide.url}
+                      className="absolute inset-0 h-full w-full"
+                      cameraControls
+                      autoRotate
+                    />
                     <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                       Fullscreen
                     </button>
@@ -702,12 +716,21 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
                       borderColor: selectedSlideIndex === index ? 'var(--brand-accent)' : 'var(--brand-border)',
                       opacity: selectedSlideIndex === index ? 1 : 0.75,
                     }}
-                    aria-label={slide.type === 'video' ? 'Putar video' : `Lihat gambar ${index + 1}`}
+                    aria-label={slide.type === 'video' ? 'Putar video' : slide.type === 'model' ? 'Lihat model 3D' : `Lihat gambar ${index + 1}`}
                   >
                     {slide.type === 'video' ? (
                       <div className="relative">
                         <video src={slide.url} muted playsInline className="aspect-square w-full object-cover" />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-lg font-bold text-white">▶</span>
+                      </div>
+                    ) : slide.type === 'model' ? (
+                      <div className="relative aspect-square w-full">
+                        <ModelViewerElement
+                          src={slide.url}
+                          className="pointer-events-none absolute inset-0 h-full w-full"
+                          cameraControls={false}
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-xs font-bold text-white">3D</span>
                       </div>
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -812,10 +835,20 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
             {activeSlide.type === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={activeSlide.url} alt={item.name} className="max-h-[80vh] w-full rounded-lg object-contain" />
-            ) : (
+            ) : activeSlide.type === 'video' ? (
               <video src={activeSlide.url} controls autoPlay className="max-h-[80vh] w-full rounded-lg object-contain" playsInline>
                 <track kind="captions" />
               </video>
+            ) : (
+              <div className="relative mx-auto aspect-square max-h-[80vh] w-[min(80vh,90vw)] overflow-hidden rounded-lg" style={{ backgroundColor: 'var(--brand-surface)' }}>
+                <ModelViewerElement
+                  src={activeSlide.url}
+                  className="absolute inset-0 h-full w-full"
+                  cameraControls
+                  autoRotate
+                  ar
+                />
+              </div>
             )}
           </div>
         </div>
