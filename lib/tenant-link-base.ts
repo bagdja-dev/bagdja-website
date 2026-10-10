@@ -1,11 +1,23 @@
 import { headers } from 'next/headers';
 
+const PLATFORM_HOSTNAMES = new Set([
+  'sites.bagdja.com',
+  'website.bagdja.com',
+]);
+
 const PLATFORM_HOST = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_PLATFORM_URL ?? 'https://sites.bagdja.com').hostname;
+    const envHost = process.env.NEXT_PUBLIC_PLATFORM_URL;
+    if (envHost) {
+      const hostname = new URL(envHost).hostname;
+      PLATFORM_HOSTNAMES.add(hostname);
+      return hostname;
+    }
   } catch {
-    return 'sites.bagdja.com';
+    // ignore invalid URL and fall back below
   }
+
+  return 'sites.bagdja.com';
 })();
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -25,7 +37,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 export function resolveTenantLinkBase(websiteSlug: string): string {
   const host = headers().get('host') ?? '';
   const hostname = host.split(':')[0];
-  if (LOCAL_HOSTS.has(hostname) || hostname === PLATFORM_HOST) {
+  if (LOCAL_HOSTS.has(hostname) || PLATFORM_HOSTNAMES.has(hostname) || hostname === PLATFORM_HOST) {
     return `/${websiteSlug}`;
   }
   return '';

@@ -17,12 +17,21 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5003';
+const PLATFORM_HOSTNAMES = new Set(['sites.bagdja.com', 'website.bagdja.com']);
+
 const PLATFORM_HOST = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_PLATFORM_URL ?? 'https://website.bagdja.com').hostname;
+    const envHost = process.env.NEXT_PUBLIC_PLATFORM_URL;
+    if (envHost) {
+      const hostname = new URL(envHost).hostname;
+      PLATFORM_HOSTNAMES.add(hostname);
+      return hostname;
+    }
   } catch {
-    return 'website.bagdja.com';
+    // ignore invalid URL and fall back below
   }
+
+  return 'sites.bagdja.com';
 })();
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -32,7 +41,9 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 // a "tenant subdomain" as if they were a website slug.
 const RESERVED_TOP_LEVEL_PATHS = new Set(['templates']);
 
-const SUBDOMAIN_PATTERN = new RegExp(`^([a-z0-9-]+)\\.${PLATFORM_HOST.replace(/\./g, '\\.')}$`);
+const SUBDOMAIN_PATTERN = new RegExp(
+  `^([a-z0-9-]+)\\.(${[...PLATFORM_HOSTNAMES].map((host) => host.replace(/\./g, '\\.') ).join('|')})$`,
+);
 
 // ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
 // Path dalam tenant: `/{slug}/cart`, `/{slug}/cart/order/...`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`, `/{slug}/chat`
