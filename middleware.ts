@@ -15,17 +15,15 @@
  * [website_slug]/... yang sudah ada dipakai apa adanya, tanpa perubahan.
  */
 import { NextResponse, type NextRequest } from 'next/server';
+import { resolvePlatformSubdomain } from './lib/tenant-host';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5003';
-const PLATFORM_HOSTNAMES = new Set(['sites.bagdja.com', 'website.bagdja.com']);
 
 const PLATFORM_HOST = (() => {
   try {
     const envHost = process.env.NEXT_PUBLIC_PLATFORM_URL;
     if (envHost) {
-      const hostname = new URL(envHost).hostname;
-      PLATFORM_HOSTNAMES.add(hostname);
-      return hostname;
+      return new URL(envHost).hostname;
     }
   } catch {
     // ignore invalid URL and fall back below
@@ -74,17 +72,6 @@ async function resolveSlugForDomain(host: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function resolvePlatformSubdomain(hostname: string): string | null {
-  for (const platformHostname of PLATFORM_HOSTNAMES) {
-    const suffix = `.${platformHostname}`;
-    if (!hostname.endsWith(suffix)) continue;
-
-    const slug = hostname.slice(0, -suffix.length);
-    return /^[a-z0-9-]+$/.test(slug) ? slug : null;
-  }
-  return null;
 }
 
 export async function middleware(request: NextRequest) {
