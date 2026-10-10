@@ -34,8 +34,14 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   const auth = await getAuthViewState(`${basePath}/order/${params.transaction_id}`, basePath);
   const { website, products, locations, faqs, blogPosts } = tenant;
   const result = await backendFetch<TransactionDetail>(`/api/transactions/${params.transaction_id}?website_id=${encodeURIComponent(website.id)}`);
+  if (result.status === 401) {
+    redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/order/${params.transaction_id}`)}`);
+  }
   if (!result.data || result.status >= 400) {
     const orderResult = await backendFetch<OrderDetail>(`/api/orders/${params.transaction_id}`);
+    if (orderResult.status === 401) {
+      redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/order/${params.transaction_id}`)}`);
+    }
     if (orderResult.data?.transaction_id) {
       redirect(transactionHref(basePath, orderResult.data.transaction_id));
     }

@@ -41,6 +41,9 @@ export default async function DraftOrderPage({ params }: DraftOrderPageProps) {
   const auth = await getAuthViewState(`${basePath}/cart/order/${params.order_id}`, basePath);
   const { website, products, locations, faqs, blogPosts } = tenant;
   const result = await backendFetch<OrderDetail>(`/api/orders/${params.order_id}`);
+  if (result.status === 401) {
+    redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/cart/order/${params.order_id}`)}`);
+  }
   if (!result.data || result.status >= 400) notFound();
   if (result.data.transaction_id) {
     redirect(transactionHref(basePath, result.data.transaction_id));

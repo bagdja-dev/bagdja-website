@@ -41,10 +41,6 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 // a "tenant subdomain" as if they were a website slug.
 const RESERVED_TOP_LEVEL_PATHS = new Set(['templates']);
 
-const SUBDOMAIN_PATTERN = new RegExp(
-  `^([a-z0-9-]+)\\.(${[...PLATFORM_HOSTNAMES].map((host) => host.replace(/\./g, '\\.') ).join('|')})$`,
-);
-
 // ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
 // Path dalam tenant: `/{slug}/cart`, `/{slug}/cart/order/...`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`, `/{slug}/chat`
 const PROTECTED_PATH_PATTERN =
@@ -78,6 +74,17 @@ async function resolveSlugForDomain(host: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function resolvePlatformSubdomain(hostname: string): string | null {
+  for (const platformHostname of PLATFORM_HOSTNAMES) {
+    const suffix = `.${platformHostname}`;
+    if (!hostname.endsWith(suffix)) continue;
+
+    const slug = hostname.slice(0, -suffix.length);
+    return /^[a-z0-9-]+$/.test(slug) ? slug : null;
+  }
+  return null;
 }
 
 export async function middleware(request: NextRequest) {
@@ -118,11 +125,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Case 2: wildcard subdomain -> rewrite using the slug parsed straight from the hostname
-  const subdomainMatch = hostname.match(SUBDOMAIN_PATTERN);
-  if (subdomainMatch) {
-    const slug = subdomainMatch[1];
+  const subdomainSlug = resolvePlatformSubdomain(hostname);
+  if (subdomainSlug) {
     const url = request.nextUrl.clone();
-    url.pathname = `/${slug}${request.nextUrl.pathname}`;
+    url.pathname = `/${subdomainSlug}${request.nextUrl.pathname}`;
     // W1: setelah rewrite ke `/{slug}/cart|checkout|order`, cek session
     if (shouldProtect(url.pathname)) {
       if (!hasSession(request)) {
