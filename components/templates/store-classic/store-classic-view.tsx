@@ -893,17 +893,11 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 {item.priceLabel}
               </p>
             )}
-            {item.description && (
-              <p className="mt-4 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-                {item.description}
-              </p>
-            )}
-
             <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
 
             {/* Mode internal (ADD_TO_CART/ESCROW): quantity + stok + tombol cart
                 — urutan: varian → quantity → cart → WhatsApp → LYNK. */}
-            {tenantSlug && internalPaymentMode && item.websiteId && (
+            {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId && (
               <PurchaseControls
                 slug={tenantSlug}
                 basePath={websiteSlug}
@@ -923,84 +917,246 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
               />
             )}
 
-            {waHref && (
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-                style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-              >
-                Pesan via WhatsApp
-              </a>
-            )}
-            {websiteId && (
-              <ChatReferenceButton
-                websiteId={websiteId}
-                basePath={websiteSlug}
-                loginHref={loginHref}
-                productId={item.id}
-                reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
-                className="mt-3 inline-flex rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-              >
-                Tanya Produk
-              </ChatReferenceButton>
-            )}
-            {/* Mode external (LYNK) — dirender setelah WhatsApp */}
-            {item.paymentMeta?.map((entry, index) => (
-              <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
-            ))}
-            {specificationEntries.length > 0 && (
-              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-                <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Spesifikasi
-                </h2>
-                <dl className="grid gap-3 sm:grid-cols-2">
-                  {specificationEntries.map(([key, value]) => (
-                    <div key={key} className="rounded-lg border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                      <dt className="text-[11px] uppercase tracking-[0.18em]" style={{ color: 'var(--brand-muted)' }}>
-                        {key}
-                      </dt>
-                      <dd className="mt-1 font-medium">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
+            {item.type === 'gathering' ? (
+              <div className="mt-6 flex flex-col gap-3">
+                {websiteId && (
+                  <ChatReferenceButton
+                    websiteId={websiteId}
+                    basePath={websiteSlug}
+                    loginHref={loginHref}
+                    productId={item.id}
+                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                    className="inline-flex w-full justify-center rounded-full bg-[var(--brand-accent)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--brand-on-accent)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    Rencanakan Gathering
+                  </ChatReferenceButton>
+                )}
+                {waHref && (
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  >
+                    Konsultasi via WhatsApp
+                  </a>
+                )}
+                {websiteId && (
+                  <ChatReferenceButton
+                    websiteId={websiteId}
+                    basePath={websiteSlug}
+                    loginHref={loginHref}
+                    productId={item.id}
+                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                    className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    Tanya Produk
+                  </ChatReferenceButton>
+                )}
               </div>
-            )}
-
-            {estimationEntries.length > 0 && (
-              <div className="mt-8 rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-                <h2 className="mb-3 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Estimasi Harga
-                </h2>
-                <div className="space-y-2">
-                  {estimationEntries.map((entry, index) => {
-                    const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
-                    return (
-                      <div key={`${entry.label}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: 'var(--brand-border)' }}>
-                        <span>{entry.label}</span>
-                        <strong style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(numericPrice)}</strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {item.detail && (
-              <details className="mt-8 rounded-xl border p-4" open style={{ borderColor: 'var(--brand-border)' }}>
-                <summary className="cursor-pointer font-semibold marker:content-none" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Detail Produk
-                </summary>
-                <div
-                  className="mt-3 text-sm leading-relaxed [&_a]:underline [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc"
-                  style={{ color: 'var(--brand-muted)' }}
-                  dangerouslySetInnerHTML={{ __html: item.detail }}
-                />
-              </details>
+            ) : (
+              <>
+                {waHref && (
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                  >
+                    Pesan via WhatsApp
+                  </a>
+                )}
+                {websiteId && (
+                  <ChatReferenceButton
+                    websiteId={websiteId}
+                    basePath={websiteSlug}
+                    loginHref={loginHref}
+                    productId={item.id}
+                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                    className="mt-3 inline-flex rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                  >
+                    Tanya Produk
+                  </ChatReferenceButton>
+                )}
+                {/* Mode external (LYNK) — dirender setelah WhatsApp */}
+                {item.paymentMeta?.map((entry, index) => (
+                  <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
+                ))}
+              </>
             )}
           </div>
         </div>
+        {(item.type === 'gathering' && item.gatheringMeta) || specificationEntries.length > 0 || estimationEntries.length > 0 || item.detail ? (
+          <div className="mt-10 w-full space-y-8">
+            {item.type === 'gathering' && item.gatheringMeta && (
+              <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Gathering</h2>
+                  <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+                    Sebelum RSVP
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
+                    <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Minimum peserta</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
+                    <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Maksimum peserta</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.eventDate && (
+                    <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Jadwal</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.eventTime && (
+                    <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Waktu</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.location && (
+                    <div className="border-l-2 pl-3 sm:col-span-2" style={{ borderColor: 'var(--brand-accent)' }}>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Lokasi</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
+                    </div>
+                  )}
+                </div>
+                {item.gatheringMeta.cancellationPolicy && (
+                  <div className="mt-6 max-w-4xl">
+                    <h3 className="font-semibold">Kebijakan pembatalan</h3>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{item.gatheringMeta.cancellationPolicy}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {(item.description || item.detail || specificationEntries.length > 0 || estimationEntries.length > 0) && (
+              <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
+                <h2 className="mb-4 text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Produk</h2>
+                {item.description && (
+                  <p className="mb-5 max-w-4xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
+                    {item.description}
+                  </p>
+                )}
+                {specificationEntries.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="mb-3 text-base font-semibold">Spesifikasi</h3>
+                    <dl className="grid gap-4 border-y py-4 sm:grid-cols-2 lg:grid-cols-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      {specificationEntries.map(([key, value]) => (
+                        <div key={key}>
+                          <dt className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{key}</dt>
+                          <dd className="mt-1 font-medium">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
+                {estimationEntries.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="mb-3 text-base font-semibold">Estimasi Harga</h3>
+                    <div className="border-y" style={{ borderColor: 'var(--brand-border)' }}>
+                      {estimationEntries.map((entry, index) => {
+                        const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
+                        return (
+                          <div key={`${entry.label}-${index}`} className="flex items-center justify-between border-b py-3 last:border-b-0" style={{ borderColor: 'var(--brand-border)' }}>
+                            <span>{entry.label}</span>
+                            <strong style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(numericPrice)}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {item.detail && (
+                  <div
+                    className="max-w-none text-sm leading-relaxed [&_a]:underline [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc"
+                    style={{ color: 'var(--brand-muted)' }}
+                    dangerouslySetInnerHTML={{ __html: item.detail }}
+                  />
+                )}
+              </section>
+            )}
+
+            {item.type === 'gathering' && item.gatheringMeta?.optionGroups?.length ? (
+              <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Option</h2>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>Kelompok pilihan yang tersedia untuk gathering ini.</p>
+                  </div>
+                  <span className="text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                    {item.gatheringMeta.optionGroups.length} kelompok pilihan
+                  </span>
+                </div>
+                <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {item.gatheringMeta.optionGroups.map((group) => (
+                    <div key={group.key} className="overflow-hidden border" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                      <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                        <h3 className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{group.label}</h3>
+                        <span className="shrink-0 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                          {group.options.length} pilihan
+                        </span>
+                      </div>
+                      <ol className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                        {group.options.map((option, index) => (
+                          <li key={option.id} className="flex gap-3 px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
+                              {String(index + 1).padStart(2, '0')}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium" style={{ color: 'var(--brand-text)' }}>{option.label}</p>
+                              {option.description ? (
+                                <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
+                              ) : null}
+                              {(option.venueLocation || option.availabilityNote) && (
+                                <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  {option.venueLocation && (
+                                    <div>
+                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Lokasi</dt>
+                                      <dd className="mt-0.5 text-xs" style={{ color: 'var(--brand-text)' }}>{option.venueLocation}</dd>
+                                    </div>
+                                  )}
+                                  {option.availabilityNote && (
+                                    <div>
+                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Ketersediaan</dt>
+                                      <dd className="mt-0.5 text-xs" style={{ color: 'var(--brand-text)' }}>{option.availabilityNote}</dd>
+                                    </div>
+                                  )}
+                                </dl>
+                              )}
+                              {option.benefits?.length ? (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Benefit</p>
+                                  <ul className="mt-1 space-y-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                                    {option.benefits.map((benefit, benefitIndex) => (
+                                      <li key={`${option.id}-benefit-${benefitIndex}`} className="flex gap-2">
+                                        <span aria-hidden="true" style={{ color: 'var(--brand-accent-muted)' }}>•</span>
+                                        <span>{benefit}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
       </section>
       {related.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -1068,6 +1224,7 @@ export function StoreClassicView({
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
   const profileSection = sections.find((s) => s.type === 'profile');
   const chatSection = sections.find((s) => s.type === 'chat');
+  const isChatPage = Boolean(chatSection);
   const pageBannerLabel = checkoutSection
     ? 'Checkout'
     : cartSection
@@ -1133,7 +1290,7 @@ export function StoreClassicView({
           <PageHeroBanner label={productPageTitle} imageUrl={productDetailItem.image} />
         ) : categoryListingLabel ? (
           <PageHeroBanner label={categoryListingLabel} imageUrl={categoryListingImage} />
-        ) : pageBannerLabel ? (
+        ) : isChatPage ? null : pageBannerLabel ? (
           <PageHeroBanner label={pageBannerLabel} />
         ) : (
           <HeroSection
@@ -1364,7 +1521,7 @@ export function StoreClassicView({
             }
           })}
 
-        {(chatHref || waHref) && (
+        {(chatHref || waHref) && !isChatPage && (
           <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">
             <a
               href={chatHref || waHref || '#'}
@@ -1380,7 +1537,7 @@ export function StoreClassicView({
 
         {!isPreview && (
           <footer className="border-t" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-            <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 text-sm sm:grid-cols-3 sm:px-6">
+            <div className={`mx-auto grid max-w-6xl px-4 text-sm sm:grid-cols-3 sm:px-6 ${isChatPage ? 'gap-4 py-5' : 'gap-8 py-12'}`}>
               <div>
                 <div className="flex items-center gap-2">
                   {profile.logoUrl && (
@@ -1391,7 +1548,7 @@ export function StoreClassicView({
                     {title}
                   </span>
                 </div>
-                {profile.tagline && <p className="mt-3 leading-relaxed" style={{ opacity: 0.85 }}>{profile.tagline}</p>}
+                {profile.tagline && <p className={`${isChatPage ? 'mt-2' : 'mt-3'} leading-relaxed`} style={{ opacity: 0.85 }}>{profile.tagline}</p>}
                 {socialLinks.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {socialLinks.map((social) => (
@@ -1413,7 +1570,7 @@ export function StoreClassicView({
 
               {footerNavLinks.length > 0 && (
                 <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>
+                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
                     Halaman
                   </p>
                   <nav className="flex flex-col gap-2">
@@ -1428,10 +1585,10 @@ export function StoreClassicView({
 
               {(footerAddress || profile.phone || waHref || profile.email) && (
                 <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>
+                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
                     Kontak
                   </p>
-                  <div className="flex flex-col gap-2">
+                  <div className={`flex flex-col ${isChatPage ? 'gap-1' : 'gap-2'}`}>
                     {footerAddress && (
                       <span className="flex items-start gap-2" style={{ opacity: 0.85 }}>
                         <MapPinIcon />
@@ -1461,7 +1618,7 @@ export function StoreClassicView({
               )}
             </div>
 
-            <p className="border-t py-6 text-center text-xs" style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
+            <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
               © Bagdja Website Builder
             </p>
           </footer>

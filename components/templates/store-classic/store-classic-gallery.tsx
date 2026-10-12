@@ -101,7 +101,7 @@ export function StoreClassicProductGallery({
   const isInteractive3d = current.type === 'model';
 
   return (
-    <div className={`grid gap-3 ${count > 1 ? 'sm:grid-cols-[80px_1fr]' : ''}`}>
+    <div className={`grid h-fit self-start gap-3 ${count > 1 ? 'sm:grid-cols-[80px_1fr]' : ''}`}>
       {count > 1 && (
         <div className="order-2 flex gap-2 overflow-x-auto sm:order-1 sm:flex-col sm:overflow-visible">
           {slides.map((slide, i) => (
@@ -152,7 +152,7 @@ export function StoreClassicProductGallery({
       )}
 
       <div
-        className={`relative order-1 overflow-hidden rounded-xl sm:order-2 ${
+        className={`relative order-1 aspect-square w-full overflow-hidden rounded-xl sm:order-2 ${
           current.type === 'image' ? 'cursor-zoom-in' : ''
         }`}
         style={{ backgroundColor: 'var(--brand-surface)' }}
@@ -167,7 +167,7 @@ export function StoreClassicProductGallery({
           <video
             key={current.url}
             src={current.url}
-            className="aspect-square w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             controls
             autoPlay
             loop
@@ -190,7 +190,7 @@ export function StoreClassicProductGallery({
         {current.type === 'image' && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={current.url} alt="" className="aspect-square w-full object-cover" />
+            <img src={current.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
             <div
               aria-hidden
               className={`pointer-events-none absolute inset-0 transition-opacity duration-150 ${

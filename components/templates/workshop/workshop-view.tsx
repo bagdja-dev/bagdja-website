@@ -750,14 +750,97 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
               {item.description ? <p className="mt-5 leading-relaxed text-[var(--brand-muted)]">{item.description}</p> : null}
             </div>
 
+            {item.type === 'gathering' && item.gatheringMeta && (
+              <div className="rounded border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h2 className="text-lg font-bold">Detail Gathering</h2>
+                  <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Sebelum RSVP</span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {item.gatheringMeta.eventDate && (
+                    <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Jadwal</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.eventTime && (
+                    <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Waktu</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.location && (
+                    <div className="rounded border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)' }}>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Lokasi</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
+                    <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Minimum</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} peserta</p>
+                    </div>
+                  )}
+                  {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
+                    <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Maksimum</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} kapasitas</p>
+                    </div>
+                  )}
+                </div>
+
+                {item.gatheringMeta.optionGroups?.length ? (
+                  <div className="mt-4 rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Pilihan yang tersedia</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                      {item.gatheringMeta.optionGroups.map((group) => (
+                        <li key={group.key}>
+                          <span className="font-semibold">{group.label}</span>
+                          <ul className="mt-1 list-disc space-y-1 pl-5">
+                            {group.options.map((option) => (
+                              <li key={option.id}>
+                                {option.label}{option.description ? `: ${option.description}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {item.gatheringMeta.cancellationPolicy && (
+                  <div className="mt-4 rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Kebijakan cancel & refund</p>
+                    <p className="mt-1 text-sm leading-relaxed">{item.gatheringMeta.cancellationPolicy}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {family.length > 1 ? <div><p className="text-xs font-bold uppercase tracking-wide">Pilihan varian</p><div className="mt-3 flex flex-wrap gap-2">{family.map((variant) => <a key={variant.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, variant.slug) : '#'} className={`border px-3 py-2 text-xs ${variant.id === item.id ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : ''}`} style={variant.id === item.id ? undefined : { borderColor: 'var(--brand-border)' }}>{variant.name}</a>)}</div></div> : null}
 
-            {tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
-            {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
-            {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
-              Tanya Produk
-            </ChatReferenceButton> : null}
-            {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
+            {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
+            {item.type === 'gathering' ? (
+              <div className="mt-4 flex w-full flex-col gap-3">
+                {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full bg-[var(--brand-accent)] px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]" style={{}}>
+                  Rencanakan Gathering
+                </ChatReferenceButton> : null}
+                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Konsultasi via WhatsApp</a> : null}
+                {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
+                  Tanya Produk
+                </ChatReferenceButton> : null}
+              </div>
+            ) : (
+              <>
+                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
+                {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
+                  Tanya Produk
+                </ChatReferenceButton> : null}
+                {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
+              </>
+            )}
           </div>
         </div>
 

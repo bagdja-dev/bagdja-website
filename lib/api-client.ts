@@ -97,6 +97,22 @@ export interface ApiWebsiteProduct {
   video_url?: string | null;
   model3d_url?: string | null;
   metadata: Record<string, unknown>;
+  gathering_options?: Array<{
+    id: string;
+    option_group_key: string;
+    option_key: string;
+    label: string;
+    description?: string | null;
+    price_per_seat: number | string;
+    currency: string;
+    min_attendees: number;
+    max_attendees: number;
+    availability_window?: Record<string, unknown>;
+    venue_location?: string | null;
+    benefits?: unknown[];
+    is_active: boolean;
+    sort_order: number;
+  }>;
   payment_meta?: PaymentMetaEntry[];
   sort_order: number;
 }

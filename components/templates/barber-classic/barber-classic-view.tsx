@@ -904,6 +904,79 @@ function ProductDetailSection({
         </p>
       )}
 
+      {item.type === 'gathering' && item.gatheringMeta && (
+        <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
+              Detail Gathering
+            </h2>
+            <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+              Sebelum RSVP
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {item.gatheringMeta.eventDate && (
+              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Jadwal</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
+              </div>
+            )}
+            {item.gatheringMeta.eventTime && (
+              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Waktu</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
+              </div>
+            )}
+            {item.gatheringMeta.location && (
+              <div className="rounded-xl border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)' }}>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Lokasi</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
+              </div>
+            )}
+            {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
+              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Minimum</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} peserta</p>
+              </div>
+            )}
+            {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
+              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Maksimum</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} kapasitas</p>
+              </div>
+            )}
+          </div>
+
+          {item.gatheringMeta.optionGroups?.length ? (
+            <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Pilihan yang tersedia</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                      {item.gatheringMeta.optionGroups.map((group) => (
+                        <li key={group.key}>
+                          <span className="font-semibold">{group.label}</span>
+                          <ul className="mt-1 list-disc space-y-1 pl-5">
+                            {group.options.map((option) => (
+                              <li key={option.id}>
+                                {option.label}{option.description ? `: ${option.description}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {item.gatheringMeta.cancellationPolicy && (
+            <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
+              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Kebijakan cancel & refund</p>
+              <p className="mt-1 text-sm leading-relaxed">{item.gatheringMeta.cancellationPolicy}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
 
       {specificationEntries.length > 0 && (
@@ -950,40 +1023,82 @@ function ProductDetailSection({
           dangerouslySetInnerHTML={{ __html: item.detail }}
         />
       )}
-      {waHref && (
-        <div className="mt-8 flex justify-center">
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
-            style={{
-              backgroundColor: 'var(--brand-accent)',
-              color: 'var(--brand-on-accent)',
-            }}
-          >
-            Booking via WhatsApp
-          </a>
+      {item.type === 'gathering' ? (
+        <div className="mt-8 flex flex-col gap-3">
+          {websiteId && (
+            <ChatReferenceButton
+              websiteId={websiteId}
+              basePath={websiteSlug}
+              loginHref={loginHref}
+              productId={item.id}
+              reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+              className="inline-flex rounded-full bg-[var(--brand-accent)] px-6 py-3 text-sm font-medium text-[var(--brand-on-accent)] transition-transform hover:scale-105 active:scale-95"
+            >
+              Rencanakan Gathering
+            </ChatReferenceButton>
+          )}
+          {waHref && (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+              style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+            >
+              Konsultasi via WhatsApp
+            </a>
+          )}
+          {websiteId && (
+            <ChatReferenceButton
+              websiteId={websiteId}
+              basePath={websiteSlug}
+              loginHref={loginHref}
+              productId={item.id}
+              reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+              className="inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+            >
+              Tanya Produk
+            </ChatReferenceButton>
+          )}
         </div>
-      )}
-      {websiteId && (
-        <ChatReferenceButton
-          websiteId={websiteId}
-          basePath={websiteSlug}
-          loginHref={loginHref}
-          productId={item.id}
-          reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
-          className="mt-3 inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
-        >
-          Tanya Produk
-        </ChatReferenceButton>
-      )}
-      {item.paymentMeta && item.paymentMeta.length > 0 && (
-        <div className="mt-4 flex flex-wrap justify-center gap-3">
-          {item.paymentMeta.map((entry, index) => (
-            <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
-          ))}
-        </div>
+      ) : (
+        <>
+          {waHref && (
+            <div className="mt-8 flex justify-center">
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: 'var(--brand-accent)',
+                  color: 'var(--brand-on-accent)',
+                }}
+              >
+                Booking via WhatsApp
+              </a>
+            </div>
+          )}
+          {websiteId && (
+            <ChatReferenceButton
+              websiteId={websiteId}
+              basePath={websiteSlug}
+              loginHref={loginHref}
+              productId={item.id}
+              reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+              className="mt-3 inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
+            >
+              Tanya Produk
+            </ChatReferenceButton>
+          )}
+          {item.paymentMeta && item.paymentMeta.length > 0 && (
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              {item.paymentMeta.map((entry, index) => (
+                <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

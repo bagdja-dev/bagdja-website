@@ -13,6 +13,19 @@ import type {
 
 export type { PaymentMetaEntry } from './api-client';
 
+export interface GatheringOptionGroup {
+  key: string;
+  label: string;
+  options: Array<{
+    id: string;
+    label: string;
+    description?: string;
+    venueLocation?: string;
+    availabilityNote?: string;
+    benefits?: string[];
+  }>;
+}
+
 export interface CatalogItem {
   id: string;
   /** Website (tenant) pemilik produk — dipakai POST /api/orders/draft.
@@ -24,6 +37,15 @@ export interface CatalogItem {
   slug: string;
   description?: string;
   detail?: string;
+  gatheringMeta?: {
+    eventDate?: string;
+    eventTime?: string;
+    location?: string;
+    minAttendees?: number;
+    maxAttendees?: number;
+    optionGroups?: GatheringOptionGroup[];
+    cancellationPolicy?: string;
+  };
   specifications?: Record<string, string>;
   estimation?: Array<{ label: string; price: number | string }>;
   priceLabel: string;
@@ -281,6 +303,86 @@ function normalizeProductEstimation(raw: unknown): Array<{ label: string; price:
  * priceLabel kosong (falsy) supaya template pakai fallback "KONSULTASI"
  * yang sudah ada, bukan menampilkan "Rp 0" yang membingungkan.
  */
+function normalizeGatheringMeta(
+  raw: unknown,
+  optionRows: ApiWebsiteProduct['gathering_options'] = [],
+): CatalogItem['gatheringMeta'] | undefined {
+  const meta = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+  const groups = new Map<string, GatheringOptionGroup>();
+
+  for (const option of optionRows ?? []) {
+    if (!option.is_active) continue;
+    const group = groups.get(option.option_group_key) ?? {
+      key: option.option_group_key,
+      label: option.option_group_key.replace(/[-_]+/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase()),
+      options: [],
+    };
+    group.options.push({
+      id: option.id,
+      label: option.label,
+      description: option.description ?? undefined,
+      venueLocation: option.venue_location ?? undefined,
+      availabilityNote: typeof option.availability_window?.note === 'string'
+        ? option.availability_window.note
+        : undefined,
+      benefits: option.benefits?.filter((benefit): benefit is string => typeof benefit === 'string'),
+    });
+    groups.set(group.key, group);
+  }
+
+  const legacyOptions = Array.isArray(meta.option_groups)
+    ? meta.option_groups.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    : typeof meta.option_groups === 'string'
+      ? meta.option_groups.split(/\n|;/).map((entry) => entry.trim()).filter(Boolean)
+      : [];
+  for (const [index, legacyOption] of legacyOptions.entries()) {
+    const separator = legacyOption.indexOf(':');
+    const groupLabel = separator > 0 ? legacyOption.slice(0, separator).trim() : 'Pilihan';
+    const label = separator > 0 ? legacyOption.slice(separator + 1).trim() : legacyOption;
+    const key = groupLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `legacy-${index + 1}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, label: groupLabel, options: [] });
+    }
+    const group = groups.get(key)!;
+    if (!group.options.some((option) => option.label === label)) {
+      group.options.push({ id: `${key}-${index}`, label });
+    }
+  }
+
+  const min = typeof meta.min_attendees === 'number' ? meta.min_attendees : Number(meta.min_attendees ?? 0);
+  const max = typeof meta.max_attendees === 'number' ? meta.max_attendees : Number(meta.max_attendees ?? 0);
+  const optionGroups = [...groups.values()];
+  const rawPolicy = meta.cancellation_policy && typeof meta.cancellation_policy === 'object'
+    ? meta.cancellation_policy as Record<string, unknown>
+    : {};
+  let cancellationPolicy = typeof meta.cancellation_policy === 'string'
+    ? meta.cancellation_policy
+    : typeof rawPolicy.summary === 'string' ? rawPolicy.summary : '';
+  if (!cancellationPolicy && Object.keys(rawPolicy).length > 0) {
+    const cutoff = Number(rawPolicy.cutoff_days_before_event ?? 0);
+    const penaltyType = String(rawPolicy.penalty_type ?? 'NONE');
+    const penaltyValue = Number(rawPolicy.penalty_value ?? 0);
+    const cutoffText = cutoff > 0
+      ? `Batas terakhir pemilik bisnis membatalkan seluruh event: ${cutoff} hari sebelum acara`
+      : 'Batas terakhir pemilik bisnis membatalkan seluruh event: hari acara';
+    const penaltyText = penaltyType === 'FIXED'
+      ? `penalti Rp${new Intl.NumberFormat('id-ID').format(penaltyValue)} per peserta`
+      : penaltyType === 'PERCENTAGE' ? `penalti ${penaltyValue}% per peserta` : 'tanpa penalti';
+    cancellationPolicy = `${cutoffText}. Pemilik bisnis dapat membatalkan seluruh event sebelum batas dengan ${penaltyText}. Setelah batas lewat, pembatalan event normal tidak tersedia. Pembatalan seat oleh peserta mengikuti aturan terpisah; setelah pesanan final dikonfirmasi, seat hanya dapat diganti.`;
+  }
+  const hasAny = optionGroups.length > 0 || meta.min_attendees != null || meta.max_attendees != null || Boolean(cancellationPolicy);
+  if (!hasAny) return undefined;
+
+  return {
+    minAttendees: Number.isFinite(min) && min >= 0 ? min : undefined,
+    maxAttendees: Number.isFinite(max) && max >= 0 ? max : undefined,
+    optionGroups: optionGroups.length ? optionGroups : undefined,
+    cancellationPolicy: cancellationPolicy || undefined,
+  };
+}
+
 export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
   return {
     id: product.id,
@@ -291,9 +393,12 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     slug: product.slug,
     description: product.description ?? undefined,
     detail: product.detail ?? undefined,
+    gatheringMeta: normalizeGatheringMeta(product.metadata, product.gathering_options),
     specifications: normalizeProductSpecifications(product.specifications),
     estimation: normalizeProductEstimation(product.estimation),
-    priceLabel: product.price > 0 ? `${formatIDR(product.price)}${product.uom?.symbol ? `/${product.uom.symbol}` : ''}` : '',
+    priceLabel: product.price > 0
+      ? `${formatIDR(product.price)}${product.type === 'gathering' ? ' / peserta' : product.uom?.symbol ? `/${product.uom.symbol}` : ''}`
+      : '',
     quotable: product.quotable,
     uomSymbol: product.uom?.symbol,
     image: product.images?.[0],
