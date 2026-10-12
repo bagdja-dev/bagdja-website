@@ -15,7 +15,7 @@ import {
 import { getTemplateRenderer } from '../lib/template-registry';
 import { resolveTenantLinkBase } from '../lib/tenant-link-base';
 import { extractTemplateTheme, sanitizeWebsiteTheme } from '../lib/website-theme';
-import type { OrderDetail } from './order-detail-content';
+import type { GatheringPlanDetail, OrderDetail } from './order-detail-content';
 import WebsiteInactiveNotice from './website-inactive-notice';
 import { transactionHref } from '../lib/order-href';
 
@@ -44,9 +44,22 @@ export default async function DraftOrderPageContent({
     redirect(transactionHref(basePath, result.data.transaction_id));
   }
 
+  const gatheringMeta = result.data.metadata?.gathering;
+  let gatheringPlan: GatheringPlanDetail | null = null;
+  if (gatheringMeta?.role === 'initiator' && gatheringMeta.group_id) {
+    const gatheringResult = await backendFetch<GatheringPlanDetail>(
+      `/api/gathering/plans/${encodeURIComponent(gatheringMeta.group_id)}?website_id=${encodeURIComponent(website.id)}`,
+    );
+    if (gatheringResult.status === 401) {
+      redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/cart/order/${orderId}`)}`);
+    }
+    if (!gatheringResult.data || gatheringResult.status >= 400) notFound();
+    gatheringPlan = gatheringResult.data;
+  }
+
   const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
   if (!Renderer) notFound();
-  const sections: SectionEntry[] = [{ type: 'order_detail', content: { order: result.data, transaction: null } }];
+  const sections: SectionEntry[] = [{ type: 'order_detail', content: { order: result.data, transaction: null, gatheringPlan } }];
 
   return (
     <CartProvider slug={websiteSlug}>

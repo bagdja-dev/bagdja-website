@@ -157,6 +157,7 @@ export interface OrderDetail {
   status: string;
   checkout_url: string | null;
   transaction_id?: string | null;
+  metadata?: { gathering?: { role?: string; group_id?: string; occurrence_id?: string } } | null;
   created_at: string;
   quoteTermins?: Array<{
     sequence: number;
@@ -166,6 +167,30 @@ export interface OrderDetail {
   }>;
   /** fulfillment-praorder-plan.md §2.1 — cuma ada kalau produknya punya step Praorder & order belum checkout. */
   praorderProgress?: OrderFulfillmentProgress | null;
+}
+
+export interface GatheringPlanDetail {
+  id: string;
+  order_id: string | null;
+  title: string;
+  status: string;
+  invite_policy: 'OPEN' | 'INVITE_ONLY';
+  occurrence: {
+    status: string;
+    price_per_seat: number;
+    currency: string;
+    min_attendees: number;
+    max_attendees: number;
+    final_schedule?: string | null;
+    final_location?: string | null;
+    option_groups_snapshot: Array<{
+      option_group_key: string;
+      option_key: string;
+      label: string;
+      description?: string | null;
+      venue_location?: string | null;
+    }>;
+  };
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -197,19 +222,79 @@ function Row({ label, value }: { label: string; value: string }) {
 export function OrderDetailContent({
   transaction,
   order,
+  gatheringPlan,
   basePath = '',
   websiteId,
   loginHref,
 }: {
   transaction?: TransactionDetail | null;
   order?: OrderDetail | null;
+  gatheringPlan?: GatheringPlanDetail | null;
   basePath?: string;
   websiteId?: string;
   loginHref?: string;
 }) {
   if (transaction) return <TransactionView transaction={transaction} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
+  if (order && gatheringPlan) return <GatheringPlanOrderView order={order} plan={gatheringPlan} basePath={basePath} />;
   if (order) return <LegacyOrderView order={order} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
   return null;
+}
+
+function GatheringPlanOrderView({ order, plan, basePath }: { order: OrderDetail; plan: GatheringPlanDetail; basePath: string }) {
+  const occurrence = plan.occurrence;
+  const seatPrice = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: occurrence.currency || 'IDR',
+    maximumFractionDigits: 0,
+  }).format(Number(occurrence.price_per_seat));
+
+  return (
+    <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>Praorder Gathering</p>
+          <h1 className="mt-1 text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{plan.title}</h1>
+        </div>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+          {occurrence.status === 'PREORDER' ? 'Praorder' : occurrence.status}
+        </span>
+      </div>
+
+      <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
+        Order rencana #{order.id.slice(0, 8)} tersimpan di keranjang. Ini bukan tagihan; pembayaran seat dibuka setelah pilihan dan jadwal gathering siap.
+      </p>
+
+      <section className="mt-6 border-y py-5" style={{ borderColor: 'var(--brand-border)' }}>
+        <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>Ringkasan gathering</h2>
+        <dl className="mt-4 grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+          <Row label="Harga per peserta" value={seatPrice} />
+          <Row label="Batas peserta" value={`Min. ${occurrence.min_attendees} · Maks. ${occurrence.max_attendees}`} />
+          <Row label="Jadwal final" value={occurrence.final_schedule || 'Belum ditentukan'} />
+          <Row label="Lokasi final" value={occurrence.final_location || 'Belum ditentukan'} />
+          <Row label="Undangan" value={plan.invite_policy === 'INVITE_ONLY' ? 'Khusus undangan' : 'Terbuka'} />
+        </dl>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>Pilihan dari produk</h2>
+        <ul className="mt-3 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
+          {occurrence.option_groups_snapshot.map((option) => (
+            <li key={`${option.option_group_key}:${option.option_key}`} className="py-3">
+              <p className="font-semibold">{option.label}</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                {option.option_group_key}{option.venue_location ? ` · ${option.venue_location}` : ''}
+              </p>
+              {option.description ? <p className="mt-2 text-sm">{option.description}</p> : null}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <a href={`${basePath}/cart`} className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+        Kembali ke keranjang
+      </a>
+    </section>
+  );
 }
 
 /** Tampilan transaksi (alur baru W2.8) — read-only, mirip layout checkout. */

@@ -44,7 +44,32 @@ interface ServerOrder {
   transaction_id: string | null;  payment_mode: string;
   /** Ada kalau produknya punya step Praorder di Fulfillment Flow-nya — TERLEPAS dari harga (bisa produk harga fix yang tetap butuh survey/denah sebelum produksi). */
   praorderProgress?: { flowName: string; steps: { completed: boolean }[] } | null;
+  /** Order gathering: initiator plan atau seat peserta; kartu tetap memakai daftar order yang sama. */
+  metadata?: { gathering?: { role?: string; group_id?: string; occurrence_id?: string } } | null;
 }
+
+interface GatheringPlanRow {
+  id: string;
+  /** Order rencana di cart (website_orders PENDING tanpa seat); null untuk plan lama. */
+  order_id: string | null;
+  title: string;
+  status: string;
+  occurrence: {
+    status: string;
+    price_per_seat: number | string;
+    currency: string;
+    min_attendees: number;
+    max_attendees: number;
+    final_schedule?: string | null;
+  };
+}
+
+const GATHERING_STATUS_LABELS: Record<string, string> = {
+  PREORDER: 'Praorder',
+  RSVP_OPEN: 'RSVP dibuka',
+  PAYMENT_OPEN: 'Pembayaran dibuka',
+  CONFIRMED: 'Terkonfirmasi',
+};
 
 /** Item cart — 1:1 dengan 1 draft order server. */
 interface CartLine {
@@ -64,6 +89,8 @@ interface CartLine {
   quotedTotal: number | null;
   uomSymbol?: string;
   quoteTermins?: Array<{ sequence: number; label: string; amount: number }>;
+  isGatheringPlan: boolean;
+  gatheringPlan?: GatheringPlanRow;
 }
 
 function CartIcon({ className = '' }: { className?: string }) {
@@ -88,6 +115,7 @@ function ViewOrderIcon() {
 }
 
 function canCheckoutLine(line: CartLine) {
+  if (line.isGatheringPlan) return false;
   if (line.isQuotable && line.hasIncompletePraorderSteps) return false;
   if (line.isQuotable && line.quotedTotal === null) return false;
   if (line.unitPrice <= 0 && line.quotedTotal === null) return false;
@@ -95,6 +123,7 @@ function canCheckoutLine(line: CartLine) {
 }
 
 function checkoutBlockedReason(line: CartLine) {
+  if (line.isGatheringPlan) return 'Rencana gathering belum masuk tahap pembayaran';
   if (line.isQuotable && line.quotedTotal === null) return 'Menunggu penawaran';
   if (line.isQuotable && line.hasIncompletePraorderSteps) return 'Lengkapi data praorder dulu';
   if (line.unitPrice <= 0 && line.quotedTotal === null) return 'Harga belum tersedia';
@@ -112,6 +141,7 @@ function RemoveIcon() {
 export function CartContent({ basePath, websiteId }: { basePath: string; websiteId: string }) {
   const router = useRouter();
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
+  const [gatheringPlans, setGatheringPlans] = useState<GatheringPlanRow[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -119,17 +149,27 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
   const loadServerOrders = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
+      const [res, plansRes] = await Promise.all([
+        fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' }),
+        fetch(`/api/gathering/plans?website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' }),
+      ]);
       if (!res.ok) {
         setServerError('Gagal memuat keranjang dari server');
         setServerOrders([]);
-        return;
+      } else {
+        const data = (await res.json()) as { data?: ServerOrder[] };
+        setServerOrders(data?.data ?? []);
       }
-      const data = (await res.json()) as { data?: ServerOrder[] };
-      setServerOrders(data?.data ?? []);
+      if (plansRes.ok) {
+        const plans = await plansRes.json() as GatheringPlanRow[];
+        setGatheringPlans(Array.isArray(plans) ? plans : []);
+      } else {
+        setGatheringPlans([]);
+      }
     } catch {
       setServerError('Gagal memuat keranjang dari server');
       setServerOrders([]);
+      setGatheringPlans([]);
     }
   }, [websiteId]);
 
@@ -143,6 +183,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('bagdja:cart-changed'));
   }, [serverOrders]);
+
+  const gatheringPlansByOrderId = useMemo(
+    () => new Map(gatheringPlans.filter((plan) => plan.order_id).map((plan) => [plan.order_id as string, plan])),
+    [gatheringPlans],
+  );
 
   const lines: CartLine[] = useMemo(
     () =>
@@ -163,8 +208,12 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
         quotedTotal: o.quoted_total_amount != null ? Number(o.quoted_total_amount) : null,
         uomSymbol: o.product?.uom?.symbol,
         quoteTermins: o.quoteTermins,
+        isGatheringPlan: o.metadata?.gathering?.role === 'initiator',
+        gatheringPlan: o.metadata?.gathering?.role === 'initiator'
+          ? gatheringPlansByOrderId.get(o.id)
+          : undefined,
       })),
-    [serverOrders],
+    [serverOrders, gatheringPlansByOrderId],
   );
 
   // Default: semua item yang bisa checkout terpilih saat list pertama dimuat.
@@ -183,9 +232,10 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
   }, [lines]);
 
   const displayCount = useMemo(
-    () => lines.reduce((acc, l) => acc + l.quantity, 0),
+    () => lines.filter((line) => !line.isGatheringPlan).reduce((acc, line) => acc + line.quantity, 0),
     [lines],
   );
+  const gatheringPlanCount = lines.filter((line) => line.isGatheringPlan).length;
 
   const toggleLine = useCallback((key: string, allowed: boolean) => {
     if (!allowed) return;
@@ -344,9 +394,9 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Pesanan
+          Keranjang
           <span className="ml-2 text-sm font-normal" style={{ color: 'var(--brand-muted)' }}>
-            ({displayCount} item)
+            ({displayCount} item{gatheringPlanCount ? ` · ${gatheringPlanCount} rencana` : ''})
           </span>
         </h1>
       </div>
@@ -469,6 +519,13 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                           Varian produk
                         </p>
                       )}
+                      {line.isGatheringPlan && (
+                        <span className="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase" style={{ backgroundColor: 'rgba(139, 92, 246, 0.12)', color: 'var(--brand-accent-muted)' }}>
+                          {line.gatheringPlan
+                            ? GATHERING_STATUS_LABELS[line.gatheringPlan.occurrence.status] ?? line.gatheringPlan.occurrence.status
+                            : 'Praorder Gathering'}
+                        </span>
+                      )}
                       {blockedReason && (
                         <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
                           {blockedReason}
@@ -509,6 +566,9 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
                     {/* Qty stepper */}
+                    {line.isGatheringPlan ? (
+                      <span className="text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>Order rencana · tanpa seat</span>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -534,9 +594,29 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                         +
                       </button>
                     </div>
+                    )}
 
                     <div className="text-right">
-                      {line.unitPrice <= 0 ? (
+                      {line.isGatheringPlan ? (
+                        line.gatheringPlan ? (
+                        <>
+                          <p className="text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Harga per peserta</p>
+                          <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
+                            {new Intl.NumberFormat('id-ID', {
+                              style: 'currency',
+                              currency: line.gatheringPlan.occurrence.currency || 'IDR',
+                              maximumFractionDigits: 0,
+                            }).format(Number(line.gatheringPlan.occurrence.price_per_seat))}
+                          </p>
+                          <p className="mt-1 text-[11px]" style={{ color: 'var(--brand-muted)' }}>
+                            Min. {line.gatheringPlan.occurrence.min_attendees} · Maks. {line.gatheringPlan.occurrence.max_attendees}
+                            {line.gatheringPlan.occurrence.final_schedule ? ` · ${line.gatheringPlan.occurrence.final_schedule}` : ' · Belum dijadwalkan'}
+                          </p>
+                        </>
+                        ) : (
+                          <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>Memuat detail rencana gathering…</p>
+                        )
+                      ) : line.unitPrice <= 0 ? (
                         <Link
                           href={`${basePath}/cart/order/${line.orderId}`}
                           className="text-sm font-semibold underline"
@@ -644,7 +724,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
               className="mt-5 block w-full cursor-not-allowed rounded-full px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide opacity-50"
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
-              {selectedLines.length > 0 && hasUnquotedSelected ? 'Menunggu Penawaran' : 'Pilih item dulu'}
+              {selectedLines.length > 0 && hasUnquotedSelected
+                ? 'Menunggu Penawaran'
+                : gatheringPlanCount > 0 && lines.every((line) => line.gatheringPlan)
+                  ? 'Praorder Gathering'
+                  : 'Pilih item dulu'}
             </button>
           )}
 
@@ -654,6 +738,8 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
           >
             {hasUnquotedSelected
               ? 'Harga final sedang disiapkan oleh admin. Checkout aktif setelah penawaran tersedia.'
+              : selectedLines.length === 0 && gatheringPlanCount > 0 && lines.every((line) => line.isGatheringPlan)
+                ? 'Rencana gathering tetap tersimpan di cart. Order rencana tidak dibayar; checkout seat peserta dibuka pada tahap pembayaran gathering.'
               : 'Item terpilih akan di-checkout dalam satu transaksi. Item lain tetap di keranjang sampai transaksi ini selesai.'}
           </p>
         </aside>

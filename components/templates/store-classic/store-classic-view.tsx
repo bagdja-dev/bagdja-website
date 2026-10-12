@@ -53,6 +53,7 @@ import { AddToCartButton } from '../../cart-button';
 import { CartBadge } from '../../cart-badge';
 import { PurchaseControls } from '../../purchase-controls';
 import { ChatReferenceButton } from '../../chat-reference-button';
+import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 
 export interface StoreClassicProfile {
@@ -920,16 +921,15 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {item.type === 'gathering' ? (
               <div className="mt-6 flex flex-col gap-3">
                 {websiteId && (
-                  <ChatReferenceButton
+                  <GatheringPlanButton
                     websiteId={websiteId}
+                    productId={item.id}
                     basePath={websiteSlug}
                     loginHref={loginHref}
-                    productId={item.id}
-                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
                     className="inline-flex w-full justify-center rounded-full bg-[var(--brand-accent)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--brand-on-accent)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
                   >
                     Rencanakan Gathering
-                  </ChatReferenceButton>
+                  </GatheringPlanButton>
                 )}
                 {waHref && (
                   <a
@@ -1509,7 +1509,8 @@ export function StoreClassicView({
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
                 const order = section.content.order as OrderDetail | null | undefined;
-                return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
+                const gatheringPlan = section.content.gatheringPlan as import('../../order-detail-content').GatheringPlanDetail | null | undefined;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;

@@ -35,6 +35,7 @@ import { ProfileContent } from '../../profile-content';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { ChatReferenceButton } from '../../chat-reference-button';
+import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 import { ModelViewerElement } from '../../model-viewer-element';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
@@ -824,9 +825,9 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
             {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} paymentMode={internalPaymentMode} locationIds={item.locationIds} locations={locations} cartLabel="Pesan" /> : null}
             {item.type === 'gathering' ? (
               <div className="mt-4 flex w-full flex-col gap-3">
-                {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full bg-[var(--brand-accent)] px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]" style={{}}>
+                {websiteId ? <GatheringPlanButton websiteId={websiteId} productId={item.id} basePath={websiteSlug} loginHref={auth?.loginHref} className="flex w-full flex-1 justify-center rounded-full bg-[var(--brand-accent)] px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]">
                   Rencanakan Gathering
-                </ChatReferenceButton> : null}
+                </GatheringPlanButton> : null}
                 {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Konsultasi via WhatsApp</a> : null}
                 {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
                   Tanya Produk
@@ -1070,7 +1071,8 @@ export function WorkshopView({
             case 'order_detail': {
               const transaction = section.content.transaction as TransactionDetail | null | undefined;
               const order = section.content.order as OrderDetail | null | undefined;
-              return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
+              const gatheringPlan = section.content.gatheringPlan as import('../../order-detail-content').GatheringPlanDetail | null | undefined;
+              return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
             }
             default: return null;
           }

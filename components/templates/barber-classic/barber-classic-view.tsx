@@ -45,6 +45,7 @@ import { ProfileContent } from '../../profile-content';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { ChatReferenceButton } from '../../chat-reference-button';
+import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 
 export interface BarberClassicProfile {
@@ -1026,16 +1027,15 @@ function ProductDetailSection({
       {item.type === 'gathering' ? (
         <div className="mt-8 flex flex-col gap-3">
           {websiteId && (
-            <ChatReferenceButton
+            <GatheringPlanButton
               websiteId={websiteId}
+              productId={item.id}
               basePath={websiteSlug}
               loginHref={loginHref}
-              productId={item.id}
-              reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: 'Rencanakan gathering', href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
               className="inline-flex rounded-full bg-[var(--brand-accent)] px-6 py-3 text-sm font-medium text-[var(--brand-on-accent)] transition-transform hover:scale-105 active:scale-95"
             >
               Rencanakan Gathering
-            </ChatReferenceButton>
+            </GatheringPlanButton>
           )}
           {waHref && (
             <a
@@ -1483,7 +1483,8 @@ export function BarberClassicView({
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
                 const order = section.content.order as OrderDetail | null | undefined;
-                return <OrderDetailContent key={key} transaction={transaction} order={order} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
+                const gatheringPlan = section.content.gatheringPlan as import('../../order-detail-content').GatheringPlanDetail | null | undefined;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
