@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const body = await request.json().catch(() => null);
-  if (!body || (body.title === undefined && body.invite_policy === undefined)) {
+  if (!body || (body.title === undefined && body.invite_policy === undefined && body.opened_option_ids === undefined)) {
     return NextResponse.json({ message: 'Tidak ada perubahan untuk disimpan.' }, { status: 400 });
   }
   const query = websiteQuery(request);

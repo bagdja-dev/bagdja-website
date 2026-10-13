@@ -17,6 +17,7 @@ import { OrderActionButtons } from './order-action-buttons';
 import { OrderQuantityControl } from './order-quantity-control';
 import { PraorderStepList } from './praorder-step-list';
 import { ChatReferenceButton } from './chat-reference-button';
+import { GatheringWorkflowSteps } from './gathering-workflow-steps';
 import { buildChatReferenceHref } from './chat-reference';
 import { RetryPaymentButton } from './retry-payment-button';
 
@@ -174,6 +175,7 @@ export interface GatheringPlanDetail {
   order_id: string | null;
   title: string;
   status: string;
+  workflow_step: 'PLAN' | 'INVITATIONS' | 'INVITATION_CONFIRMATION' | 'PAYMENT_CONFIRMATION' | 'LOCKED';
   invite_policy: 'OPEN' | 'INVITE_ONLY';
   occurrence: {
     status: string;
@@ -183,13 +185,17 @@ export interface GatheringPlanDetail {
     max_attendees: number;
     final_schedule?: string | null;
     final_location?: string | null;
+    rsvp_close_at?: string | null;
+    payment_deadline?: string | null;
     option_groups_snapshot: Array<{
+      product_option_id: string;
       option_group_key: string;
       option_key: string;
       label: string;
       description?: string | null;
       venue_location?: string | null;
     }>;
+    opened_option_ids_snapshot: string[];
   };
 }
 
@@ -235,12 +241,12 @@ export function OrderDetailContent({
   loginHref?: string;
 }) {
   if (transaction) return <TransactionView transaction={transaction} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
-  if (order && gatheringPlan) return <GatheringPlanOrderView order={order} plan={gatheringPlan} basePath={basePath} />;
+  if (order && gatheringPlan) return <GatheringPlanOrderView order={order} plan={gatheringPlan} basePath={basePath} websiteId={websiteId ?? ''} />;
   if (order) return <LegacyOrderView order={order} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
   return null;
 }
 
-function GatheringPlanOrderView({ order, plan, basePath }: { order: OrderDetail; plan: GatheringPlanDetail; basePath: string }) {
+function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: OrderDetail; plan: GatheringPlanDetail; basePath: string; websiteId: string }) {
   const occurrence = plan.occurrence;
   const seatPrice = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -289,6 +295,8 @@ function GatheringPlanOrderView({ order, plan, basePath }: { order: OrderDetail;
           ))}
         </ul>
       </section>
+
+      <GatheringWorkflowSteps plan={plan} websiteId={websiteId} basePath={basePath} />
 
       <a href={`${basePath}/cart`} className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
         Kembali ke keranjang
