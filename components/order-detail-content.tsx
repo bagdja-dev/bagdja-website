@@ -297,10 +297,6 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
       </section>
 
       <GatheringWorkflowSteps plan={plan} websiteId={websiteId} basePath={basePath} />
-
-      <a href={`${basePath}/cart`} className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
-        Kembali ke keranjang
-      </a>
     </section>
   );
 }

@@ -407,7 +407,7 @@ export function ProductCard({
               stock: item.stock,
             }}
             paymentMode={internalMode.payment_mode}
-            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : 'Masukkan ke Keranjang'}
+            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : 'Tambahkan ke Daftar Pesanan'}
           />
         </div>
       </div>
@@ -1228,7 +1228,7 @@ export function StoreClassicView({
   const pageBannerLabel = checkoutSection
     ? 'Checkout'
     : cartSection
-      ? 'Keranjang'
+      ? 'Daftar Pesanan'
       : ordersSection
         ? 'Daftar Transaksi'
         : orderDetailSection

@@ -58,7 +58,7 @@ export function StoreClassicHeader({
   cartHref,
   chatHref,
   websiteId,
-  cartLabel = 'Cart',
+  cartLabel = 'Daftar Pesanan',
 }: StoreClassicHeaderProps) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -312,7 +312,7 @@ export function StoreClassicHeader({
                     </span>
                   </div>
                   {[
-                    { href: auth.cartHref, label: 'Cart' },
+                    { href: auth.cartHref, label: cartLabel },
                     { href: auth.ordersHref, label: 'Transaction' },
                     { href: auth.tagihanHref, label: 'Tagihan' },
                     { href: auth.profileHref, label: 'Profile' },
