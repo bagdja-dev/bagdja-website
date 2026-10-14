@@ -13,8 +13,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
   }
 
+  const origin = request.headers.get('origin');
   const result = await backendFetch('/api/transactions/checkout', {
     method: 'POST',
+    headers: origin ? { 'x-return-origin': origin } : undefined,
     body: JSON.stringify(body),
   });
 

@@ -22,10 +22,30 @@ export function TagihanBadge({ href, isLoggedIn, websiteId, label = 'Tagihan' }:
 
   const loadCount = useCallback(async () => {
     try {
-      const res = await fetch(`/api/transactions/termins/count?status=ISSUED&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = (await res.json()) as { count?: number };
-      setCount(Number(data?.count ?? 0));
+      const [terminResponse, invoiceResponse] = await Promise.all([
+        fetch(`/api/transactions/termins/count?status=ISSUED&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' }),
+        fetch(`/api/gathering/invoices?website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' }),
+      ]);
+      if (!terminResponse.ok) return;
+
+      const terminData = await terminResponse.json() as { count?: number };
+      const invoices = invoiceResponse.ok
+        ? await invoiceResponse.json() as Array<{
+            id: string;
+            transaction_id?: string | null;
+            payment_status: string;
+            payment_open: boolean;
+            can_pay: boolean;
+          }>
+        : [];
+      const payableInvoiceGroups = new Set(
+        invoices
+          .filter((invoice) => invoice.can_pay
+            && invoice.payment_open
+            && !['PAID', 'REFUNDED'].includes(invoice.payment_status))
+          .map((invoice) => invoice.transaction_id ? `transaction:${invoice.transaction_id}` : `invoice:${invoice.id}`),
+      );
+      setCount(Number(terminData.count ?? 0) + payableInvoiceGroups.size);
     } catch {
       // biarkan count apa adanya (nilai terakhir yang berhasil dimuat)
     }

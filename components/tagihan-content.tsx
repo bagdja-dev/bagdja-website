@@ -76,23 +76,55 @@ interface TagihanRow {
   createdAt: string;
 }
 
+interface GatheringInvoiceRow {
+  id: string;
+  transaction_id?: string | null;
+  can_view_transaction?: boolean;
+  invoice_id: string;
+  gathering_title: string;
+  attendee_name: string;
+  amount: number;
+  currency: string;
+  payment_status: string;
+  invoice_issued_at: string;
+  payment_deadline?: string | null;
+  can_pay: boolean;
+  is_initiator: boolean;
+}
+
+interface GatheringInvoiceGroup {
+  id: string;
+  transaction_id: string | null;
+  invoices: GatheringInvoiceRow[];
+  amount: number;
+  payment_status: string;
+  has_refunded_invoice: boolean;
+  has_paid_invoice: boolean;
+  has_outstanding_invoice: boolean;
+  is_fully_paid: boolean;
+  can_view_transaction: boolean;
+}
+
 interface TagihanContentProps {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
 }
 
-type TabKey = 'all' | 'scheduled' | 'issued' | 'paid' | 'cancelled';
+type TabKey = 'all' | 'scheduled' | 'issued' | 'paid' | 'refunded' | 'cancelled';
 
 const TABS: Array<{ key: TabKey; label: string; match?: (s: string) => boolean }> = [
   { key: 'all', label: 'Semua' },
   { key: 'scheduled', label: 'Menunggu Diterbitkan', match: (s) => s === 'SCHEDULED' },
   { key: 'issued', label: 'Perlu Dibayar', match: (s) => s === 'ISSUED' },
   { key: 'paid', label: 'Lunas', match: (s) => s === 'PAID' },
+  { key: 'refunded', label: 'Direfund' },
   { key: 'cancelled', label: 'Dibatalkan', match: (s) => s === 'CANCELLED' },
 ];
 
 export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { websiteId: string }) {
   const [rows, setRows] = useState<TagihanRow[]>([]);
+  const [gatheringInvoices, setGatheringInvoices] = useState<GatheringInvoiceRow[]>([]);
+  const [gatheringInvoiceError, setGatheringInvoiceError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('all');
@@ -137,21 +169,80 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
     };
   }, [websiteId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/gathering/invoices?website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        if (response.status === 401) return [];
+        const payload = await response.json().catch(() => null) as GatheringInvoiceRow[] | { message?: string } | null;
+        if (!response.ok) throw new Error((payload as { message?: string } | null)?.message || 'Gagal memuat tagihan gathering.');
+        return Array.isArray(payload) ? payload : [];
+      })
+      .then((invoices) => { if (!cancelled) setGatheringInvoices(invoices); })
+      .catch((cause) => { if (!cancelled) setGatheringInvoiceError(cause instanceof Error ? cause.message : 'Gagal memuat tagihan gathering.'); });
+    return () => { cancelled = true; };
+  }, [websiteId]);
+
+  const groupedGatheringInvoices = useMemo(() => {
+    const groups = new Map<string, GatheringInvoiceRow[]>();
+    for (const invoice of gatheringInvoices) {
+      const key = invoice.transaction_id ? `transaction:${invoice.transaction_id}` : `invoice:${invoice.id}`;
+      groups.set(key, [...(groups.get(key) ?? []), invoice]);
+    }
+
+    return Array.from(groups.values()).map((invoices): GatheringInvoiceGroup => {
+      const statuses = new Set(invoices.map((invoice) => invoice.payment_status));
+      const hasRefundedInvoice = statuses.has('REFUNDED');
+      const hasPaidInvoice = statuses.has('PAID');
+      const hasOutstandingInvoice = invoices.some((invoice) => !['PAID', 'REFUNDED'].includes(invoice.payment_status));
+      const isFullyPaid = invoices.every((invoice) => invoice.payment_status === 'PAID');
+      const paymentStatus = statuses.size > 1 ? 'PARTIAL' : invoices[0].payment_status;
+      return {
+        id: invoices[0].id,
+        transaction_id: invoices[0].transaction_id ?? null,
+        invoices,
+        amount: invoices.reduce((total, invoice) => total + Number(invoice.amount), 0),
+        payment_status: paymentStatus,
+        has_refunded_invoice: hasRefundedInvoice,
+        has_paid_invoice: hasPaidInvoice,
+        has_outstanding_invoice: hasOutstandingInvoice,
+        is_fully_paid: isFullyPaid,
+        can_view_transaction: Boolean(invoices[0].can_view_transaction),
+      };
+    });
+  }, [gatheringInvoices]);
+
   const filtered = useMemo(() => {
     const t = TABS.find((x) => x.key === tab);
-    if (!t || !t.match) return rows;
-    return rows.filter((r) => t.match!(r.status));
+    if (!t || tab === 'all') return rows;
+    if (tab === 'refunded') return [];
+    return rows.filter((row) => t.match?.(row.status));
   }, [rows, tab]);
 
+  const filteredGatheringInvoices = useMemo(() => {
+    if (tab === 'all') return groupedGatheringInvoices;
+    if (tab === 'issued') return groupedGatheringInvoices.filter((group) => group.has_outstanding_invoice);
+    if (tab === 'paid') return groupedGatheringInvoices.filter((group) => group.is_fully_paid);
+    if (tab === 'refunded') return groupedGatheringInvoices.filter((group) => group.has_refunded_invoice);
+    return [];
+  }, [groupedGatheringInvoices, tab]);
+
   const tabCounts = useMemo(() => {
-    const cnt: Record<TabKey, number> = { all: rows.length, scheduled: 0, issued: 0, paid: 0, cancelled: 0 };
+    const cnt: Record<TabKey, number> = {
+      all: rows.length + groupedGatheringInvoices.length,
+      scheduled: 0,
+      issued: groupedGatheringInvoices.filter((group) => group.has_outstanding_invoice).length,
+      paid: groupedGatheringInvoices.filter((group) => group.is_fully_paid).length,
+      refunded: groupedGatheringInvoices.filter((group) => group.has_refunded_invoice).length,
+      cancelled: 0,
+    };
     for (const r of rows) {
       for (const t of TABS) {
         if (t.match?.(r.status)) cnt[t.key] += 1;
       }
     }
     return cnt;
-  }, [rows]);
+  }, [groupedGatheringInvoices, rows]);
 
   async function payTermin(terminId: string) {
     setPayingId(terminId);
@@ -236,7 +327,79 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && (filtered.length > 0 || filteredGatheringInvoices.length > 0) ? (
+        <section className="mb-8">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold">Daftar tagihan</h2>
+            <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{filtered.length + filteredGatheringInvoices.length} tagihan</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {filteredGatheringInvoices.map((group) => {
+              const invoice = group.invoices[0];
+              const status = group.payment_status === 'PARTIAL'
+                ? group.has_refunded_invoice ? 'Sebagian direfund' : group.has_paid_invoice ? 'Sebagian dibayar' : 'Pembayaran diproses'
+                : group.payment_status === 'PAID' ? 'Lunas' : group.payment_status === 'PENDING_PAYMENT' ? 'Pembayaran diproses' : group.payment_status === 'REFUNDED' ? 'Direfund' : 'Perlu dibayar';
+              const invoiceHref = group.transaction_id && group.can_view_transaction
+                ? `${basePath}/order/${encodeURIComponent(group.transaction_id)}`
+                : `${basePath}/gathering/invoice/${encodeURIComponent(invoice.id)}`;
+              const invoiceSummary = group.invoices.length > 1
+                ? `${group.invoices.length} invoice · ${group.invoices.slice(0, 2).map((item) => item.attendee_name).join(', ')}${group.invoices.length > 2 ? ` +${group.invoices.length - 2} lainnya` : ''}`
+                : `${invoice.invoice_id} · ${invoice.attendee_name}`;
+              return (
+                <article key={group.id} className="border text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    <div>
+                      <p className="font-semibold">{invoice.gathering_title}</p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{invoiceSummary}</p>
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color: group.is_fully_paid ? 'rgb(22, 163, 74)' : group.has_refunded_invoice ? 'rgb(180, 83, 9)' : 'var(--brand-muted)' }}>{status}</span>
+                  </div>
+                  <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{formatMoney(group.amount)}</p>
+                      {invoice.payment_deadline ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Batas: {formatDate(invoice.payment_deadline)}</p> : null}
+                      {invoice.is_initiator && !invoice.can_pay ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Anda pengelola gathering ini.</p> : null}
+                    </div>
+                    <a href={invoiceHref} className="inline-flex rounded-full border px-4 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat detail tagihan</a>
+                  </div>
+                </article>
+              );
+            })}
+            {filtered.map((row) => {
+              const tone = STATUS_TONE[row.status] ?? 'muted';
+              const toneStyle = pillBg(tone);
+              const orderHref = row.orderTransactionId ? `${basePath}/order/${row.orderTransactionId}` : undefined;
+              return (
+                <article key={`termin:${row.id}`} className="rounded border text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                  <div className="flex items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                      <span className="font-semibold">{row.productName ?? 'Produk'}</span><span>•</span><span>{formatDate(row.createdAt)}</span>
+                    </div>
+                    <span className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide" style={{ backgroundColor: toneStyle.bg, color: toneStyle.color }}>{STATUS_LABEL[row.status] ?? row.status}</span>
+                  </div>
+                  <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{row.label}</p>
+                      {row.anchorStepName ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Setelah &quot;{row.anchorStepName}&quot;</p> : null}
+                      {payError[row.id] ? <p className="mt-1 text-xs" style={{ color: 'rgb(185, 28, 28)' }}>{payError[row.id]}</p> : null}
+                    </div>
+                    <div className="flex flex-col items-start gap-3 sm:shrink-0 sm:items-end">
+                      <p className="text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{formatMoney(row.amount)}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {orderHref ? <a href={orderHref} className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat Order</a> : null}
+                        {row.status === 'ISSUED' ? <button type="button" disabled={payingId === row.id} onClick={() => setPendingTermin({ id: row.id, label: row.label, amount: row.amount })} className="inline-flex rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>{payingId === row.id ? 'Memproses…' : 'Bayar'}</button> : null}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {gatheringInvoiceError ? <p role="alert" className="mt-2 text-xs text-red-700">{gatheringInvoiceError}</p> : null}
+        </section>
+      ) : null}
+
+      {!loading && !error && filtered.length === 0 && filteredGatheringInvoices.length === 0 && (
         <div
           className="flex flex-col items-center gap-4 rounded-xl border p-10 text-center"
           style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
@@ -248,91 +411,8 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
             Belum ada Tagihan
           </p>
           <p className="max-w-sm text-sm" style={{ color: 'var(--brand-muted)' }}>
-            Termin/Tagihan akan muncul di sini kalau ada pesanan Anda yang memakai skema pembayaran bertahap.
+            Termin atau tagihan peserta akan muncul di sini setelah diterbitkan.
           </p>
-        </div>
-      )}
-
-      {!loading && !error && filtered.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filtered.map((row) => {
-            const tone = STATUS_TONE[row.status] ?? 'muted';
-            const toneStyle = pillBg(tone);
-            const orderHref = row.orderTransactionId ? `${basePath}/order/${row.orderTransactionId}` : undefined;
-            return (
-              <article
-                key={row.id}
-                className="rounded-xl border text-sm"
-                style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
-              >
-                <div
-                  className="flex items-center justify-between gap-3 border-b px-5 py-3"
-                  style={{ borderColor: 'var(--brand-border)' }}
-                >
-                  <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                    <span className="font-semibold">{row.productName ?? 'Produk'}</span>
-                    <span>•</span>
-                    <span>{formatDate(row.createdAt)}</span>
-                  </div>
-                  <span
-                    className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
-                    style={{ backgroundColor: toneStyle.bg, color: toneStyle.color }}
-                  >
-                    {STATUS_LABEL[row.status] ?? row.status}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p
-                      className="font-semibold"
-                      style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
-                    >
-                      {row.label}
-                    </p>
-                    {row.anchorStepName && (
-                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                        Setelah &quot;{row.anchorStepName}&quot;
-                      </p>
-                    )}
-                    {payError[row.id] && (
-                      <p className="mt-1 text-xs" style={{ color: 'rgb(185, 28, 28)' }}>
-                        {payError[row.id]}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col items-start gap-3 sm:shrink-0 sm:items-end">
-                    <p className="text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-                      {formatMoney(row.amount)}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {orderHref && (
-                        <a
-                          href={orderHref}
-                          className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
-                          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-                        >
-                          Lihat Order
-                        </a>
-                      )}
-                      {row.status === 'ISSUED' && (
-                        <button
-                          type="button"
-                          disabled={payingId === row.id}
-                          onClick={() => setPendingTermin({ id: row.id, label: row.label, amount: row.amount })}
-                          className="inline-flex rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60"
-                          style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-                        >
-                          {payingId === row.id ? 'Memproses…' : 'Bayar'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
         </div>
       )}
 

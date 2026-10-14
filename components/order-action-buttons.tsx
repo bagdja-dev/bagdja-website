@@ -78,6 +78,7 @@ export function OrderActionButtons({
   orderTitle,
   orderImage,
   loginHref,
+  gatheringMode = false,
 }: {
   transactionId: string;
   status: string;
@@ -89,6 +90,7 @@ export function OrderActionButtons({
   orderTitle?: string;
   orderImage?: string;
   loginHref?: string;
+  gatheringMode?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<ActionKind | null>(null);
@@ -145,7 +147,7 @@ export function OrderActionButtons({
     </ChatReferenceButton>
   ) : null;
 
-  const actionButtons =
+  const actionButtons = gatheringMode ? null :
     status === 'PENDING_PAYMENT' || status === 'PENDING' ? (
       <div className="mt-3 flex flex-col gap-3">
         <button

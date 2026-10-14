@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useRouter } from 'next/navigation';
 import { GatheringInvitationManager } from './gathering-invitation-manager';
+import { GatheringInvitationCard } from './gathering-invitation-card';
 import { GatheringPlanControls } from './gathering-plan-controls';
 import type { GatheringPlanDetail } from './order-detail-content';
 
@@ -38,9 +39,22 @@ interface RegistrationRow {
   }>;
   registration_status: string;
   payment_status: string;
+  invoice_amount?: number | string;
   rejection_message?: string | null;
   order_id?: string | null;
   created_at?: string;
+}
+
+interface GatheringOperationProgress {
+  id: string;
+  kind: 'INVOICE_ISSUANCE' | 'INVITATION_REVOCATION';
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  total_count: number;
+  processed_count: number;
+  success_count: number;
+  failed_count: number;
+  failed_items: string[];
+  error_message: string | null;
 }
 
 type GatheringOptionSnapshot = GatheringPlanDetail['occurrence']['option_groups_snapshot'][number];
@@ -93,9 +107,13 @@ function ReadOnlyInvitationHistory({
   includeRegistrations = false,
   canConfirmReservations = false,
   minAttendees = 0,
+  maxAttendees = 0,
   paymentDeadline,
   stageNumber = 2,
   canConfirmEvent = false,
+  canCancelGathering = false,
+  cancelling = false,
+  onCancelGathering,
 }: {
   groupId: string;
   websiteId: string;
@@ -105,9 +123,13 @@ function ReadOnlyInvitationHistory({
   includeRegistrations?: boolean;
   canConfirmReservations?: boolean;
   minAttendees?: number;
+  maxAttendees?: number;
   paymentDeadline?: string | null;
   stageNumber?: 2 | 3 | 4;
   canConfirmEvent?: boolean;
+  canCancelGathering?: boolean;
+  cancelling?: boolean;
+  onCancelGathering?: () => void;
 }) {
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationHistoryRow[]>([]);
@@ -116,6 +138,15 @@ function ReadOnlyInvitationHistory({
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [collectivePaying, setCollectivePaying] = useState(false);
+  const [showCollectivePaymentDialog, setShowCollectivePaymentDialog] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<RegistrationRow | null>(null);
+  const [refundingRegistrationId, setRefundingRegistrationId] = useState('');
+  const [resendingInvoices, setResendingInvoices] = useState(false);
+  const [failedInvoiceEmails, setFailedInvoiceEmails] = useState<string[]>([]);
+  const [invoiceResendNotice, setInvoiceResendNotice] = useState('');
+  const [invoiceOperationId, setInvoiceOperationId] = useState('');
+  const [invoiceOperation, setInvoiceOperation] = useState<GatheringOperationProgress | null>(null);
   const [shareUrl, setShareUrl] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [copied, setCopied] = useState(false);
@@ -156,6 +187,62 @@ function ReadOnlyInvitationHistory({
   }, [groupId, websiteId, includeRegistrations]);
 
   useEffect(() => {
+    if (stageNumber !== 4) return;
+    const storageKey = `gathering-invoice-result:${groupId}`;
+    const stored = window.sessionStorage.getItem(storageKey);
+    if (!stored) return;
+    window.sessionStorage.removeItem(storageKey);
+    try {
+      const result = JSON.parse(stored) as {
+        operation_id: string;
+        status: GatheringOperationProgress['status'];
+        total_count: number;
+        processed_count: number;
+        success_count: number;
+        failed_count: number;
+        failed_items: string[];
+        error_message: string | null;
+      };
+      setInvoiceOperation({
+        id: result.operation_id,
+        kind: 'INVOICE_ISSUANCE',
+        status: result.status,
+        total_count: result.total_count,
+        processed_count: result.processed_count,
+        success_count: result.success_count,
+        failed_count: result.failed_count,
+        failed_items: result.failed_items,
+        error_message: result.error_message,
+      });
+      setFailedInvoiceEmails(result.failed_items);
+    } catch {
+      window.sessionStorage.removeItem(storageKey);
+    }
+  }, [groupId, stageNumber]);
+
+  useEffect(() => {
+    if (!invoiceOperationId) return;
+    const source = new EventSource(`/api/gathering/plans/${encodeURIComponent(groupId)}/operations/${encodeURIComponent(invoiceOperationId)}/events?website_id=${encodeURIComponent(websiteId)}`);
+    source.onmessage = (event) => {
+      try {
+        const progress = JSON.parse(event.data) as GatheringOperationProgress;
+        setInvoiceOperation(progress);
+        setFailedInvoiceEmails(progress.failed_items ?? []);
+        if (progress.status === 'COMPLETED' || progress.status === 'FAILED') {
+          setInvoiceResendNotice(progress.status === 'COMPLETED'
+            ? `Email tagihan terkirim ke ${progress.success_count} peserta.`
+            : `Pengiriman selesai: ${progress.success_count} terkirim, ${progress.failed_count} gagal.`);
+          source.close();
+        }
+      } catch {
+        source.close();
+      }
+    };
+    source.onerror = () => source.close();
+    return () => source.close();
+  }, [groupId, websiteId, invoiceOperationId]);
+
+  useEffect(() => {
     let cancelled = false;
     if (!shareUrl) {
       setQrDataUrl('');
@@ -183,13 +270,75 @@ function ReadOnlyInvitationHistory({
     setError('');
     try {
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/confirm-reservations?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
-      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      const payload = await response.json().catch(() => null) as { message?: string; failed_invoice_emails?: string[]; invoice_operation_id?: string; invoice_operation_status?: GatheringOperationProgress['status']; invoice_email_total?: number; invoice_email_success_count?: number; invoice_email_failed_count?: number; invoice_email_error?: string | null } | null;
       if (!response.ok) throw new Error(payload?.message || 'Gagal membuka pembayaran peserta.');
+      setFailedInvoiceEmails(payload?.failed_invoice_emails ?? []);
+      if (payload?.invoice_operation_id) {
+        const operationResult = {
+          operation_id: payload.invoice_operation_id,
+          status: payload.invoice_operation_status ?? 'COMPLETED',
+          total_count: payload.invoice_email_total ?? 0,
+          processed_count: 0,
+          success_count: payload.invoice_email_success_count ?? 0,
+          failed_count: payload.invoice_email_failed_count ?? 0,
+          failed_items: payload.failed_invoice_emails ?? [],
+          error_message: payload.invoice_email_error ?? null,
+        };
+        window.sessionStorage.setItem(`gathering-invoice-result:${groupId}`, JSON.stringify(operationResult));
+        setInvoiceOperationId(payload.invoice_operation_id);
+        setInvoiceOperation({
+          id: payload.invoice_operation_id,
+          kind: 'INVOICE_ISSUANCE',
+          status: operationResult.status,
+          total_count: operationResult.total_count,
+          processed_count: operationResult.processed_count,
+          success_count: operationResult.success_count,
+          failed_count: operationResult.failed_count,
+          failed_items: operationResult.failed_items,
+          error_message: operationResult.error_message,
+        });
+      }
+      setSelectedRegistrationIds([]);
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal membuka pembayaran peserta.');
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function resendInvoiceEmails() {
+    if (resendingInvoices) return;
+    setResendingInvoices(true);
+    setError('');
+    setInvoiceResendNotice('');
+    try {
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/resend-invoices?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
+      const payload = await response.json().catch(() => null) as ({ operation_id?: string; operation_status?: GatheringOperationProgress['status']; total_count?: number; processed_count?: number; success_count?: number; failed_count?: number; failed_items?: string[]; error_message?: string | null; sent_count?: number; failed_emails?: string[]; message?: string }) | null;
+      if (!response.ok) throw new Error(payload?.message || 'Gagal mengirim ulang email tagihan.');
+      if (payload?.operation_id) {
+        setInvoiceOperationId(payload.operation_id);
+        setInvoiceOperation({
+          id: payload.operation_id,
+          kind: 'INVOICE_ISSUANCE',
+          status: payload.operation_status ?? 'QUEUED',
+          total_count: payload.total_count ?? 0,
+          processed_count: payload.processed_count ?? 0,
+          success_count: payload.success_count ?? 0,
+          failed_count: payload.failed_count ?? 0,
+          failed_items: payload.failed_items ?? [],
+          error_message: payload.error_message ?? null,
+        });
+        setFailedInvoiceEmails(payload.failed_items ?? []);
+        setInvoiceResendNotice('Pengiriman ulang invoice sedang diproses di antrean.');
+      } else {
+        setFailedInvoiceEmails(payload?.failed_emails ?? []);
+        setInvoiceResendNotice(`Tidak ada invoice yang perlu dikirim ulang (${payload?.sent_count ?? 0} terkirim).`);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Gagal mengirim ulang email tagihan.');
+    } finally {
+      setResendingInvoices(false);
     }
   }
 
@@ -233,11 +382,18 @@ function ReadOnlyInvitationHistory({
 
   const rejectableRegistrations = registrations.filter(canRejectRegistration);
   const activeRegistrations = registrations.filter((registration) => registration.registration_status === 'RSVP_CONFIRMED');
+  const paidActiveRegistrations = registrations.filter((registration) => registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PAID');
+  const collectivelyPayableRegistrations = registrations.filter((registration) => canConfirmEvent
+    && registration.registration_status === 'RSVP_CONFIRMED'
+    && registration.payment_status === 'UNPAID');
+  const selectedCollectiveTotal = collectivelyPayableRegistrations
+    .filter((registration) => selectedRegistrationIds.includes(registration.id))
+    .reduce((total, registration) => total + Number(registration.invoice_amount ?? 0), 0);
   const optionGroups = new Map<string, GatheringOptionSnapshot[]>();
   options.forEach((option) => optionGroups.set(option.option_group_key, [...(optionGroups.get(option.option_group_key) ?? []), option]));
 
   async function confirmEvent() {
-    const paidSeats = registrations.filter((registration) => registration.payment_status === 'PAID').length;
+    const paidSeats = registrations.filter((registration) => registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PAID').length;
     if (finalizing || paidSeats < minAttendees) return;
     setFinalizing(true);
     setError('');
@@ -250,6 +406,48 @@ function ReadOnlyInvitationHistory({
       setError(cause instanceof Error ? cause.message : 'Gagal mengonfirmasi acara.');
     } finally {
       setFinalizing(false);
+    }
+  }
+
+  async function paySelectedInvoicesCollectively() {
+    if (collectivePaying || !selectedRegistrationIds.length) return;
+    setCollectivePaying(true);
+    setError('');
+    try {
+      const payableIds = selectedRegistrationIds.filter((id) => collectivelyPayableRegistrations.some((registration) => registration.id === id));
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/registrations/collective-checkout?website_id=${encodeURIComponent(websiteId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_ids: payableIds }),
+      });
+      const payload = await response.json().catch(() => null) as { checkout_url?: string; checkoutUrl?: string; message?: string } | null;
+      const checkoutUrl = payload?.checkout_url ?? payload?.checkoutUrl;
+      if (!response.ok || !checkoutUrl) throw new Error(payload?.message || 'Gagal menyiapkan pembayaran kolektif.');
+      setShowCollectivePaymentDialog(false);
+      window.location.assign(checkoutUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Gagal menyiapkan pembayaran kolektif.');
+      setCollectivePaying(false);
+    }
+  }
+
+  async function refundSeat() {
+    if (!refundTarget) return;
+    if (refundingRegistrationId) return;
+    setRefundingRegistrationId(refundTarget.id);
+    setError('');
+    try {
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/registrations/${encodeURIComponent(refundTarget.id)}/refund?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
+      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      if (!response.ok) throw new Error(payload?.message || 'Refund seat gagal.');
+      setRegistrations((current) => current.map((item) => item.id === refundTarget.id
+        ? { ...item, registration_status: 'CANCELLED', payment_status: 'REFUNDED' }
+        : item));
+      setRefundTarget(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Refund seat gagal.');
+    } finally {
+      setRefundingRegistrationId('');
     }
   }
 
@@ -281,7 +479,7 @@ function ReadOnlyInvitationHistory({
       </div>
       {loading ? <p className="mt-4 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</p> : null}
       {error ? <p role="alert" className="mt-4 text-sm text-red-700">{error}</p> : null}
-      {invitePolicy === 'OPEN' ? (
+      {stageNumber === 3 && invitePolicy === 'OPEN' ? (
         <div className="mt-4 border-y py-4" style={{ borderColor: 'var(--brand-border)' }}>
           <p className="text-sm font-medium">Undangan terbuka</p>
           <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Link dan QR memakai ID undangan yang tersimpan dan tetap sama saat Anda berpindah tahap.</p>
@@ -346,18 +544,64 @@ function ReadOnlyInvitationHistory({
                 ) : null}
               </div>
             ) : null}
+          {canConfirmEvent && collectivelyPayableRegistrations.length ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y py-3" style={{ borderColor: 'var(--brand-border)' }}>
+              <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                <input
+                  type="checkbox"
+                  checked={collectivelyPayableRegistrations.every((registration) => selectedRegistrationIds.includes(registration.id))}
+                  onChange={(event) => setSelectedRegistrationIds((current) => {
+                    const payableIds = new Set(collectivelyPayableRegistrations.map((registration) => registration.id));
+                    return event.target.checked
+                      ? [...new Set([...current.filter((id) => !payableIds.has(id)), ...payableIds])]
+                      : current.filter((id) => !payableIds.has(id));
+                  })}
+                  className="h-4 w-4 accent-current"
+                />
+                Pilih tagihan belum dibayar
+              </label>
+              <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Refund pembayaran kolektif kembali ke dompet initiator.</span>
+              {collectivelyPayableRegistrations.some((registration) => selectedRegistrationIds.includes(registration.id)) ? (
+                <button type="button" onClick={() => setShowCollectivePaymentDialog(true)} disabled={collectivePaying} className="rounded px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)' }}>
+                  {collectivePaying ? 'Menyiapkan checkout…' : `Bayar kolektif · ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedCollectiveTotal)}`}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {canConfirmEvent && registrations.some((registration) => registration.registration_status === 'RSVP_CONFIRMED' && !['PAID', 'REFUNDED'].includes(registration.payment_status)) ? (
+            <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 border-y px-3 py-3 text-xs ${failedInvoiceEmails.length ? 'border-amber-200 bg-amber-50 text-amber-900' : ''}`} style={!failedInvoiceEmails.length ? { borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' } : undefined}>
+              <span>{failedInvoiceEmails.length ? `Email tagihan gagal dikirim ke: ${failedInvoiceEmails.join(', ')}` : invoiceResendNotice || 'Belum menerima email? Kirim ulang tautan tagihan ke peserta yang belum lunas.'}</span>
+              <button type="button" onClick={() => void resendInvoiceEmails()} disabled={resendingInvoices} className={`rounded border px-3 py-2 font-semibold disabled:opacity-50 ${failedInvoiceEmails.length ? 'border-amber-300' : ''}`} style={!failedInvoiceEmails.length ? { borderColor: 'var(--brand-border)' } : undefined}>
+                {resendingInvoices ? 'Mengirim…' : 'Kirim ulang email tagihan'}
+              </button>
+            </div>
+          ) : null}
+          {canConfirmEvent && invoiceOperation ? (
+            <div className="mt-3 border-y py-3" style={{ borderColor: 'var(--brand-border)' }} role="status">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold">{invoiceOperation.status === 'QUEUED' ? 'Menunggu pengiriman tagihan' : invoiceOperation.status === 'RUNNING' ? 'Mengirim email tagihan' : invoiceOperation.status === 'COMPLETED' ? 'Proses invoice selesai' : 'Proses invoice gagal'}</span>
+                <span style={{ color: 'var(--brand-muted)' }}>{invoiceOperation.processed_count}/{invoiceOperation.total_count} diproses · {invoiceOperation.success_count} terkirim · {invoiceOperation.failed_count} gagal</span>
+              </div>
+              {invoiceOperation.total_count > 0 ? (
+                <div className="mt-2 h-1.5 overflow-hidden bg-zinc-100" role="progressbar" aria-label="Progres pengiriman email invoice" aria-valuemin={0} aria-valuemax={invoiceOperation.total_count} aria-valuenow={invoiceOperation.processed_count}>
+                  <div className="h-full transition-[width]" style={{ width: `${Math.min(100, (invoiceOperation.processed_count / invoiceOperation.total_count) * 100)}%`, backgroundColor: 'var(--brand-accent)' }} />
+                </div>
+              ) : null}
+              {invoiceOperation.error_message ? <p className="mt-2 text-xs text-red-700">{invoiceOperation.error_message}</p> : null}
+            </div>
+          ) : null}
           {registrations.length ? (
             <ul className="mt-3 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
               {registrations.map((registration) => (
                 <li key={registration.id} className="flex flex-col gap-3 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    {canRejectRegistration(registration) ? (
+                    {canRejectRegistration(registration) || collectivelyPayableRegistrations.some((item) => item.id === registration.id) ? (
                       <input
                         type="checkbox"
                         aria-label={`Pilih reservasi ${registration.attendee_name}`}
                         checked={selectedRegistrationIds.includes(registration.id)}
                         onChange={(event) => setSelectedRegistrationIds((current) => event.target.checked
-                          ? [...current, registration.id]
+                          ? [...new Set([...current, registration.id])]
                           : current.filter((id) => id !== registration.id))}
                         className="h-4 w-4 shrink-0 accent-current"
                       />
@@ -370,6 +614,11 @@ function ReadOnlyInvitationHistory({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pl-7 sm:pl-0">
+                    {canConfirmEvent && registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PAID' ? (
+                      <button type="button" onClick={() => setRefundTarget(registration)} disabled={refundingRegistrationId === registration.id} className="rounded border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">
+                        {refundingRegistrationId === registration.id ? 'Memproses…' : 'Refund seat'}
+                      </button>
+                    ) : null}
                     {canRejectRegistration(registration) ? (
                       <button type="button" onClick={() => { setSelectedRegistrationIds([registration.id]); setShowRejectDialog(true); }} className="rounded border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">
                         Tolak
@@ -466,18 +715,32 @@ function ReadOnlyInvitationHistory({
             );
           })() : null}
           {canConfirmReservations ? (
-            <div className="mt-5">
-              <button type="button" onClick={() => void confirmReservations()} disabled={confirming || activeRegistrations.length === 0} className="rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+            <div className="mt-5 flex flex-wrap items-start gap-2">
+              <div>
+              <button type="button" onClick={() => void confirmReservations()} disabled={confirming || activeRegistrations.length < minAttendees || activeRegistrations.length > maxAttendees} className="rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
                 {confirming ? 'Membuka pembayaran…' : 'Tutup RSVP & buka pembayaran'}
               </button>
-              {activeRegistrations.length === 0 ? <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Setidaknya satu RSVP aktif diperlukan sebelum pembayaran seat dibuka.</p> : <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Batas minimum dihitung dari seat yang telah dibayar, bukan jumlah RSVP.</p>}
+              <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>RSVP aktif: {activeRegistrations.length} · Minimum {minAttendees} · Maksimum {maxAttendees}</p>
+              </div>
+              {canCancelGathering && onCancelGathering ? (
+                <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
+                  {cancelling ? 'Membatalkan…' : 'Cancel event'}
+                </button>
+              ) : null}
             </div>
           ) : canConfirmEvent ? (
-            <div className="mt-5">
-              <button type="button" onClick={() => void confirmEvent()} disabled={finalizing || registrations.filter((registration) => registration.payment_status === 'PAID').length < minAttendees} className="rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+            <div className="mt-5 flex flex-wrap items-start gap-2">
+              <div>
+              <button type="button" onClick={() => void confirmEvent()} disabled={finalizing || paidActiveRegistrations.length < minAttendees || paidActiveRegistrations.length > maxAttendees} className="rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
                 {finalizing ? 'Mengonfirmasi acara…' : 'Konfirmasi acara & selesaikan escrow'}
               </button>
-              {registrations.filter((registration) => registration.payment_status === 'PAID').length < minAttendees ? <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Minimum {minAttendees} seat lunas diperlukan.</p> : <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Dana escrow seat peserta akan dilepas satu kali setelah konfirmasi.</p>}
+              <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Seat lunas: {paidActiveRegistrations.length} · Minimum {minAttendees} · Maksimum {maxAttendees}{paidActiveRegistrations.length >= minAttendees && paidActiveRegistrations.length <= maxAttendees ? ' · Dana escrow seat akan dilepas setelah konfirmasi.' : ''}</p>
+              </div>
+              {canCancelGathering && onCancelGathering ? (
+                <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
+                  {cancelling ? 'Membatalkan…' : 'Cancel event'}
+                </button>
+              ) : null}
             </div>
           ) : <p className="mt-4 text-xs" style={{ color: 'var(--brand-muted)' }}>Tampilan baca saja untuk tahap yang sudah dilewati.</p>}
           {showRejectDialog ? (
@@ -493,6 +756,33 @@ function ReadOnlyInvitationHistory({
                   <button type="submit" disabled={rejecting || !rejectionMessage.trim()} className="rounded bg-red-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{rejecting ? 'Memproses…' : 'Tolak reservasi & kirim email'}</button>
                 </div>
               </form>
+            </div>
+          ) : null}
+          {showCollectivePaymentDialog ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !collectivePaying) setShowCollectivePaymentDialog(false); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="collective-payment-title" className="w-full max-w-lg border bg-white p-5 text-zinc-900 shadow-xl sm:p-6" style={{ borderColor: 'var(--brand-border)' }}>
+                <h3 id="collective-payment-title" className="text-base font-semibold">Konfirmasi pembayaran kolektif</h3>
+                <p className="mt-2 text-sm text-zinc-600">Bayar {collectivelyPayableRegistrations.filter((registration) => selectedRegistrationIds.includes(registration.id)).length} tagihan gathering dalam satu escrow?</p>
+                <p className="mt-3 text-xl font-semibold">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedCollectiveTotal)}</p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">Jika refund diperlukan, dana akan kembali ke dompet akun initiator yang membayar.</p>
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button type="button" disabled={collectivePaying} onClick={() => setShowCollectivePaymentDialog(false)} className="rounded border border-zinc-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-50">Batal</button>
+                  <button type="button" disabled={collectivePaying || selectedCollectiveTotal <= 0} onClick={() => void paySelectedInvoicesCollectively()} className="rounded px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)' }}>{collectivePaying ? 'Menyiapkan checkout…' : 'Lanjutkan pembayaran'}</button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+          {refundTarget ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !refundingRegistrationId) setRefundTarget(null); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="refund-seat-title" className="w-full max-w-lg border bg-white p-5 text-zinc-900 shadow-xl sm:p-6" style={{ borderColor: 'var(--brand-border)' }}>
+                <h3 id="refund-seat-title" className="text-base font-semibold">Konfirmasi refund seat</h3>
+                <p className="mt-2 text-sm text-zinc-600">Refund seat untuk {refundTarget.attendee_name}?</p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">Dana akan kembali ke dompet akun yang membayar escrow, bukan selalu ke dompet peserta.</p>
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button type="button" disabled={Boolean(refundingRegistrationId)} onClick={() => setRefundTarget(null)} className="rounded border border-zinc-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-50">Batal</button>
+                  <button type="button" disabled={Boolean(refundingRegistrationId)} onClick={() => void refundSeat()} className="rounded bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{refundingRegistrationId ? 'Memproses refund…' : 'Refund seat'}</button>
+                </div>
+              </section>
             </div>
           ) : null}
         </section>
@@ -515,8 +805,35 @@ export function GatheringWorkflowSteps({
     ? STEPS.length - 1
     : Math.max(0, workflowIndex);
   const [selectedIndex, setSelectedIndex] = useState(currentIndex);
+  const [cancelling, setCancelling] = useState(false);
+  const [invitationBannerUrl, setInvitationBannerUrl] = useState(plan.invitation_banner_url ?? '');
+  const [invitationDescription, setInvitationDescription] = useState(plan.invitation_description ?? '');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('Dibatalkan oleh initiator');
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => setSelectedIndex(currentIndex), [currentIndex]);
+
+  async function cancelGathering(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (cancelling) return;
+    setCancelling(true);
+    setCancelError('');
+    try {
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(plan.id)}/cancel?website_id=${encodeURIComponent(websiteId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason.trim() || 'Dibatalkan oleh initiator' }),
+      });
+      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      if (!response.ok) throw new Error(payload?.message || 'Gagal membatalkan acara.');
+      window.location.reload();
+    } catch (cause) {
+      setCancelError(cause instanceof Error ? cause.message : 'Gagal membatalkan acara.');
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const occurrence = plan.occurrence;
 
@@ -560,7 +877,21 @@ export function GatheringWorkflowSteps({
         />
       ) : null}
       {selectedIndex === currentIndex && plan.workflow_step === 'INVITATIONS' ? (
-        <GatheringInvitationManager groupId={plan.id} websiteId={websiteId} basePath={basePath} invitePolicy={plan.invite_policy} />
+        <GatheringInvitationManager
+          groupId={plan.id}
+          websiteId={websiteId}
+          basePath={basePath}
+          invitePolicy={plan.invite_policy}
+          initialBannerUrl={invitationBannerUrl}
+          initialDescription={invitationDescription}
+          onInvitationContentSaved={(content) => {
+            setInvitationBannerUrl(content.bannerUrl);
+            setInvitationDescription(content.description);
+          }}
+        />
+      ) : null}
+      {selectedIndex === 2 && currentIndex >= 2 ? (
+        <GatheringInvitationCard plan={plan} bannerUrl={invitationBannerUrl} description={invitationDescription} />
       ) : null}
       {selectedIndex === 2 && currentIndex >= 2 ? (
         <ReadOnlyInvitationHistory
@@ -571,7 +902,11 @@ export function GatheringWorkflowSteps({
           options={occurrence.option_groups_snapshot.filter((option) => (occurrence.opened_option_ids_snapshot ?? []).includes(option.product_option_id))}
           includeRegistrations
           canConfirmReservations={selectedIndex === currentIndex && plan.workflow_step === 'INVITATION_CONFIRMATION'}
+          canCancelGathering={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          cancelling={cancelling}
+          onCancelGathering={() => { setCancelError(''); setShowCancelDialog(true); }}
           minAttendees={occurrence.min_attendees}
+          maxAttendees={occurrence.max_attendees}
           stageNumber={3}
         />
       ) : null}
@@ -584,10 +919,29 @@ export function GatheringWorkflowSteps({
           options={occurrence.option_groups_snapshot.filter((option) => (occurrence.opened_option_ids_snapshot ?? []).includes(option.product_option_id))}
           includeRegistrations
           minAttendees={occurrence.min_attendees}
+          maxAttendees={occurrence.max_attendees}
           paymentDeadline={occurrence.payment_deadline}
           stageNumber={4}
           canConfirmEvent={plan.workflow_step === 'PAYMENT_CONFIRMATION' && plan.status === 'PAYMENT_OPEN'}
+          canCancelGathering={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          cancelling={cancelling}
+          onCancelGathering={() => { setCancelError(''); setShowCancelDialog(true); }}
         />
+      ) : null}
+      {showCancelDialog ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancelling) setShowCancelDialog(false); }}>
+          <form onSubmit={(event) => void cancelGathering(event)} role="dialog" aria-modal="true" aria-labelledby="cancel-gathering-title" className="w-full max-w-lg border bg-white p-5 text-zinc-900 shadow-xl sm:p-6" style={{ borderColor: 'var(--brand-border)' }}>
+            <h2 id="cancel-gathering-title" className="text-base font-semibold">Batalkan acara</h2>
+            <p className="mt-2 text-sm text-zinc-600">Acara akan dibatalkan dan proses refund akan dijalankan sesuai kebijakan.</p>
+            <label htmlFor="cancel-gathering-reason" className="mt-5 block text-sm font-medium">Alasan pembatalan (opsional)</label>
+            <input id="cancel-gathering-reason" type="text" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} className="mt-2 block w-full rounded border border-zinc-300 px-3 py-2.5 text-sm focus:border-zinc-600 focus:outline-none" />
+            {cancelError ? <p role="alert" className="mt-2 text-sm text-red-700">{cancelError}</p> : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={cancelling} onClick={() => setShowCancelDialog(false)} className="rounded border border-zinc-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-50">Batal</button>
+              <button type="submit" disabled={cancelling} className="rounded bg-red-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{cancelling ? 'Membatalkan…' : 'Batalkan acara'}</button>
+            </div>
+          </form>
+        </div>
       ) : null}
     </>
   );

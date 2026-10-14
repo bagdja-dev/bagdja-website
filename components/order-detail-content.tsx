@@ -35,7 +35,15 @@ export interface TransactionItem {
   quantity: number;
   unit_price: number;
   total_amount: number;
-  order?: { product?: TransactionProduct | null } | null;
+  order?: {
+    product?: TransactionProduct | null;
+    gathering_invoice?: {
+      registration_id: string;
+      invoice_id: string;
+      attendee_name: string;
+      payment_status: string;
+    } | null;
+  } | null;
 }
 
 /**
@@ -177,6 +185,8 @@ export interface GatheringPlanDetail {
   status: string;
   workflow_step: 'PLAN' | 'INVITATIONS' | 'INVITATION_CONFIRMATION' | 'PAYMENT_CONFIRMATION' | 'LOCKED';
   invite_policy: 'OPEN' | 'INVITE_ONLY';
+  invitation_banner_url?: string | null;
+  invitation_description?: string | null;
   occurrence: {
     status: string;
     price_per_seat: number;
@@ -304,6 +314,8 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
 /** Tampilan transaksi (alur baru W2.8) — read-only, mirip layout checkout. */
 function TransactionView({ transaction, basePath, websiteId, loginHref }: { transaction: TransactionDetail; basePath: string; websiteId?: string; loginHref?: string }) {
   const items = transaction.items ?? [];
+  const gatheringItems = items.filter((item) => item.order?.gathering_invoice);
+  const isGatheringTransaction = gatheringItems.length > 0;
 
   const shippingLines = [
     transaction.recipient_name,
@@ -343,8 +355,8 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Transaksi</h1>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Sudah checkout</span>
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{isGatheringTransaction ? 'Detail Pembayaran Gathering' : 'Detail Transaksi'}</h1>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>{isGatheringTransaction ? 'Escrow seat' : 'Sudah checkout'}</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span
@@ -389,6 +401,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
               {items.map((item) => {
                 const product = item.order?.product;
                 const image = product?.images?.[0];
+                const gatheringInvoice = item.order?.gathering_invoice;
                 return (
                   <div
                     key={item.id}
@@ -412,13 +425,21 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
                       <p className="truncate font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
                         {product?.name ?? 'Produk'}
                       </p>
+                      {gatheringInvoice ? (
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                          <span>Peserta: {gatheringInvoice.attendee_name} · Invoice {gatheringInvoice.invoice_id}</span>
+                          <a href={`${basePath}/gathering/invoice/${encodeURIComponent(gatheringInvoice.registration_id)}`} className="font-semibold underline" style={{ color: 'var(--brand-accent-muted)' }}>Detail invoice</a>
+                        </div>
+                      ) : null}
                       {product?.description && (
                         <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
                           {product.description}
                         </p>
                       )}
                       <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                        {transaction.payment_mode === 'ESCROW'
+                        {isGatheringTransaction
+                          ? 'Dana seat ditahan di escrow sampai acara dikonfirmasi pengelola'
+                          : transaction.payment_mode === 'ESCROW'
                           ? 'Escrow — dana ditahan sampai Anda konfirmasi terima barang'
                           : 'Checkout Bagdja'}
                       </p>
@@ -565,7 +586,9 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
 
           {!needsPayment && (
             <p className="mt-5 rounded-lg border px-3 py-2 text-xs leading-relaxed" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-              {statusLabel}
+              {isGatheringTransaction
+                ? `${statusLabel}. Dana escrow seat akan diselesaikan oleh pengelola setelah konfirmasi acara.`
+                : statusLabel}
             </p>
           )}
 
@@ -579,6 +602,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
             orderTitle={items[0]?.order?.product?.name}
             orderImage={items[0]?.order?.product?.images?.[0]}
             loginHref={loginHref}
+            gatheringMode={isGatheringTransaction}
           />
         </aside>
       </div>

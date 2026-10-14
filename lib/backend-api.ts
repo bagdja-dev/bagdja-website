@@ -6,6 +6,19 @@ import { getSession } from './session';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5003';
 
+export async function publicBackendFetch<T = unknown>(path: string): Promise<{ data: T | null; status: number; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
+    if (!res.ok) {
+      const body = await res.text();
+      return { data: null, status: res.status, error: body || res.statusText };
+    }
+    return { data: (await res.json()) as T, status: res.status };
+  } catch (error) {
+    return { data: null, status: 500, error: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
+
 export async function backendFetch<T = unknown>(
   path: string,
   options: RequestInit = {},

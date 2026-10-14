@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
+import { GatheringInvitationAppearance } from './gathering-invitation-appearance';
 
 interface InvitationRow {
   id: string;
@@ -16,6 +17,18 @@ interface InvitationRow {
   max_uses: number;
   email_delivery_status?: 'NOT_SENT' | 'SENT' | 'FAILED' | 'MANUAL';
   delivery_error?: string | null;
+}
+
+interface InvitationOperationProgress {
+  id: string;
+  kind: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  total_count: number;
+  processed_count: number;
+  success_count: number;
+  failed_count: number;
+  failed_items: string[];
+  error_message: string | null;
 }
 
 type PendingContact = {
@@ -41,11 +54,17 @@ export function GatheringInvitationManager({
   websiteId,
   basePath,
   invitePolicy,
+  initialBannerUrl,
+  initialDescription,
+  onInvitationContentSaved,
 }: {
   groupId: string;
   websiteId: string;
   basePath: string;
   invitePolicy: 'OPEN' | 'INVITE_ONLY';
+  initialBannerUrl: string;
+  initialDescription: string;
+  onInvitationContentSaved: (content: { bannerUrl: string; description: string }) => void;
 }) {
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
@@ -61,6 +80,8 @@ export function GatheringInvitationManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [revokeOperationId, setRevokeOperationId] = useState('');
+  const [revokeOperation, setRevokeOperation] = useState<InvitationOperationProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pendingContacts, setPendingContacts] = useState<PendingContact[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -86,6 +107,22 @@ export function GatheringInvitationManager({
   }, [collectionUrl]);
 
   useEffect(() => { void loadInvitations(); }, [loadInvitations]);
+
+  useEffect(() => {
+    if (!revokeOperationId) return;
+    const source = new EventSource(`/api/gathering/plans/${encodeURIComponent(groupId)}/operations/${encodeURIComponent(revokeOperationId)}/events?website_id=${encodeURIComponent(websiteId)}`);
+    source.onmessage = (event) => {
+      try {
+        const progress = JSON.parse(event.data) as InvitationOperationProgress;
+        setRevokeOperation(progress);
+        if (progress.status === 'COMPLETED' || progress.status === 'FAILED') source.close();
+      } catch {
+        source.close();
+      }
+    };
+    source.onerror = () => source.close();
+    return () => source.close();
+  }, [groupId, websiteId, revokeOperationId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,8 +284,22 @@ export function GatheringInvitationManager({
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/${encodeURIComponent(invitationId)}?website_id=${encodeURIComponent(websiteId)}`, {
         method: 'DELETE',
       });
-      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      const payload = await response.json().catch(() => null) as { message?: string; operation_id?: string; operation_status?: InvitationOperationProgress['status'] } | null;
       if (!response.ok) throw new Error(payload?.message || 'Gagal mencabut undangan.');
+      if (payload?.operation_id) {
+        setRevokeOperationId(payload.operation_id);
+        setRevokeOperation({
+          id: payload.operation_id,
+          kind: 'INVITATION_REVOCATION',
+          status: payload.operation_status ?? 'QUEUED',
+          total_count: 1,
+          processed_count: 0,
+          success_count: 0,
+          failed_count: 0,
+          failed_items: [],
+          error_message: null,
+        });
+      }
       await loadInvitations();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal mencabut undangan.');
@@ -284,6 +335,14 @@ export function GatheringInvitationManager({
         </div>
         <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{invitations.length} undangan</span>
       </div>
+
+      <GatheringInvitationAppearance
+        groupId={groupId}
+        websiteId={websiteId}
+        initialBannerUrl={initialBannerUrl}
+        initialDescription={initialDescription}
+        onSaved={onInvitationContentSaved}
+      />
 
       {invitePolicy === 'INVITE_ONLY' ? (
         <>
@@ -355,54 +414,16 @@ export function GatheringInvitationManager({
             </div>
           ) : null}
         </>
-      ) : (
-        <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', background: 'rgba(255,255,255,0.02)' }}>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium">Undangan terbuka</p>
-              <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Siapa pun yang memiliki tautan dapat melihat preview dan melanjutkan RSVP setelah tahap tersebut dibuka.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => { if (shareUrl) void copyShareUrl(); }} disabled={!shareUrl} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>Salin link</button>
-              <button type="button" onClick={() => { if (shareUrl) window.open(shareUrl, '_blank', 'noopener,noreferrer'); }} disabled={!shareUrl} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>Buka</button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
-            <div className="flex justify-center rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)', background: ' rgba(255,255,255,0.01)' }}>
-              {shareUrl && qrDataUrl ? (
-                <img src={qrDataUrl} alt="QR undangan terbuka" className="h-40 w-40 rounded-md border bg-white p-2" />
-              ) : (
-                <div className="flex h-40 w-40 items-center justify-center rounded-md border border-dashed text-[10px] uppercase tracking-[0.2em]" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-                  QR
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Link undangan</label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <input
-                  readOnly
-                  value={shareUrl || 'Belum tersedia — submit undangan untuk membuat link'}
-                  aria-label="Link undangan terbuka"
-                  onClick={(event) => event.currentTarget.select()}
-                  className="min-w-0 flex-1 rounded border bg-transparent px-2 py-2 text-xs outline-none"
-                  style={{ borderColor: 'var(--brand-border)', cursor: 'text' }}
-                />
-                <button type="button" onClick={() => { if (shareUrl) void copyShareUrl(); }} disabled={!shareUrl} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>{copied ? 'Tersalin' : 'Salin'}</button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {shareUrl && whatsappHref ? <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Share WhatsApp</a> : null}
-                {shareUrl && emailHref ? <a href={emailHref} className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Share email</a> : null}
-                <button type="button" onClick={() => window.print()} className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Screenshot / Print</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
+      {revokeOperation ? (
+        <div className="mt-3 border-y py-3 text-xs" style={{ borderColor: 'var(--brand-border)' }} role="status">
+          <span className="font-semibold">{revokeOperation.status === 'QUEUED' ? 'Pencabutan antre' : revokeOperation.status === 'RUNNING' ? 'Memproses pencabutan' : revokeOperation.status === 'COMPLETED' ? 'Undangan berhasil dicabut' : 'Pencabutan gagal'}</span>
+          <span className="ml-2" style={{ color: 'var(--brand-muted)' }}>{revokeOperation.processed_count}/{revokeOperation.total_count} diproses</span>
+          {revokeOperation.error_message ? <p className="mt-1 text-red-700">{revokeOperation.error_message}</p> : null}
+        </div>
+      ) : null}
 
       <ul className="mt-5 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
         {loading ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</li> : invitations.length === 0 ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada penerima yang diundang.</li> : invitations.map((invitation) => {

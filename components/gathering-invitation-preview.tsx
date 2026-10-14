@@ -4,7 +4,14 @@ import { useEffect, useState } from 'react';
 
 interface InvitePreview {
   invitation: { invitee_name?: string | null; expires_at: string };
-  group: { id: string; title: string; invite_policy: 'OPEN' | 'INVITE_ONLY'; workflow_step: string };
+  group: {
+    id: string;
+    title: string;
+    invite_policy: 'OPEN' | 'INVITE_ONLY';
+    workflow_step: string;
+    invitation_banner_url?: string | null;
+    invitation_description?: string | null;
+  };
   occurrence: {
     status: string;
     price_per_seat: number | string;
@@ -336,8 +343,10 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
       <header className="border-b border-zinc-200"><div className="mx-auto max-w-2xl px-5 py-4 text-sm font-semibold">{websiteName}</div></header>
       <article className="mx-auto max-w-2xl px-5 py-10">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Undangan gathering</p>
+        {preview.group.invitation_banner_url ? <img src={preview.group.invitation_banner_url} alt={`Banner ${preview.group.title}`} className="mt-4 aspect-[16/8] w-full object-cover" /> : null}
         <h1 className="mt-2 text-2xl font-semibold">{preview.group.title}</h1>
         {preview.invitation.invitee_name ? <p className="mt-2 text-sm text-zinc-600">Untuk {preview.invitation.invitee_name}</p> : null}
+        {preview.group.invitation_description ? <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-zinc-700">{preview.group.invitation_description}</p> : null}
         <dl className="mt-6 grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
           <div><dt className="text-xs uppercase text-zinc-500">Harga per peserta</dt><dd className="mt-1 font-semibold">{price}</dd></div>
           <div><dt className="text-xs uppercase text-zinc-500">Batas peserta</dt><dd className="mt-1 font-semibold">Min. {occurrence.min_attendees} · Maks. {occurrence.max_attendees}</dd></div>
