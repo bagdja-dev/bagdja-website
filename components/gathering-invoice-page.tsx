@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
+function formatLocalDate(value?: string | null) {
+  if (!value) return 'Belum ditentukan';
+  const date = new Date(value);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { timeZone });
+}
+
 interface PublicGatheringInvoice {
   id: string;
   invoice_id: string;
@@ -90,8 +97,8 @@ export function GatheringInvoicePage({ registrationId, websiteName }: { registra
           <dl className="grid gap-4 sm:grid-cols-2">
             <div><dt className="text-xs text-zinc-500">Nomor tagihan</dt><dd className="mt-1 font-medium">{invoice.invoice_id}</dd></div>
             <div><dt className="text-xs text-zinc-500">Nama peserta</dt><dd className="mt-1 font-medium">{invoice.attendee_name}</dd></div>
-            <div><dt className="text-xs text-zinc-500">Batas pembayaran</dt><dd className="mt-1 font-medium">{invoice.payment_deadline ? new Date(invoice.payment_deadline).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
-            <div><dt className="text-xs text-zinc-500">Tanggal acara</dt><dd className="mt-1 font-medium">{invoice.event_date ? new Date(invoice.event_date).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Batas pembayaran</dt><dd className="mt-1 font-medium">{formatLocalDate(invoice.payment_deadline)}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Tanggal acara</dt><dd className="mt-1 font-medium">{formatLocalDate(invoice.event_date)}</dd></div>
           </dl>
           <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-200 pt-4">
             <span className="text-sm text-zinc-600">Status: {statusLabel}</span>

@@ -191,7 +191,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
   const lines: CartLine[] = useMemo(
     () =>
-      (serverOrders ?? []).map((o) => ({
+      (serverOrders ?? []).filter((o) => o.metadata?.gathering?.role !== 'initiator').map((o) => ({
         key: o.id,
         orderId: o.id,
         productId: o.product_id,
@@ -377,15 +377,19 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
           Keranjang Anda kosong
         </h1>
         <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          {serverError ?? 'Belum ada produk di keranjang. Yuk mulai belanja!'}
+          {serverError ?? (gatheringPlans.length
+            ? 'Keranjang produk kosong. Rencana acara Anda tersimpan terpisah di Kalender.'
+            : 'Belum ada produk di keranjang. Yuk mulai belanja!')}
         </p>
-        <Link
-          href={basePath || '/'}
-          className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
-          style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-        >
-          Lihat Produk
-        </Link>
+        {gatheringPlans.length ? (
+          <Link href={`${basePath}/calendar`} className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+            Buka Kalender Acara
+          </Link>
+        ) : (
+          <Link href={basePath || '/'} className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+            Lihat Produk
+          </Link>
+        )}
       </main>
     );
   }
@@ -396,7 +400,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
           Keranjang
           <span className="ml-2 text-sm font-normal" style={{ color: 'var(--brand-muted)' }}>
-            ({displayCount} item{gatheringPlanCount ? ` · ${gatheringPlanCount} rencana` : ''})
+            ({displayCount} item)
           </span>
         </h1>
       </div>

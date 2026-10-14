@@ -193,6 +193,7 @@ export interface GatheringPlanDetail {
     currency: string;
     min_attendees: number;
     max_attendees: number;
+    deposit_amount_per_seat?: number;
     final_schedule?: string | null;
     final_location?: string | null;
     rsvp_close_at?: string | null;
@@ -204,8 +205,13 @@ export interface GatheringPlanDetail {
       label: string;
       description?: string | null;
       venue_location?: string | null;
+      is_final_selection?: boolean;
     }>;
     opened_option_ids_snapshot: string[];
+    voting_results?: Record<string, {
+      total_votes: number;
+      options: Record<string, { votes: number; percentage: number }>;
+    }>;
   };
 }
 
@@ -233,6 +239,17 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-right font-semibold">{value}</span>
     </div>
   );
+}
+
+function formatLocalDateTime(value?: string | null) {
+  if (!value) return 'Belum ditentukan';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Belum ditentukan';
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(date);
 }
 
 export function OrderDetailContent({
@@ -277,7 +294,7 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
       </div>
 
       <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
-        Order rencana #{order.id.slice(0, 8)} tersimpan di keranjang. Ini bukan tagihan; pembayaran seat dibuka setelah pilihan dan jadwal gathering siap.
+        Rencana gathering #{order.id.slice(0, 8)} dikelola terpisah dari keranjang dan bukan tagihan. Pembayaran seat dibuka setelah peserta dan rencana acara dikonfirmasi.
       </p>
 
       <section className="mt-6 border-y py-5" style={{ borderColor: 'var(--brand-border)' }}>
@@ -285,7 +302,7 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
         <dl className="mt-4 grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
           <Row label="Harga per peserta" value={seatPrice} />
           <Row label="Batas peserta" value={`Min. ${occurrence.min_attendees} · Maks. ${occurrence.max_attendees}`} />
-          <Row label="Jadwal final" value={occurrence.final_schedule || 'Belum ditentukan'} />
+          <Row label="Jadwal final" value={formatLocalDateTime(occurrence.final_schedule)} />
           <Row label="Lokasi final" value={occurrence.final_location || 'Belum ditentukan'} />
           <Row label="Undangan" value={plan.invite_policy === 'INVITE_ONLY' ? 'Khusus undangan' : 'Terbuka'} />
         </dl>
@@ -566,13 +583,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
           </dl>
 
           {needsPayment && transaction.checkout_url && (
-            <a
-              href={transaction.checkout_url}
-              className="mt-5 flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.03] active:scale-95"
-              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-            >
-              Lanjutkan Pembayaran
-            </a>
+            <RetryPaymentButton transactionId={transaction.id} fullWidth label="Lanjutkan Pembayaran" />
           )}
 
           {needsPayment && !transaction.checkout_url && (
@@ -736,7 +747,10 @@ function LegacyOrderView({ order, basePath, websiteId, loginHref }: { order: Ord
           Diskusikan Pesanan
         </ChatReferenceButton>
       )}
-      {order.status === 'PENDING' && order.checkout_url && !awaitingQuote && (
+      {order.status === 'PENDING' && order.transaction_id && !awaitingQuote && (
+        <RetryPaymentButton transactionId={order.transaction_id} label="Lanjutkan Pembayaran" />
+      )}
+      {order.status === 'PENDING' && !order.transaction_id && order.checkout_url && !awaitingQuote && (
         <a
           href={order.checkout_url}
           className="mt-6 inline-flex rounded-full px-8 py-3 text-sm font-semibold uppercase tracking-wide"

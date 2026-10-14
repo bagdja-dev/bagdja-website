@@ -43,6 +43,7 @@ export interface CatalogItem {
     location?: string;
     minAttendees?: number;
     maxAttendees?: number;
+    depositAmountPerSeat?: number;
     optionGroups?: GatheringOptionGroup[];
     cancellationPolicy?: string;
   };
@@ -353,6 +354,9 @@ function normalizeGatheringMeta(
 
   const min = typeof meta.min_attendees === 'number' ? meta.min_attendees : Number(meta.min_attendees ?? 0);
   const max = typeof meta.max_attendees === 'number' ? meta.max_attendees : Number(meta.max_attendees ?? 0);
+  const depositAmount = typeof meta.deposit_amount_per_seat === 'number'
+    ? meta.deposit_amount_per_seat
+    : Number(meta.deposit_amount_per_seat ?? 0);
   const optionGroups = [...groups.values()];
   const rawPolicy = meta.cancellation_policy && typeof meta.cancellation_policy === 'object'
     ? meta.cancellation_policy as Record<string, unknown>
@@ -362,15 +366,19 @@ function normalizeGatheringMeta(
     : typeof rawPolicy.summary === 'string' ? rawPolicy.summary : '';
   if (!cancellationPolicy && Object.keys(rawPolicy).length > 0) {
     const cutoff = Number(rawPolicy.cutoff_days_before_event ?? 0);
+    const prepare = Number(rawPolicy.prepare_days_before_event ?? cutoff);
     const penaltyType = String(rawPolicy.penalty_type ?? 'NONE');
     const penaltyValue = Number(rawPolicy.penalty_value ?? 0);
+    const prepareText = prepare > 0
+      ? `Persiapan acara dimulai ${prepare} hari sebelum acara`
+      : 'Persiapan acara dimulai pada hari acara';
     const cutoffText = cutoff > 0
-      ? `Batas terakhir pemilik bisnis membatalkan seluruh event: ${cutoff} hari sebelum acara`
-      : 'Batas terakhir pemilik bisnis membatalkan seluruh event: hari acara';
+      ? `cutoff pembatalan adalah ${cutoff} hari sebelum acara`
+      : 'cutoff pembatalan adalah hari acara';
     const penaltyText = penaltyType === 'FIXED'
       ? `penalti Rp${new Intl.NumberFormat('id-ID').format(penaltyValue)} per peserta`
       : penaltyType === 'PERCENTAGE' ? `penalti ${penaltyValue}% per peserta` : 'tanpa penalti';
-    cancellationPolicy = `${cutoffText}. Pemilik bisnis dapat membatalkan seluruh event sebelum batas dengan ${penaltyText}. Setelah batas lewat, pembatalan event normal tidak tersedia. Pembatalan seat oleh peserta mengikuti aturan terpisah; setelah pesanan final dikonfirmasi, seat hanya dapat diganti.`;
+    cancellationPolicy = `${prepareText}. Initiator dapat membatalkan sebelum persiapan tanpa penalti. Pembatalan sejak persiapan dimulai hingga ${cutoffText} dikenai ${penaltyText}. Setelah cutoff, pembatalan oleh initiator tidak tersedia. Pembatalan seat oleh peserta mengikuti aturan terpisah.`;
   }
   const hasAny = optionGroups.length > 0 || meta.min_attendees != null || meta.max_attendees != null || Boolean(cancellationPolicy);
   if (!hasAny) return undefined;
@@ -378,6 +386,7 @@ function normalizeGatheringMeta(
   return {
     minAttendees: Number.isFinite(min) && min >= 0 ? min : undefined,
     maxAttendees: Number.isFinite(max) && max >= 0 ? max : undefined,
+    depositAmountPerSeat: Number.isFinite(depositAmount) && depositAmount >= 0 ? depositAmount : undefined,
     optionGroups: optionGroups.length ? optionGroups : undefined,
     cancellationPolicy: cancellationPolicy || undefined,
   };

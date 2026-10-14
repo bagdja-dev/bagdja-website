@@ -40,9 +40,9 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 const RESERVED_TOP_LEVEL_PATHS = new Set(['templates']);
 
 // ─── W1 auth renderer: route protected (wajib login buyer) ─────────────
-// Path dalam tenant: `/{slug}/cart`, `/{slug}/cart/order/...`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`, `/{slug}/chat`
+// Path dalam tenant: `/{slug}/cart`, `/{slug}/cart/order/...`, `/{slug}/checkout`, `/{slug}/order/...`, `/{slug}/orders`, `/{slug}/tagihan`, `/{slug}/calendar`, `/{slug}/chat`
 const PROTECTED_PATH_PATTERN =
-  /^\/([a-z0-9-]+)\/(cart|checkout|orders|tagihan|profile|chat)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
+  /^\/([a-z0-9-]+)\/(cart|checkout|orders|tagihan|calendar|profile|chat)(\/|$)|^\/([a-z0-9-]+)\/order(\/|$)/;
 
 function shouldProtect(pathname: string): boolean {
   return PROTECTED_PATH_PATTERN.test(pathname);

@@ -1,5 +1,12 @@
 import type { GatheringPlanDetail } from './order-detail-content';
 
+function formatLocalDate(value?: string | null) {
+  if (!value) return 'Belum ditentukan';
+  const date = new Date(value);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { timeZone });
+}
+
 export function GatheringInvitationCard({
   plan,
   bannerUrl,
@@ -38,8 +45,8 @@ export function GatheringInvitationCard({
           <dl className="mt-5 grid gap-4 border-y border-zinc-200 py-4 text-sm sm:grid-cols-2">
             <div><dt className="text-xs text-zinc-500">Harga per peserta</dt><dd className="mt-1 font-semibold">{price}</dd></div>
             <div><dt className="text-xs text-zinc-500">Batas peserta</dt><dd className="mt-1 font-semibold">Min. {occurrence.min_attendees} · Maks. {occurrence.max_attendees}</dd></div>
-            <div><dt className="text-xs text-zinc-500">Jadwal</dt><dd className="mt-1 font-semibold">{occurrence.final_schedule ? new Date(occurrence.final_schedule).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
-            <div><dt className="text-xs text-zinc-500">Batas RSVP</dt><dd className="mt-1 font-semibold">{occurrence.rsvp_close_at ? new Date(occurrence.rsvp_close_at).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Jadwal</dt><dd className="mt-1 font-semibold">{formatLocalDate(occurrence.final_schedule)}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Batas RSVP</dt><dd className="mt-1 font-semibold">{formatLocalDate(occurrence.rsvp_close_at)}</dd></div>
           </dl>
           {openedOptions.length ? (
             <div className="mt-4">

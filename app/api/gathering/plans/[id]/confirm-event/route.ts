@@ -8,7 +8,11 @@ interface RouteContext {
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const websiteId = request.nextUrl.searchParams.get('website_id');
   const query = websiteId ? `?website_id=${encodeURIComponent(websiteId)}` : '';
-  const result = await backendFetch(`/api/gathering/plans/${encodeURIComponent(params.id)}/confirm-event${query}`, { method: 'POST' });
+  const body = await request.json().catch(() => null);
+  const result = await backendFetch(`/api/gathering/plans/${encodeURIComponent(params.id)}/confirm-event${query}`, {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  });
   if (!result.data || result.status >= 400) {
     return NextResponse.json({ message: result.error ?? 'Gagal mengonfirmasi acara.' }, { status: result.status });
   }

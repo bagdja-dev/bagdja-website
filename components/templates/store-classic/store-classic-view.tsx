@@ -45,6 +45,7 @@ import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
+import { GatheringCalendarContent } from '../../gathering-calendar-content';
 import { ProfileContent } from '../../profile-content';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
@@ -999,6 +1000,13 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                   </span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {item.gatheringMeta.depositAmountPerSeat != null && (
+                    <div className="border-l-2 pl-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>DP booking per peserta</p>
+                      <p className="mt-1 font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(item.gatheringMeta.depositAmountPerSeat)}</p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Nominal total DP menyesuaikan jumlah peserta.</p>
+                    </div>
+                  )}
                   {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
                     <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
                       <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Minimum peserta</p>
@@ -1491,6 +1499,9 @@ export function StoreClassicView({
               }
               case 'tagihan': {
                 return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+              }
+              case 'gathering_calendar': {
+                return <GatheringCalendarContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;

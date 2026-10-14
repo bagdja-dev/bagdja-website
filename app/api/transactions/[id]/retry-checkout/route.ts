@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '../../../../../lib/backend-api';
 
 /**
- * BFF route /api/transactions/:id/retry-checkout — retry inisialisasi
- * pembayaran transaksi PENDING_PAYMENT yang belum punya `checkout_url`
- * (mis. checkout gagal di tengah jalan). Kalau `checkout_url` sudah ada,
- * backend langsung mengembalikannya tanpa panggil payment-service lagi.
+ * BFF route /api/transactions/:id/retry-checkout — (re)inisialisasi
+ * pembayaran transaksi PENDING_PAYMENT. Dipakai tombol "Lanjutkan
+ * Pembayaran": untuk ESCROW backend selalu menerbitkan ulang sesi + link
+ * Pay UI (link lama bisa sudah kedaluwarsa), juga untuk transaksi yang
+ * checkout-nya sempat gagal di tengah jalan (belum punya `checkout_url`).
  */
 interface RouteContext {
   params: { id: string };

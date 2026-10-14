@@ -7,6 +7,7 @@ import { SocialIcon } from './barber-classic-icons';
 import { CartBadge } from '../../cart-badge';
 import { NotificationBell } from '../../notification-bell';
 import { TagihanBadge } from '../../tagihan-badge';
+import { CalendarBadge } from '../../calendar-badge';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -25,6 +26,7 @@ export interface HeaderAuthState {
   cartHref?: string;
   ordersHref?: string;
   tagihanHref?: string;
+  calendarHref?: string;
   profileHref?: string;
   chatHref?: string;
 }
@@ -157,6 +159,9 @@ export function BarberClassicHeader({
           {auth?.tagihanHref && auth?.isLoggedIn && (
             <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
           )}
+          {auth?.calendarHref && auth?.isLoggedIn && (
+            <CalendarBadge href={auth.calendarHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
+          )}
           {auth?.isLoggedIn && (
             <NotificationBell websiteId={websiteId} basePath={basePath} isLoggedIn={auth.isLoggedIn} />
           )}
@@ -214,6 +219,7 @@ export function BarberClassicHeader({
                       { href: auth.cartHref, label: 'Keranjang' },
                       { href: auth.ordersHref, label: 'Transaksi' },
                       { href: auth.tagihanHref, label: 'Tagihan' },
+                      { href: auth.calendarHref, label: 'Kalender' },
                       { href: auth.chatHref, label: 'Inbox' },
                       { href: auth.profileHref, label: 'Profil' },
                     ].map(
@@ -324,6 +330,7 @@ export function BarberClassicHeader({
                     { href: auth.cartHref, label: 'Keranjang' },
                     { href: auth.ordersHref, label: 'Transaksi' },
                     { href: auth.tagihanHref, label: 'Tagihan' },
+                    { href: auth.calendarHref, label: 'Kalender' },
                     { href: auth.profileHref, label: 'Profil' },
                   ].map(
                     (item) =>

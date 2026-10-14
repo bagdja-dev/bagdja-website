@@ -57,6 +57,9 @@ export function GatheringInvitationManager({
   initialBannerUrl,
   initialDescription,
   onInvitationContentSaved,
+  canCancel = false,
+  cancelling = false,
+  onCancel,
 }: {
   groupId: string;
   websiteId: string;
@@ -65,6 +68,9 @@ export function GatheringInvitationManager({
   initialBannerUrl: string;
   initialDescription: string;
   onInvitationContentSaved: (content: { bannerUrl: string; description: string }) => void;
+  canCancel?: boolean;
+  cancelling?: boolean;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
@@ -456,6 +462,11 @@ export function GatheringInvitationManager({
         <button type="button" onClick={() => void submitInvitationStage()} disabled={submitting || (invitePolicy === 'INVITE_ONLY' && invitations.length === 0 && pendingContacts.length === 0)} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
           {submitting ? 'Submit undangan…' : 'Submit'}
         </button>
+        {canCancel && onCancel ? (
+          <button type="button" onClick={onCancel} disabled={submitting || cancelling} className="rounded-full border border-red-500 px-6 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
+            {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
+          </button>
+        ) : null}
       </div>
       <p className="mt-2 text-[11px]" style={{ color: 'var(--brand-muted)' }}>WhatsApp belum memiliki engine pengiriman. Kontak WhatsApp menggunakan tautan manual.</p>
     </section>

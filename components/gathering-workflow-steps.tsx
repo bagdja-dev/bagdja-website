@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import QRCode from 'qrcode';
 import { useRouter } from 'next/navigation';
 import { GatheringInvitationManager } from './gathering-invitation-manager';
@@ -62,7 +63,8 @@ type GatheringOptionSnapshot = GatheringPlanDetail['occurrence']['option_groups_
 function formatDate(value?: string | null) {
   if (!value) return 'Belum ditentukan';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID');
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { timeZone });
 }
 
 function ReadOnlyPlan({ plan }: { plan: GatheringPlanDetail }) {
@@ -85,7 +87,10 @@ function ReadOnlyPlan({ plan }: { plan: GatheringPlanDetail }) {
         <ul className="mt-2 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
           {openedOptions.map((option) => (
             <li key={option.product_option_id} className="py-3">
-              <p className="text-sm font-medium">{option.label}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">{option.label}</p>
+                {option.is_final_selection ? <span className="border px-2 py-0.5 text-[10px] font-semibold uppercase" style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent-muted)' }}>Opsi final</span> : null}
+              </div>
               <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
                 {[option.option_group_key, option.venue_location, option.description].filter(Boolean).join(' · ')}
               </p>
@@ -108,8 +113,12 @@ function ReadOnlyInvitationHistory({
   canConfirmReservations = false,
   minAttendees = 0,
   maxAttendees = 0,
+  depositAmountPerSeat = 0,
+  votingResults = {},
+  initialFinalSelections = {},
   paymentDeadline,
   stageNumber = 2,
+  invitationPreview,
   canConfirmEvent = false,
   canCancelGathering = false,
   cancelling = false,
@@ -124,8 +133,12 @@ function ReadOnlyInvitationHistory({
   canConfirmReservations?: boolean;
   minAttendees?: number;
   maxAttendees?: number;
+  depositAmountPerSeat?: number;
+  votingResults?: Record<string, { total_votes: number; options: Record<string, { votes: number; percentage: number }> }>;
+  initialFinalSelections?: Record<string, string>;
   paymentDeadline?: string | null;
   stageNumber?: 2 | 3 | 4;
+  invitationPreview?: ReactNode;
   canConfirmEvent?: boolean;
   canCancelGathering?: boolean;
   cancelling?: boolean;
@@ -142,6 +155,7 @@ function ReadOnlyInvitationHistory({
   const [showCollectivePaymentDialog, setShowCollectivePaymentDialog] = useState(false);
   const [refundTarget, setRefundTarget] = useState<RegistrationRow | null>(null);
   const [refundingRegistrationId, setRefundingRegistrationId] = useState('');
+  const [cancellingCheckoutId, setCancellingCheckoutId] = useState('');
   const [resendingInvoices, setResendingInvoices] = useState(false);
   const [failedInvoiceEmails, setFailedInvoiceEmails] = useState<string[]>([]);
   const [invoiceResendNotice, setInvoiceResendNotice] = useState('');
@@ -155,6 +169,9 @@ function ReadOnlyInvitationHistory({
   const [rejectionMessage, setRejectionMessage] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [viewingRegistrationId, setViewingRegistrationId] = useState('');
+  const [finalSelections, setFinalSelections] = useState<Record<string, string>>(initialFinalSelections);
+
+  useEffect(() => setFinalSelections(initialFinalSelections), [initialFinalSelections]);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +220,7 @@ function ReadOnlyInvitationHistory({
         failed_items: string[];
         error_message: string | null;
       };
+      setInvoiceOperationId(result.operation_id);
       setInvoiceOperation({
         id: result.operation_id,
         kind: 'INVOICE_ISSUANCE',
@@ -391,14 +409,24 @@ function ReadOnlyInvitationHistory({
     .reduce((total, registration) => total + Number(registration.invoice_amount ?? 0), 0);
   const optionGroups = new Map<string, GatheringOptionSnapshot[]>();
   options.forEach((option) => optionGroups.set(option.option_group_key, [...(optionGroups.get(option.option_group_key) ?? []), option]));
+  const paidSeatCount = paidActiveRegistrations.reduce((total, registration) => total + Number(registration.order_id ? 1 : 0), 0);
+  const plannedBookingDeposit = depositAmountPerSeat * paidSeatCount;
 
   async function confirmEvent() {
-    const paidSeats = registrations.filter((registration) => registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PAID').length;
-    if (finalizing || paidSeats < minAttendees) return;
+    if (finalizing || paidSeatCount < minAttendees || Object.keys(finalSelections).length !== optionGroups.size) return;
     setFinalizing(true);
     setError('');
     try {
-      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/confirm-event?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/confirm-event?website_id=${encodeURIComponent(websiteId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          final_selections: [...optionGroups.keys()].map((option_group_key) => ({
+            option_group_key,
+            option_id: finalSelections[option_group_key],
+          })),
+        }),
+      });
       const payload = await response.json().catch(() => null) as { message?: string } | null;
       if (!response.ok) throw new Error(payload?.message || 'Gagal mengonfirmasi acara.');
       router.refresh();
@@ -451,6 +479,25 @@ function ReadOnlyInvitationHistory({
     }
   }
 
+  async function cancelParticipantCheckout(registration: RegistrationRow) {
+    if (cancellingCheckoutId) return;
+    setCancellingCheckoutId(registration.id);
+    setError('');
+    try {
+      const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/registrations/${encodeURIComponent(registration.id)}/cancel-checkout?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
+      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      if (!response.ok) throw new Error(payload?.message || 'Gagal membatalkan checkout peserta.');
+      setRegistrations((current) => current.map((item) => item.id === registration.id
+        ? { ...item, payment_status: 'UNPAID' }
+        : item));
+      setInvoiceResendNotice('Checkout peserta dibatalkan. Seat ini sekarang bisa dipilih untuk pembayaran kolektif.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Gagal membatalkan checkout peserta.');
+    } finally {
+      setCancellingCheckoutId('');
+    }
+  }
+
   const publicInvitation = invitations.find((invitation) => !invitation.email && !invitation.whatsapp);
   const publicInvitationId = publicInvitation?.id;
 
@@ -477,6 +524,7 @@ function ReadOnlyInvitationHistory({
         </div>
         {!loading && <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{invitations.length} undangan</span>}
       </div>
+      {invitationPreview ? <div className="mt-4">{invitationPreview}</div> : null}
       {loading ? <p className="mt-4 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</p> : null}
       {error ? <p role="alert" className="mt-4 text-sm text-red-700">{error}</p> : null}
       {stageNumber === 3 && invitePolicy === 'OPEN' ? (
@@ -576,7 +624,7 @@ function ReadOnlyInvitationHistory({
               </button>
             </div>
           ) : null}
-          {canConfirmEvent && invoiceOperation ? (
+          {invoiceOperation ? (
             <div className="mt-3 border-y py-3" style={{ borderColor: 'var(--brand-border)' }} role="status">
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-semibold">{invoiceOperation.status === 'QUEUED' ? 'Menunggu pengiriman tagihan' : invoiceOperation.status === 'RUNNING' ? 'Mengirim email tagihan' : invoiceOperation.status === 'COMPLETED' ? 'Proses invoice selesai' : 'Proses invoice gagal'}</span>
@@ -608,12 +656,18 @@ function ReadOnlyInvitationHistory({
                     ) : <span className="w-4 shrink-0" />}
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{registration.attendee_name}</p>
+                      <p className="truncate text-xs" style={{ color: 'var(--brand-muted)' }}>{registration.email}</p>
                       <p className="mt-1 text-xs" style={{ color: registration.registration_status === 'REJECTED' ? '#b91c1c' : 'var(--brand-muted)' }}>
                         {registration.registration_status === 'REJECTED' ? 'Ditolak' : registration.registration_status === 'CANCELLED' ? 'Dibatalkan' : registration.payment_status === 'PAID' ? 'Lunas' : registration.payment_status === 'PENDING_PAYMENT' ? 'Menunggu pembayaran' : 'Belum dibayar'}
                       </p>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pl-7 sm:pl-0">
+                    {canConfirmEvent && registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PENDING_PAYMENT' && registration.order_id ? (
+                      <button type="button" onClick={() => void cancelParticipantCheckout(registration)} disabled={Boolean(cancellingCheckoutId)} className="rounded border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">
+                        {cancellingCheckoutId === registration.id ? 'Membatalkan…' : 'Batalkan pembayaran'}
+                      </button>
+                    ) : null}
                     {canConfirmEvent && registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PAID' ? (
                       <button type="button" onClick={() => setRefundTarget(registration)} disabled={refundingRegistrationId === registration.id} className="rounded border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">
                         {refundingRegistrationId === registration.id ? 'Memproses…' : 'Refund seat'}
@@ -724,25 +778,65 @@ function ReadOnlyInvitationHistory({
               </div>
               {canCancelGathering && onCancelGathering ? (
                 <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
-                  {cancelling ? 'Membatalkan…' : 'Cancel event'}
+                  {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
                 </button>
               ) : null}
             </div>
           ) : canConfirmEvent ? (
             <div className="mt-5 flex flex-wrap items-start gap-2">
-              <div>
-              <button type="button" onClick={() => void confirmEvent()} disabled={finalizing || paidActiveRegistrations.length < minAttendees || paidActiveRegistrations.length > maxAttendees} className="rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
-                {finalizing ? 'Mengonfirmasi acara…' : 'Konfirmasi acara & selesaikan escrow'}
-              </button>
-              <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Seat lunas: {paidActiveRegistrations.length} · Minimum {minAttendees} · Maksimum {maxAttendees}{paidActiveRegistrations.length >= minAttendees && paidActiveRegistrations.length <= maxAttendees ? ' · Dana escrow seat akan dilepas setelah konfirmasi.' : ''}</p>
-              </div>
+              <section className="w-full border-y py-5" style={{ borderColor: 'var(--brand-border)' }}>
+                <h3 className="text-sm font-semibold">Pilih opsi final dari hasil voting</h3>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Pilih satu opsi untuk setiap kelompok. Hasil vote menjadi referensi; pilihan akhir dikunci saat Anda mengonfirmasi.</p>
+                <div className="mt-4 space-y-4">
+                  {[...optionGroups.entries()].map(([groupKey, groupOptions]) => {
+                    const result = votingResults[groupKey];
+                    return (
+                      <fieldset key={groupKey} className="space-y-2">
+                        <legend className="mb-2 text-sm font-medium">{groupKey}</legend>
+                        {groupOptions.map((option) => {
+                          const vote = result?.options[String(option.product_option_id)];
+                          return (
+                            <label key={option.product_option_id} className="flex cursor-pointer items-start gap-3 border px-3 py-3 text-sm" style={{ borderColor: finalSelections[groupKey] === String(option.product_option_id) ? 'var(--brand-accent)' : 'var(--brand-border)' }}>
+                              <input type="radio" name={`final-option-${groupKey}`} value={option.product_option_id} checked={finalSelections[groupKey] === String(option.product_option_id)} onChange={() => setFinalSelections((current) => ({ ...current, [groupKey]: String(option.product_option_id) }))} className="mt-1 accent-[var(--brand-accent)]" />
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-medium">{option.label}</span>
+                                {option.venue_location ? <span className="mt-1 block text-xs" style={{ color: 'var(--brand-muted)' }}>{option.venue_location}</span> : null}
+                              </span>
+                              <span className="shrink-0 text-right text-xs" style={{ color: 'var(--brand-muted)' }}>{vote ? `${vote.votes} suara · ${vote.percentage}%` : '0 suara'}</span>
+                            </label>
+                          );
+                        })}
+                        <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>Total suara: {result?.total_votes ?? 0}</p>
+                      </fieldset>
+                    );
+                  })}
+                </div>
+                <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--brand-border)' }}>
+                  <p className="text-sm font-medium">DP booking (tetap ditahan di escrow)</p>
+                  <p className="mt-1 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(plannedBookingDeposit)}</p>
+                  <p className="mt-1 text-xs leading-5" style={{ color: 'var(--brand-muted)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(depositAmountPerSeat)} × {paidSeatCount} seat lunas. Seluruh dana tetap ditahan sampai admin memulai persiapan acara.</p>
+                </div>
+                <button type="button" onClick={() => void confirmEvent()} disabled={finalizing || paidSeatCount < minAttendees || paidSeatCount > maxAttendees || Object.keys(finalSelections).length !== optionGroups.size} className="mt-4 rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+                  {finalizing ? 'Menyimpan konfirmasi…' : 'Konfirmasi acara'}
+                </button>
+                <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Seat lunas: {paidSeatCount} · Minimum {minAttendees} · Maksimum {maxAttendees}. Opsi pilihan Anda akan dikunci. Admin akan memproses persiapan dan pencairan DP pada tahap berikutnya.</p>
+              </section>
               {canCancelGathering && onCancelGathering ? (
                 <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
-                  {cancelling ? 'Membatalkan…' : 'Cancel event'}
+                  {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
                 </button>
               ) : null}
             </div>
-          ) : <p className="mt-4 text-xs" style={{ color: 'var(--brand-muted)' }}>Tampilan baca saja untuk tahap yang sudah dilewati.</p>}
+          ) : (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4" style={{ borderColor: 'var(--brand-border)' }}>
+              <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>Tampilan baca saja untuk tahap yang sudah dilewati.</p>
+              {canCancelGathering && onCancelGathering ? (
+                <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
+                  {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
+                </button>
+              ) : null}
+            </div>
+          )}
           {showRejectDialog ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !rejecting) setShowRejectDialog(false); }}>
               <form onSubmit={rejectSelectedRegistrations} role="dialog" aria-modal="true" aria-labelledby="reject-reservations-title" className="w-full max-w-lg border bg-white p-5 text-zinc-900 shadow-xl sm:p-6" style={{ borderColor: 'var(--brand-border)' }}>
@@ -862,7 +956,21 @@ export function GatheringWorkflowSteps({
       </ol>
 
       {selectedIndex < currentIndex && selectedIndex === 0 ? <ReadOnlyPlan plan={plan} /> : null}
-      {selectedIndex < currentIndex && selectedIndex === 1 ? <ReadOnlyInvitationHistory groupId={plan.id} websiteId={websiteId} basePath={basePath} invitePolicy={plan.invite_policy} /> : null}
+      {selectedIndex < currentIndex && selectedIndex === 1 ? (
+        <ReadOnlyInvitationHistory
+          groupId={plan.id}
+          websiteId={websiteId}
+          basePath={basePath}
+          invitePolicy={plan.invite_policy}
+          invitationPreview={(
+            <GatheringInvitationCard
+              plan={plan}
+              bannerUrl={invitationBannerUrl}
+              description={invitationDescription}
+            />
+          )}
+        />
+      ) : null}
       {selectedIndex === currentIndex && plan.workflow_step === 'PLAN' ? (
         <GatheringPlanControls
           groupId={plan.id}
@@ -874,6 +982,9 @@ export function GatheringWorkflowSteps({
           initialReservationDeadline={occurrence.rsvp_close_at}
           initialPaymentDeadline={occurrence.payment_deadline}
           initialEventAt={occurrence.final_schedule}
+          canCancel={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          cancelling={cancelling}
+          onCancel={() => { setCancelError(''); setShowCancelDialog(true); }}
         />
       ) : null}
       {selectedIndex === currentIndex && plan.workflow_step === 'INVITATIONS' ? (
@@ -888,10 +999,10 @@ export function GatheringWorkflowSteps({
             setInvitationBannerUrl(content.bannerUrl);
             setInvitationDescription(content.description);
           }}
+          canCancel={plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          cancelling={cancelling}
+          onCancel={() => { setCancelError(''); setShowCancelDialog(true); }}
         />
-      ) : null}
-      {selectedIndex === 2 && currentIndex >= 2 ? (
-        <GatheringInvitationCard plan={plan} bannerUrl={invitationBannerUrl} description={invitationDescription} />
       ) : null}
       {selectedIndex === 2 && currentIndex >= 2 ? (
         <ReadOnlyInvitationHistory
@@ -921,6 +1032,13 @@ export function GatheringWorkflowSteps({
           minAttendees={occurrence.min_attendees}
           maxAttendees={occurrence.max_attendees}
           paymentDeadline={occurrence.payment_deadline}
+          depositAmountPerSeat={occurrence.deposit_amount_per_seat}
+          votingResults={occurrence.voting_results}
+          initialFinalSelections={Object.fromEntries(
+            occurrence.option_groups_snapshot
+              .filter((option) => option.is_final_selection)
+              .map((option) => [option.option_group_key, option.product_option_id]),
+          )}
           stageNumber={4}
           canConfirmEvent={plan.workflow_step === 'PAYMENT_CONFIRMATION' && plan.status === 'PAYMENT_OPEN'}
           canCancelGathering={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
@@ -932,7 +1050,11 @@ export function GatheringWorkflowSteps({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancelling) setShowCancelDialog(false); }}>
           <form onSubmit={(event) => void cancelGathering(event)} role="dialog" aria-modal="true" aria-labelledby="cancel-gathering-title" className="w-full max-w-lg border bg-white p-5 text-zinc-900 shadow-xl sm:p-6" style={{ borderColor: 'var(--brand-border)' }}>
             <h2 id="cancel-gathering-title" className="text-base font-semibold">Batalkan acara</h2>
-            <p className="mt-2 text-sm text-zinc-600">Acara akan dibatalkan dan proses refund akan dijalankan sesuai kebijakan.</p>
+            <p className="mt-2 text-sm text-zinc-600">
+              {plan.status === 'CONFIRMED'
+                ? 'Acara akan dibatalkan. Seluruh dana peserta yang masih ditahan di escrow akan direfund; DP belum dicairkan.'
+                : 'Acara akan dibatalkan dan proses refund akan dijalankan sesuai kebijakan.'}
+            </p>
             <label htmlFor="cancel-gathering-reason" className="mt-5 block text-sm font-medium">Alasan pembatalan (opsional)</label>
             <input id="cancel-gathering-reason" type="text" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} className="mt-2 block w-full rounded border border-zinc-300 px-3 py-2.5 text-sm focus:border-zinc-600 focus:outline-none" />
             {cancelError ? <p role="alert" className="mt-2 text-sm text-red-700">{cancelError}</p> : null}

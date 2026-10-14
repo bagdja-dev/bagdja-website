@@ -12,16 +12,17 @@ export interface GatheringPlanOption {
   venue_location?: string | null;
 }
 
-function toLocalInput(value?: string | null) {
-  if (!value) return '';
+function toLocalParts(value?: string | null) {
+  if (!value) return { date: '', time: '00:00' };
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  if (Number.isNaN(date.getTime())) return { date: '', time: '00:00' };
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  const localValue = local.toISOString();
+  return { date: localValue.slice(0, 10), time: localValue.slice(11, 16) };
 }
 
-function toIso(value: string) {
-  return value ? new Date(value).toISOString() : undefined;
+function toIso(date: string, time: string) {
+  return date ? new Date(`${date}T${time || '00:00'}`).toISOString() : undefined;
 }
 
 export function GatheringPlanControls({
@@ -34,6 +35,9 @@ export function GatheringPlanControls({
   initialReservationDeadline,
   initialPaymentDeadline,
   initialEventAt,
+  canCancel = false,
+  cancelling = false,
+  onCancel,
 }: {
   groupId: string;
   websiteId: string;
@@ -44,14 +48,23 @@ export function GatheringPlanControls({
   initialReservationDeadline?: string | null;
   initialPaymentDeadline?: string | null;
   initialEventAt?: string | null;
+  canCancel?: boolean;
+  cancelling?: boolean;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [invitePolicy, setInvitePolicy] = useState(initialInvitePolicy);
   const [openedOptionIds, setOpenedOptionIds] = useState(() => new Set(initialOpenedOptionIds));
-  const [reservationDeadline, setReservationDeadline] = useState(toLocalInput(initialReservationDeadline));
-  const [paymentDeadline, setPaymentDeadline] = useState(toLocalInput(initialPaymentDeadline));
-  const [eventAt, setEventAt] = useState(toLocalInput(initialEventAt));
+  const [initialReservation] = useState(() => toLocalParts(initialReservationDeadline));
+  const [initialPayment] = useState(() => toLocalParts(initialPaymentDeadline));
+  const [initialEvent] = useState(() => toLocalParts(initialEventAt));
+  const [reservationDate, setReservationDate] = useState(initialReservation.date);
+  const [reservationTime, setReservationTime] = useState(initialReservation.time);
+  const [paymentDate, setPaymentDate] = useState(initialPayment.date);
+  const [paymentTime, setPaymentTime] = useState(initialPayment.time);
+  const [eventDate, setEventDate] = useState(initialEvent.date);
+  const [eventTime, setEventTime] = useState(initialEvent.time);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -87,9 +100,9 @@ export function GatheringPlanControls({
           title: title.trim(),
           invite_policy: invitePolicy,
           opened_option_ids: [...openedOptionIds],
-          reservation_deadline: toIso(reservationDeadline),
-          payment_deadline: toIso(paymentDeadline),
-          event_at: toIso(eventAt),
+          reservation_deadline: toIso(reservationDate, reservationTime),
+          payment_deadline: toIso(paymentDate, paymentTime),
+          event_at: toIso(eventDate, eventTime),
           ...(submitPlan ? { submit_plan: true } : {}),
         }),
       });
@@ -125,18 +138,21 @@ export function GatheringPlanControls({
       />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        <label className="text-xs font-medium">
-          Terakhir reservasi
-          <input type="datetime-local" required value={reservationDeadline} onChange={(event) => { setReservationDeadline(event.target.value); setSaved(false); }} className="mt-1.5 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-        </label>
-        <label className="text-xs font-medium">
-          Terakhir pembayaran
-          <input type="datetime-local" required value={paymentDeadline} onChange={(event) => { setPaymentDeadline(event.target.value); setSaved(false); }} className="mt-1.5 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-        </label>
-        <label className="text-xs font-medium">
-          Tanggal acara
-          <input type="datetime-local" required value={eventAt} onChange={(event) => { setEventAt(event.target.value); setSaved(false); }} className="mt-1.5 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-        </label>
+        <fieldset className="space-y-2 text-xs font-medium">
+          <legend>Terakhir reservasi</legend>
+          <input aria-label="Tanggal terakhir reservasi" type="date" required value={reservationDate} onChange={(event) => { setReservationDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <input aria-label="Jam terakhir reservasi" type="time" value={reservationTime} onChange={(event) => { setReservationTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+        </fieldset>
+        <fieldset className="space-y-2 text-xs font-medium">
+          <legend>Terakhir pembayaran</legend>
+          <input aria-label="Tanggal terakhir pembayaran" type="date" required value={paymentDate} onChange={(event) => { setPaymentDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <input aria-label="Jam terakhir pembayaran" type="time" value={paymentTime} onChange={(event) => { setPaymentTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+        </fieldset>
+        <fieldset className="space-y-2 text-xs font-medium">
+          <legend>Tanggal acara</legend>
+          <input aria-label="Tanggal acara" type="date" required value={eventDate} onChange={(event) => { setEventDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <input aria-label="Jam acara" type="time" value={eventTime} onChange={(event) => { setEventTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+        </fieldset>
       </div>
 
       <label className="mt-5 block text-sm font-medium" htmlFor="gathering-invite-policy">Akses undangan</label>
@@ -191,9 +207,14 @@ export function GatheringPlanControls({
         <button type="button" onClick={() => void savePlan(false)} disabled={saving || title.trim().length < 3} className="rounded-full border px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>
           {saving ? 'Menyimpan…' : 'Simpan'}
         </button>
-        <button type="button" onClick={() => void savePlan(true)} disabled={saving || title.trim().length < 3 || !reservationDeadline || !paymentDeadline || !eventAt} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+        <button type="button" onClick={() => void savePlan(true)} disabled={saving || title.trim().length < 3 || !reservationDate || !paymentDate || !eventDate} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
           {saving ? 'Mengirim…' : 'Submit rencana'}
         </button>
+        {canCancel && onCancel ? (
+          <button type="button" onClick={onCancel} disabled={saving || cancelling} className="rounded-full border border-red-500 px-6 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
+            {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
+          </button>
+        ) : null}
       </div>
     </section>
   );

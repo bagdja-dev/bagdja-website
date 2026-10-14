@@ -23,10 +23,7 @@ export interface CartBadgeProps {
   label?: string;
 }
 
-interface ServerOrder {
-  quantity: number;
-  metadata?: { gathering?: { role?: string } } | null;
-}
+interface ServerOrder { quantity: number }
 
 export function CartBadge({ href, isLoggedIn, websiteId, label = 'Keranjang' }: CartBadgeProps) {
   const [count, setCount] = useState(0);
@@ -36,10 +33,7 @@ export function CartBadge({ href, isLoggedIn, websiteId, label = 'Keranjang' }: 
       const res = await fetch(`/api/orders?cart=true&website_id=${encodeURIComponent(websiteId)}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = (await res.json()) as { data?: ServerOrder[] };
-      const total = (data?.data ?? []).reduce(
-        (acc, order) => acc + (order.metadata?.gathering?.role === 'initiator' ? 1 : Number(order.quantity)),
-        0,
-      );
+      const total = (data?.data ?? []).reduce((acc, order) => acc + Number(order.quantity), 0);
       setCount(total);
     } catch {
       // biarkan count apa adanya (nilai terakhir yang berhasil dimuat)

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!result.data || result.status >= 400) {
     return NextResponse.json({ message: result.error ?? 'Gagal memuat rencana gathering.' }, { status: result.status });
   }
-  return NextResponse.json(result.data);
+  return NextResponse.json(result.data, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: NextRequest) {

@@ -86,7 +86,8 @@ interface GatheringInvoiceRow {
   amount: number;
   currency: string;
   payment_status: string;
-  invoice_issued_at: string;
+  invoice_status?: 'SCHEDULED' | 'ISSUED';
+  invoice_issued_at: string | null;
   payment_deadline?: string | null;
   can_pay: boolean;
   is_initiator: boolean;
@@ -98,6 +99,7 @@ interface GatheringInvoiceGroup {
   invoices: GatheringInvoiceRow[];
   amount: number;
   payment_status: string;
+  has_not_issued_invoice: boolean;
   has_refunded_invoice: boolean;
   has_paid_invoice: boolean;
   has_outstanding_invoice: boolean;
@@ -194,7 +196,8 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
       const statuses = new Set(invoices.map((invoice) => invoice.payment_status));
       const hasRefundedInvoice = statuses.has('REFUNDED');
       const hasPaidInvoice = statuses.has('PAID');
-      const hasOutstandingInvoice = invoices.some((invoice) => !['PAID', 'REFUNDED'].includes(invoice.payment_status));
+      const hasNotIssuedInvoice = invoices.some((invoice) => !invoice.invoice_issued_at || invoice.invoice_status === 'SCHEDULED');
+      const hasOutstandingInvoice = invoices.some((invoice) => Boolean(invoice.invoice_issued_at) && !['PAID', 'REFUNDED'].includes(invoice.payment_status));
       const isFullyPaid = invoices.every((invoice) => invoice.payment_status === 'PAID');
       const paymentStatus = statuses.size > 1 ? 'PARTIAL' : invoices[0].payment_status;
       return {
@@ -203,6 +206,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
         invoices,
         amount: invoices.reduce((total, invoice) => total + Number(invoice.amount), 0),
         payment_status: paymentStatus,
+        has_not_issued_invoice: hasNotIssuedInvoice,
         has_refunded_invoice: hasRefundedInvoice,
         has_paid_invoice: hasPaidInvoice,
         has_outstanding_invoice: hasOutstandingInvoice,
@@ -221,6 +225,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
 
   const filteredGatheringInvoices = useMemo(() => {
     if (tab === 'all') return groupedGatheringInvoices;
+    if (tab === 'scheduled') return groupedGatheringInvoices.filter((group) => group.has_not_issued_invoice);
     if (tab === 'issued') return groupedGatheringInvoices.filter((group) => group.has_outstanding_invoice);
     if (tab === 'paid') return groupedGatheringInvoices.filter((group) => group.is_fully_paid);
     if (tab === 'refunded') return groupedGatheringInvoices.filter((group) => group.has_refunded_invoice);
@@ -230,7 +235,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
   const tabCounts = useMemo(() => {
     const cnt: Record<TabKey, number> = {
       all: rows.length + groupedGatheringInvoices.length,
-      scheduled: 0,
+      scheduled: groupedGatheringInvoices.filter((group) => group.has_not_issued_invoice).length,
       issued: groupedGatheringInvoices.filter((group) => group.has_outstanding_invoice).length,
       paid: groupedGatheringInvoices.filter((group) => group.is_fully_paid).length,
       refunded: groupedGatheringInvoices.filter((group) => group.has_refunded_invoice).length,
@@ -338,8 +343,11 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
               const invoice = group.invoices[0];
               const status = group.payment_status === 'PARTIAL'
                 ? group.has_refunded_invoice ? 'Sebagian direfund' : group.has_paid_invoice ? 'Sebagian dibayar' : 'Pembayaran diproses'
+                : group.has_not_issued_invoice && !invoice.invoice_issued_at ? 'Menunggu diterbitkan'
                 : group.payment_status === 'PAID' ? 'Lunas' : group.payment_status === 'PENDING_PAYMENT' ? 'Pembayaran diproses' : group.payment_status === 'REFUNDED' ? 'Direfund' : 'Perlu dibayar';
-              const invoiceHref = group.transaction_id && group.can_view_transaction
+              const invoiceHref = !invoice.invoice_issued_at
+                ? undefined
+                : group.transaction_id && group.can_view_transaction
                 ? `${basePath}/order/${encodeURIComponent(group.transaction_id)}`
                 : `${basePath}/gathering/invoice/${encodeURIComponent(invoice.id)}`;
               const invoiceSummary = group.invoices.length > 1
@@ -360,7 +368,11 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
                       {invoice.payment_deadline ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Batas: {formatDate(invoice.payment_deadline)}</p> : null}
                       {invoice.is_initiator && !invoice.can_pay ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Anda pengelola gathering ini.</p> : null}
                     </div>
-                    <a href={invoiceHref} className="inline-flex rounded-full border px-4 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat detail tagihan</a>
+                    {invoiceHref ? (
+                      <a href={invoiceHref} className="inline-flex rounded-full border px-4 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat detail tagihan</a>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Tagihan tersedia setelah initiator membuka pembayaran.</span>
+                    )}
                   </div>
                 </article>
               );

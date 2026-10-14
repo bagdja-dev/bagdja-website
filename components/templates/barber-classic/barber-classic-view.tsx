@@ -41,6 +41,7 @@ import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
+import { GatheringCalendarContent } from '../../gathering-calendar-content';
 import { ProfileContent } from '../../profile-content';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
@@ -917,6 +918,13 @@ function ProductDetailSection({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            {item.gatheringMeta.depositAmountPerSeat != null && (
+              <div className="rounded-xl border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>DP booking per peserta</p>
+                <p className="mt-1 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(item.gatheringMeta.depositAmountPerSeat)}</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Nominal total DP menyesuaikan jumlah peserta.</p>
+              </div>
+            )}
             {item.gatheringMeta.eventDate && (
               <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
                 <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Jadwal</p>
@@ -1479,6 +1487,9 @@ export function BarberClassicView({
               }
               case 'tagihan': {
                 return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+              }
+              case 'gathering_calendar': {
+                return <GatheringCalendarContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
               }
               case 'order_detail': {
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;

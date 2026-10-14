@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
+function formatLocalDate(value?: string | null) {
+  if (!value) return 'Belum ditentukan';
+  const date = new Date(value);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { timeZone });
+}
+
 interface InvitePreview {
   invitation: { invitee_name?: string | null; expires_at: string };
   group: {
@@ -257,21 +264,23 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
 
   async function payForSeat() {
     if (!registrationId || paying) return;
-    if (paymentUrl) {
-      window.location.assign(paymentUrl);
-      return;
-    }
     setPaying(true);
     setRsvpError('');
     try {
+      // Selalu lewat seat-order (jangan buka paymentUrl tersimpan): untuk checkout yang
+      // masih pending, backend menerbitkan ulang sesi Pay UI karena link lama bisa sudah kedaluwarsa.
       const orderResponse = await fetch(`/api/gathering/registrations/${encodeURIComponent(registrationId)}/seat-order`, { method: 'POST' });
-      const order = await orderResponse.json().catch(() => null) as { id?: string; message?: string } | null;
+      const order = await orderResponse.json().catch(() => null) as { id?: string; checkout_url?: string | null; message?: string } | null;
       if (orderResponse.status === 401) {
         const next = `${window.location.pathname}${window.location.search}`;
         window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
         return;
       }
       if (!orderResponse.ok || !order?.id) throw new Error(order?.message || 'Gagal menyiapkan order seat.');
+      if (order.checkout_url) {
+        window.location.assign(order.checkout_url);
+        return;
+      }
       const checkoutResponse = await fetch('/api/transactions/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -350,8 +359,8 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
         <dl className="mt-6 grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
           <div><dt className="text-xs uppercase text-zinc-500">Harga per peserta</dt><dd className="mt-1 font-semibold">{price}</dd></div>
           <div><dt className="text-xs uppercase text-zinc-500">Batas peserta</dt><dd className="mt-1 font-semibold">Min. {occurrence.min_attendees} · Maks. {occurrence.max_attendees}</dd></div>
-          <div><dt className="text-xs uppercase text-zinc-500">Jadwal</dt><dd className="mt-1 font-semibold">{occurrence.final_schedule ? new Date(occurrence.final_schedule).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
-          <div><dt className="text-xs uppercase text-zinc-500">Batas RSVP</dt><dd className="mt-1 font-semibold">{occurrence.rsvp_close_at ? new Date(occurrence.rsvp_close_at).toLocaleString('id-ID') : 'Belum ditentukan'}</dd></div>
+          <div><dt className="text-xs uppercase text-zinc-500">Jadwal</dt><dd className="mt-1 font-semibold">{formatLocalDate(occurrence.final_schedule)}</dd></div>
+          <div><dt className="text-xs uppercase text-zinc-500">Batas RSVP</dt><dd className="mt-1 font-semibold">{formatLocalDate(occurrence.rsvp_close_at)}</dd></div>
           <div><dt className="text-xs uppercase text-zinc-500">Status</dt><dd className="mt-1 font-semibold">{occurrence.status === 'PREORDER' ? 'Perencanaan' : occurrence.status === 'RSVP_OPEN' ? 'Pendaftaran dibuka' : occurrence.status === 'PAYMENT_OPEN' ? 'Pembayaran dibuka' : occurrence.status}</dd></div>
         </dl>
         <p className="mt-6 border-l-2 border-zinc-500 pl-3 text-sm text-zinc-600">Undangan ini valid sampai {new Date(preview.invitation.expires_at).toLocaleDateString('id-ID')}.</p>

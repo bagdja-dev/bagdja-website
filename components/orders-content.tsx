@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ChatReferenceButton } from './chat-reference-button';
+import { RetryPaymentButton } from './retry-payment-button';
 import { buildChatReferenceHref } from './chat-reference';
 
 /**
@@ -520,14 +521,13 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
                 Chat Order
               </ChatReferenceButton>
             )}
-            {needPayment && row.checkout_url && (
-              <a
-                href={row.checkout_url}
-                className="inline-flex rounded-full px-4 py-1.5 text-xs font-semibold"
-                style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-              >
-                Lanjutkan Pembayaran
-              </a>
+            {needPayment && (
+              <RetryPaymentButton
+                transactionId={row.id}
+                label="Lanjutkan Pembayaran"
+                wrapperClassName="inline-flex flex-col items-start"
+                buttonClassName="inline-flex rounded-full px-4 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              />
             )}
           </div>
         </div>
