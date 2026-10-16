@@ -55,6 +55,8 @@ import type { NextResponse } from 'next/server';
 const TOKEN_COOKIE = 'site_token';
 const USER_COOKIE = 'site_user';
 const AUTH_SELECTED_COOKIE = 'site_auth_selected';
+/** Session lifetime shared by all session cookies. */
+const SESSION_MAX_AGE = 60 * 60 * 24; // 24 hours
 
 /** Sama seperti middleware.ts — host dev lokal, tidak pernah domain-match subdomain wildcard produksi. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -96,7 +98,7 @@ function getCookieOptions(targetHostname: string) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
     path: '/',
-    maxAge: 60 * 60 * 24, // 24 hours
+    maxAge: SESSION_MAX_AGE,
     domain: getCookieDomain(targetHostname),
   };
 }
@@ -125,7 +127,10 @@ export function setSessionCookies(
   const hostname = new URL(targetOrigin).hostname;
   const cookieOptions = getCookieOptions(hostname);
   response.cookies.set(TOKEN_COOKIE, token, cookieOptions);
-  response.cookies.set(AUTH_SELECTED_COOKIE, '1', { ...cookieOptions, maxAge: 60 * 60 });
+  // Same lifetime as site_token: middleware requires both, so a shorter
+  // site_auth_selected logged buyers out (e.g. returning from payment) while
+  // the token was still valid.
+  response.cookies.set(AUTH_SELECTED_COOKIE, '1', cookieOptions);
   response.cookies.set(USER_COOKIE, JSON.stringify(user), {
     ...cookieOptions,
     httpOnly: false, // client needs to read user info

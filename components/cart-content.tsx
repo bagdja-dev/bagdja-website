@@ -27,6 +27,7 @@ interface ServerOrder {
   website_id: string;
   product?: {
     name?: string;
+    type?: string;
     description?: string | null;
     images?: string[];
     price?: number;
@@ -77,6 +78,7 @@ interface CartLine {
   orderId: string;
   productId: string;
   name: string;
+  isDigital: boolean;
   description?: string;
   image?: string;
   unitPrice: number;
@@ -196,10 +198,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
         orderId: o.id,
         productId: o.product_id,
         name: o.product?.name ?? 'Produk',
+        isDigital: o.product?.type === 'digital',
         description: o.product?.description ?? undefined,
         image: o.product?.images?.[0],
         unitPrice: Number(o.unit_price),
-        quantity: o.quantity,
+        quantity: o.product?.type === 'digital' ? 1 : o.quantity,
         paymentMode: o.payment_mode,
         variantAttributes: o.product?.metadata?.variant_attributes,
         isVariant: Boolean(o.product?.parent_product_id),
@@ -572,7 +575,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                     {/* Qty stepper */}
                     {line.isGatheringPlan ? (
                       <span className="text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>Order rencana · tanpa seat</span>
-                    ) : (
+                    ) : !line.isDigital ? (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -598,7 +601,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                         +
                       </button>
                     </div>
-                    )}
+                    ) : null}
 
                     <div className="text-right">
                       {line.isGatheringPlan ? (
@@ -658,7 +661,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                           ) : (
                             <>
                               <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
-                                Rp {line.unitPrice.toLocaleString('id-ID')}{line.uomSymbol ? `/${line.uomSymbol}` : ''} × {line.quantity}{line.uomSymbol ? ` ${line.uomSymbol}` : ''}
+                                Rp {line.unitPrice.toLocaleString('id-ID')}{line.uomSymbol ? `/${line.uomSymbol}` : ''}{!line.isDigital ? ` × ${line.quantity}${line.uomSymbol ? ` ${line.uomSymbol}` : ''}` : ''}
                               </p>
                               <p className="text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
                                 Rp {lineTotal.toLocaleString('id-ID')}
