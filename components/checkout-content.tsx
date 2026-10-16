@@ -190,6 +190,20 @@ export function CheckoutContent({
     [draftOrders],
   );
 
+  const paymentGroups = useMemo(() => {
+    const grouped = new Map<string, typeof displayItems>();
+    for (const item of displayItems) {
+      const items = grouped.get(item.mode) ?? [];
+      items.push(item);
+      grouped.set(item.mode, items);
+    }
+    return Array.from(grouped, ([mode, items]) => ({
+      mode,
+      items,
+      subtotal: items.reduce((sum, item) => sum + item.price * item.qty, 0),
+    }));
+  }, [displayItems]);
+
   const subtotal = displayItems.reduce((acc, d) => acc + d.price * d.qty, 0);
   const shippingCost = shippingEnabled ? selectedCourierOption?.cost ?? 0 : 0;
   const total = subtotal + shippingCost;
@@ -328,6 +342,95 @@ export function CheckoutContent({
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >
             Lihat Produk
+          </Link>
+        )}
+      </main>
+    );
+  }
+
+  if (paymentGroups.length > 1) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+          Pilih Jalur Pembayaran
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm" style={{ color: 'var(--brand-muted)' }}>
+          Pesanan dengan metode pembayaran berbeda diproses sebagai transaksi terpisah. Pilih satu kelompok untuk melanjutkan; kelompok lainnya tetap tersedia di keranjang.
+        </p>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {paymentGroups.map((group) => {
+            const isEscrow = group.mode === 'ESCROW';
+            const label = isEscrow ? 'Escrow' : group.mode === 'ADD_TO_CART' ? 'Bayar Langsung' : 'Metode Pembayaran';
+            const orderIds = group.items.map((item) => item.id);
+            const checkoutHref = `${basePath}/checkout?order_ids=${encodeURIComponent(orderIds.join(','))}`;
+
+            return (
+              <section
+                key={group.mode}
+                className="flex flex-col rounded-xl border p-5"
+                style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {label}
+                    </h2>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                      {isEscrow
+                        ? 'Dana ditahan sampai Anda mengonfirmasi pesanan diterima.'
+                        : 'Pembayaran diproses langsung melalui Bagdja.'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                    {group.items.length} item
+                  </span>
+                </div>
+
+                <ul className="mt-5 divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                  {group.items.map((item) => (
+                    <li key={item.id} className="flex justify-between gap-4 py-3 text-sm">
+                      <span className="min-w-0 truncate">
+                        {item.qty} × {item.name}
+                      </span>
+                      <span className="shrink-0 font-medium">
+                        Rp {(item.price * item.qty).toLocaleString('id-ID')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <dl className="mt-auto pt-4">
+                  <div className="flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: 'var(--brand-border)' }}>
+                    <dt className="font-semibold">Subtotal</dt>
+                    <dd className="text-lg font-bold">Rp {group.subtotal.toLocaleString('id-ID')}</dd>
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
+                    Ongkir, jika berlaku, dihitung pada checkout kelompok ini.
+                  </p>
+                </dl>
+
+                {missingSelection ? (
+                  <p className="mt-5 text-sm" style={{ color: 'crimson' }}>
+                    Sebagian pesanan sudah tidak tersedia. Kembali ke keranjang untuk memilih ulang.
+                  </p>
+                ) : (
+                  <Link
+                    href={checkoutHref}
+                    className="mt-5 inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition-opacity hover:opacity-85"
+                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                  >
+                    Lanjut ke checkout {isEscrow ? 'Escrow' : 'Bayar Langsung'}
+                  </Link>
+                )}
+              </section>
+            );
+          })}
+        </div>
+
+        {missingSelection && (
+          <Link href={`${basePath}/cart`} className="mt-6 inline-flex text-sm font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>
+            Kembali ke keranjang
           </Link>
         )}
       </main>

@@ -859,7 +859,7 @@ function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
   }
 }
 
-function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; loginHref?: string }) {
+function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, isLoggedIn, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; isLoggedIn?: boolean; loginHref?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
@@ -903,6 +903,8 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
               <PurchaseControls
                 slug={tenantSlug}
                 basePath={websiteSlug}
+                isLoggedIn={isLoggedIn}
+                loginHref={loginHref}
                 websiteId={item.websiteId}
                 product={{
                   id: item.id,
@@ -963,7 +965,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     href={waHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-6 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                    className="mt-6 inline-flex w-full justify-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                   >
                     Pesan via WhatsApp
@@ -976,7 +978,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     loginHref={loginHref}
                     productId={item.id}
                     reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
-                    className="mt-3 inline-flex rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
+                    className="mt-3 inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                   >
                     Tanya Produk
                   </ChatReferenceButton>
@@ -1526,7 +1528,7 @@ export function StoreClassicView({
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
                 if (!item) return null;
-                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} loginHref={auth?.loginHref} />;
+                return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} />;
               }
               default:
                 return null;

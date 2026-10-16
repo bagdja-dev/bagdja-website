@@ -111,7 +111,7 @@ export function AddToCartButton({
       type="button"
       disabled={outOfStock || busy || disabled}
       onClick={handleClick}
-      className="mt-3 inline-flex justify-center text-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+      className="mt-3 inline-flex w-full justify-center text-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
       style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
     >
       {outOfStock
