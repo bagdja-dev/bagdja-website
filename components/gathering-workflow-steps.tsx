@@ -16,6 +16,19 @@ const STEPS = [
   { key: 'PAYMENT_CONFIRMATION', label: 'Konfirmasi pembayaran' },
 ] as const;
 
+type WorkflowStep = GatheringPlanDetail['workflow_step'];
+
+/** Urutan tahap — LOCKED dianggap setelah tahap terakhir. */
+function workflowRank(step: WorkflowStep): number {
+  return step === 'LOCKED' ? STEPS.length : STEPS.findIndex((item) => item.key === step);
+}
+
+interface PlanAdvance {
+  workflow_step: WorkflowStep;
+  status: string;
+  occurrence_status: string;
+}
+
 interface InvitationHistoryRow {
   id: string;
   invitee_name: string | null;
@@ -123,6 +136,7 @@ function ReadOnlyInvitationHistory({
   canCancelGathering = false,
   cancelling = false,
   onCancelGathering,
+  onReservationsConfirmed,
 }: {
   groupId: string;
   websiteId: string;
@@ -143,6 +157,8 @@ function ReadOnlyInvitationHistory({
   canCancelGathering?: boolean;
   cancelling?: boolean;
   onCancelGathering?: () => void;
+  /** Dipanggil setelah RSVP ditutup — memajukan tahap langsung dari respons API tanpa menunggu router.refresh(). */
+  onReservationsConfirmed?: (advance: PlanAdvance) => void;
 }) {
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationHistoryRow[]>([]);
@@ -288,7 +304,7 @@ function ReadOnlyInvitationHistory({
     setError('');
     try {
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/confirm-reservations?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
-      const payload = await response.json().catch(() => null) as { message?: string; failed_invoice_emails?: string[]; invoice_operation_id?: string; invoice_operation_status?: GatheringOperationProgress['status']; invoice_email_total?: number; invoice_email_success_count?: number; invoice_email_failed_count?: number; invoice_email_error?: string | null } | null;
+      const payload = await response.json().catch(() => null) as { message?: string; workflow_step?: WorkflowStep; status?: string; occurrence?: { status?: string } | null; failed_invoice_emails?: string[]; invoice_operation_id?: string; invoice_operation_status?: GatheringOperationProgress['status']; invoice_email_total?: number; invoice_email_success_count?: number; invoice_email_failed_count?: number; invoice_email_error?: string | null } | null;
       if (!response.ok) throw new Error(payload?.message || 'Gagal membuka pembayaran peserta.');
       setFailedInvoiceEmails(payload?.failed_invoice_emails ?? []);
       if (payload?.invoice_operation_id) {
@@ -317,6 +333,11 @@ function ReadOnlyInvitationHistory({
         });
       }
       setSelectedRegistrationIds([]);
+      onReservationsConfirmed?.({
+        workflow_step: payload?.workflow_step ?? 'PAYMENT_CONFIRMATION',
+        status: payload?.status ?? 'PAYMENT_OPEN',
+        occurrence_status: payload?.occurrence?.status ?? 'PAYMENT_OPEN',
+      });
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal membuka pembayaran peserta.');
@@ -886,7 +907,7 @@ function ReadOnlyInvitationHistory({
 }
 
 export function GatheringWorkflowSteps({
-  plan,
+  plan: planProp,
   websiteId,
   basePath,
 }: {
@@ -894,6 +915,18 @@ export function GatheringWorkflowSteps({
   websiteId: string;
   basePath: string;
 }) {
+  // Tahap yang sudah dimajukan dari respons API aksi. Dipakai selama data server
+  // (router.refresh) belum menyusul; begitu props sudah di tahap yang sama/lebih
+  // jauh, props kembali jadi sumber kebenaran.
+  const [planAdvance, setPlanAdvance] = useState<PlanAdvance | null>(null);
+  const plan: GatheringPlanDetail = planAdvance && workflowRank(planAdvance.workflow_step) > workflowRank(planProp.workflow_step)
+    ? {
+      ...planProp,
+      workflow_step: planAdvance.workflow_step,
+      status: planAdvance.status,
+      occurrence: { ...planProp.occurrence, status: planAdvance.occurrence_status },
+    }
+    : planProp;
   const workflowIndex = STEPS.findIndex((step) => step.key === plan.workflow_step);
   const currentIndex = plan.workflow_step === 'LOCKED'
     ? STEPS.length - 1
@@ -1019,6 +1052,7 @@ export function GatheringWorkflowSteps({
           minAttendees={occurrence.min_attendees}
           maxAttendees={occurrence.max_attendees}
           stageNumber={3}
+          onReservationsConfirmed={setPlanAdvance}
         />
       ) : null}
       {selectedIndex === 3 && currentIndex >= 3 ? (

@@ -5,6 +5,7 @@ import { backendFetch } from '../../../../lib/backend-api';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
+import TransactionLoadError from '../../../../components/transaction-load-error';
 import { CartProvider } from '../../../../lib/cart';
 import { toBlogPostItem, toCatalogItem, toFaqItem, toLocationItem, toNavPage, type SectionEntry } from '../../../../lib/template-data';
 import { getTemplateRenderer } from '../../../../lib/template-registry';
@@ -14,6 +15,14 @@ import type { OrderDetail, TransactionDetail } from '../../../../components/orde
 import { draftOrderHref, transactionHref } from '../../../../lib/order-href';
 
 export const revalidate = 60;
+
+/** Mirror `TransactionSyncResponseDto` (bagdja-website-api) — hasil POST /api/transactions/:id/sync. */
+interface TransactionSyncResult {
+  id: string;
+  status: string;
+  synced: boolean;
+  sync_errors: Array<'escrow' | 'direct_payment' | 'termin' | 'digital_delivery'>;
+}
 
 interface TransactionPageProps {
   params: { website_slug: string; transaction_id: string };
@@ -31,16 +40,38 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
 
   const basePath = resolveTenantLinkBase(params.website_slug);
-  const auth = await getAuthViewState(`${basePath}/order/${params.transaction_id}`, basePath);
+  const detailPath = `${basePath}/order/${params.transaction_id}`;
+  const auth = await getAuthViewState(detailPath, basePath);
   const { website, products, locations, faqs, blogPosts } = tenant;
-  const result = await backendFetch<TransactionDetail>(`/api/transactions/${params.transaction_id}?website_id=${encodeURIComponent(website.id)}`);
-  if (result.status === 401) {
-    redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/order/${params.transaction_id}`)}`);
+  const transactionPath = `/api/transactions/${encodeURIComponent(params.transaction_id)}`;
+  const websiteQuery = `?website_id=${encodeURIComponent(website.id)}`;
+
+  // Sinkron status (escrow / payment-service / aset digital) dulu — best-effort:
+  // gagal di sini tidak menghalangi detail tampil dengan status terakhir di DB.
+  const syncResult = await backendFetch<TransactionSyncResult>(`${transactionPath}/sync${websiteQuery}`, { method: 'POST' });
+  if (syncResult.status === 401) {
+    redirect(`/auth/login?next=${encodeURIComponent(detailPath)}`);
   }
-  if (!result.data || result.status >= 400) {
-    const orderResult = await backendFetch<OrderDetail>(`/api/orders/${params.transaction_id}`);
+  if (syncResult.status >= 500 || syncResult.data?.synced === false) {
+    console.error(
+      `[order-detail] sync ${params.transaction_id} -> ${syncResult.status} ${syncResult.data?.sync_errors?.join(',') ?? syncResult.error ?? ''}`,
+    );
+  }
+
+  const result = await backendFetch<TransactionDetail>(`${transactionPath}${websiteQuery}`);
+  if (result.status === 401) {
+    redirect(`/auth/login?next=${encodeURIComponent(detailPath)}`);
+  }
+  if (result.status !== 404 && (result.status >= 400 || !result.data)) {
+    // Error server/jaringan — jangan disamarkan jadi 404 (transaksinya bisa jadi ada).
+    console.error(`[order-detail] load ${params.transaction_id} -> ${result.status} ${result.error ?? ''}`);
+    return <TransactionLoadError retryHref={detailPath} ordersHref={`${basePath}/orders`} />;
+  }
+  if (!result.data) {
+    // Link lama yang masih memakai order ID — arahkan ke URL yang benar.
+    const orderResult = await backendFetch<OrderDetail>(`/api/orders/${encodeURIComponent(params.transaction_id)}`);
     if (orderResult.status === 401) {
-      redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/order/${params.transaction_id}`)}`);
+      redirect(`/auth/login?next=${encodeURIComponent(detailPath)}`);
     }
     if (orderResult.data?.transaction_id) {
       redirect(transactionHref(basePath, orderResult.data.transaction_id));

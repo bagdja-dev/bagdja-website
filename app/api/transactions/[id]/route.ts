@@ -3,7 +3,7 @@ import { backendFetch } from '../../../../lib/backend-api';
 
 /**
  * BFF route /api/transactions/:id — detail transaksi milik buyer login
- * (sinkronisasi status dari escrow di backend). Dipakai halaman order.
+ * (baca DB saja; sinkron status lewat POST /api/transactions/:id/sync di backend).
  */
 interface RouteContext {
   params: { id: string };

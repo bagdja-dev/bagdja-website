@@ -20,6 +20,8 @@ interface ChatReferenceButtonProps {
   productId?: string;
   orderId?: string;
   className?: string;
+  /** Class pembungkus tombol + pesan error. Default `mt-3`; isi sendiri saat tombol berjajar dengan CTA lain. */
+  wrapperClassName?: string;
   style?: CSSProperties;
   children: ReactNode;
 }
@@ -32,6 +34,7 @@ export function ChatReferenceButton({
   productId,
   orderId,
   className,
+  wrapperClassName = 'mt-3',
   style,
   children,
 }: ChatReferenceButtonProps) {
@@ -78,7 +81,7 @@ export function ChatReferenceButton({
   }
 
   return (
-    <div className="mt-3">
+    <div className={wrapperClassName}>
       <button type="button" onClick={() => void openChat()} disabled={loading} className={className} style={style}>
         {loading ? 'Menyiapkan chat...' : children}
       </button>

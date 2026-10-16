@@ -490,12 +490,12 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
             </p>
             <p
               className="text-lg font-bold"
-              style={{ color: 'var(--brand-accent-muted)' }}
+              style={{ color: 'var(--brand-text)' }}
             >
               {formatMoney(transactionGridTotal(row))}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <a
               href={detailHref}
               className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
@@ -516,7 +516,9 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
                   meta: productName,
                   href: buildChatReferenceHref('transaction', basePath, { entityId: row.id }),
                 }}
+                wrapperClassName="inline-flex flex-col items-start"
                 className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
+                style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
               >
                 Chat Order
               </ChatReferenceButton>
