@@ -180,6 +180,7 @@ export interface OrderDetail {
 
 export interface GatheringPlanDetail {
   id: string;
+  plan_number: string;
   order_id: string | null;
   title: string;
   status: string;
@@ -296,6 +297,7 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
       <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
         Rencana gathering #{order.id.slice(0, 8)} dikelola terpisah dari keranjang dan bukan tagihan. Pembayaran seat dibuka setelah peserta dan rencana acara dikonfirmasi.
       </p>
+      <p className="mt-2 text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>Nomor rencana: {plan.plan_number}</p>
 
       <section className="mt-6 border-y py-5" style={{ borderColor: 'var(--brand-border)' }}>
         <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>Ringkasan gathering</h2>

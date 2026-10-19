@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 type PlanRow = {
   id: string;
+  plan_number: string;
   order_id: string | null;
   title: string;
   status: string;
@@ -115,6 +116,7 @@ export function GatheringCalendarContent({ basePath, websiteId }: { basePath: st
                 <h2 className="text-base font-semibold">{plan.title}</h2>
                 <span className="border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>{STATUS_LABELS[plan.status] ?? plan.status}</span>
               </div>
+              <p className="mt-1 text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>Nomor rencana: {plan.plan_number}</p>
               <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>{STEP_LABELS[plan.workflow_step] ?? plan.workflow_step}</p>
               <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Jadwal: {formatDate(plan.occurrence.final_schedule)} · Peserta: min. {plan.occurrence.min_attendees}, maks. {plan.occurrence.max_attendees}</p>
               {plan.occurrence.payment_deadline ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Batas pembayaran: {formatDate(plan.occurrence.payment_deadline)}</p> : null}

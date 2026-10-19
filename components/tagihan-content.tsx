@@ -81,6 +81,7 @@ interface GatheringInvoiceRow {
   transaction_id?: string | null;
   can_view_transaction?: boolean;
   invoice_id: string;
+  plan_number: string;
   gathering_title: string;
   attendee_name: string;
   amount: number;
@@ -358,6 +359,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
                     <div>
                       <p className="font-semibold">{invoice.gathering_title}</p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Nomor rencana: {invoice.plan_number}</p>
                       <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{invoiceSummary}</p>
                     </div>
                     <span className="text-xs font-semibold" style={{ color: group.is_fully_paid ? 'rgb(22, 163, 74)' : group.has_refunded_invoice ? 'rgb(180, 83, 9)' : 'var(--brand-muted)' }}>{status}</span>

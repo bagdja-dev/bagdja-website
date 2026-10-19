@@ -90,6 +90,7 @@ function ReadOnlyPlan({ plan }: { plan: GatheringPlanDetail }) {
       <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>1. Atur rencana</h2>
       <dl className="mt-4 grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
         <div><dt style={{ color: 'var(--brand-muted)' }}>Nama rencana</dt><dd className="mt-1 font-medium">{plan.title}</dd></div>
+        <div><dt style={{ color: 'var(--brand-muted)' }}>Nomor rencana</dt><dd className="mt-1 font-medium">{plan.plan_number}</dd></div>
         <div><dt style={{ color: 'var(--brand-muted)' }}>Akses undangan</dt><dd className="mt-1 font-medium">{plan.invite_policy === 'INVITE_ONLY' ? 'Khusus undangan' : 'Terbuka'}</dd></div>
         <div><dt style={{ color: 'var(--brand-muted)' }}>Terakhir reservasi</dt><dd className="mt-1 font-medium">{formatDate(occurrence.rsvp_close_at)}</dd></div>
         <div><dt style={{ color: 'var(--brand-muted)' }}>Terakhir pembayaran</dt><dd className="mt-1 font-medium">{formatDate(occurrence.payment_deadline)}</dd></div>
