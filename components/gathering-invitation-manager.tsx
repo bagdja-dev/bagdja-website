@@ -118,6 +118,32 @@ export function GatheringInvitationManager({
   useEffect(() => { void loadInvitations(); }, [loadInvitations]);
 
   useEffect(() => {
+    let cancelled = false;
+    const operationUrl = `/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/operation?website_id=${encodeURIComponent(websiteId)}`;
+
+    async function loadActiveDispatch() {
+      try {
+        const response = await fetch(operationUrl, { cache: 'no-store' });
+        const payload = await response.json().catch(() => null) as InvitationOperationProgress | { message?: string } | null;
+        if (!response.ok) {
+          throw new Error((payload as { message?: string } | null)?.message || 'Gagal memuat progres pengiriman undangan.');
+        }
+        if (cancelled || !payload || !('id' in payload)) return;
+
+        setDispatchOperation(payload);
+        setDispatchOperationId(payload.id);
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : 'Gagal memuat progres pengiriman undangan.');
+        }
+      }
+    }
+
+    void loadActiveDispatch();
+    return () => { cancelled = true; };
+  }, [groupId, websiteId]);
+
+  useEffect(() => {
     if (!revokeOperationId) return;
     const source = new EventSource(`/api/gathering/plans/${encodeURIComponent(groupId)}/operations/${encodeURIComponent(revokeOperationId)}/events?website_id=${encodeURIComponent(websiteId)}`);
     source.onmessage = (event) => {
