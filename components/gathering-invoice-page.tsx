@@ -13,6 +13,7 @@ interface PublicGatheringInvoice {
   id: string;
   invoice_id: string;
   gathering_title: string;
+  initiator_name: string;
   attendee_name: string;
   amount: number;
   currency: string;
@@ -97,6 +98,7 @@ export function GatheringInvoicePage({ registrationId, websiteName }: { registra
           <dl className="grid gap-4 sm:grid-cols-2">
             <div><dt className="text-xs text-zinc-500">Nomor tagihan</dt><dd className="mt-1 font-medium">{invoice.invoice_id}</dd></div>
             <div><dt className="text-xs text-zinc-500">Nama peserta</dt><dd className="mt-1 font-medium">{invoice.attendee_name}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Initiator gathering</dt><dd className="mt-1 font-medium">{invoice.initiator_name}</dd></div>
             <div><dt className="text-xs text-zinc-500">Batas pembayaran</dt><dd className="mt-1 font-medium">{formatLocalDate(invoice.payment_deadline)}</dd></div>
             <div><dt className="text-xs text-zinc-500">Tanggal acara</dt><dd className="mt-1 font-medium">{formatLocalDate(invoice.event_date)}</dd></div>
           </dl>

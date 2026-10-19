@@ -14,6 +14,7 @@ interface InvitePreview {
   group: {
     id: string;
     title: string;
+    initiator_name: string;
     invite_policy: 'OPEN' | 'INVITE_ONLY';
     workflow_step: string;
     invitation_banner_url?: string | null;
@@ -354,6 +355,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Undangan gathering</p>
         {preview.group.invitation_banner_url ? <img src={preview.group.invitation_banner_url} alt={`Banner ${preview.group.title}`} className="mt-4 aspect-[16/8] w-full object-cover" /> : null}
         <h1 className="mt-2 text-2xl font-semibold">{preview.group.title}</h1>
+        <p className="mt-2 text-sm text-zinc-600">Diprakarsai oleh <strong className="font-semibold text-zinc-800">{preview.group.initiator_name}</strong></p>
         {preview.invitation.invitee_name ? <p className="mt-2 text-sm text-zinc-600">Untuk {preview.invitation.invitee_name}</p> : null}
         {preview.group.invitation_description ? <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-zinc-700">{preview.group.invitation_description}</p> : null}
         <dl className="mt-6 grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
