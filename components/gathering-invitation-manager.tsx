@@ -324,7 +324,6 @@ export function GatheringInvitationManager({
       } | null;
       if (!response.ok || !payload?.submitted) throw new Error(payload?.message || 'Undangan belum berhasil disubmit.');
       if (payload.public_invitation?.id) setShareUrl(makeShareUrl(payload.public_invitation.id, false));
-      await loadInvitations();
       if (payload.operation_id) {
         setDispatchOperationId(payload.operation_id);
         setDispatchOperation({
@@ -341,7 +340,9 @@ export function GatheringInvitationManager({
         if (payload.operation_status === 'FAILED') {
           setError(payload.error_message || 'Pengiriman undangan gagal dimulai.');
         }
+        void loadInvitations();
       } else {
+        await loadInvitations();
         router.refresh();
       }
     } catch (cause) {
