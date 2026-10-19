@@ -124,14 +124,14 @@ export function GatheringInvitationManager({
     async function loadActiveDispatch() {
       try {
         const response = await fetch(operationUrl, { cache: 'no-store' });
-        const payload = await response.json().catch(() => null) as InvitationOperationProgress | { message?: string } | null;
+        const payload = await response.json().catch(() => null) as { operation?: InvitationOperationProgress | null; message?: string } | null;
         if (!response.ok) {
-          throw new Error((payload as { message?: string } | null)?.message || 'Gagal memuat progres pengiriman undangan.');
+          throw new Error(payload?.message || 'Gagal memuat progres pengiriman undangan.');
         }
-        if (cancelled || !payload || !('id' in payload)) return;
+        if (cancelled || !payload?.operation) return;
 
-        setDispatchOperation(payload);
-        setDispatchOperationId(payload.id);
+        setDispatchOperation(payload.operation);
+        setDispatchOperationId(payload.operation.id);
       } catch (cause) {
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : 'Gagal memuat progres pengiriman undangan.');
