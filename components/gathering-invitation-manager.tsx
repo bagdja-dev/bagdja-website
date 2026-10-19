@@ -236,13 +236,15 @@ export function GatheringInvitationManager({
     XLSX.writeFile(workbook, 'template-undangan-gathering.xlsx');
   }
 
-  async function savePendingContacts() {
+  /** Simpan antrean kontak; `true` bila semua tersimpan. Kontak yang sudah tersimpan dikeluarkan dari antrean supaya retry tidak menggandakan undangan. */
+  async function savePendingContacts(): Promise<boolean> {
     if (pendingContacts.length === 0) {
       setError('Belum ada peserta untuk disimpan.');
-      return;
+      return false;
     }
 
     setError('');
+    let remaining = pendingContacts;
     try {
       for (const contact of pendingContacts) {
         const response = await fetch(collectionUrl, {
@@ -252,11 +254,15 @@ export function GatheringInvitationManager({
         });
         const payload = await response.json().catch(() => null) as { message?: string } | null;
         if (!response.ok) throw new Error(payload?.message || 'Gagal menyimpan daftar penerima.');
+        remaining = remaining.slice(1);
       }
-      setPendingContacts([]);
-      await loadInvitations();
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal menyimpan daftar penerima.');
+      return false;
+    } finally {
+      setPendingContacts(remaining);
+      await loadInvitations();
     }
   }
 
@@ -265,10 +271,9 @@ export function GatheringInvitationManager({
     setSubmitting(true); setError(''); setShareUrl('');
     try {
       if (invitePolicy === 'INVITE_ONLY' && pendingContacts.length) {
-        await savePendingContacts();
-        if (pendingContacts.length > 0) {
-          return;
-        }
+        // Jangan baca `pendingContacts` di sini — nilainya masih snapshot render sebelum disimpan.
+        const saved = await savePendingContacts();
+        if (!saved) return;
       }
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/submit?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
       const payload = await response.json().catch(() => null) as { submitted?: boolean; failed_emails?: number; public_invitation?: { id?: string }; message?: string } | null;
