@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
 import { GatheringInvitationAppearance } from './gathering-invitation-appearance';
+import { ConfirmDialog } from './confirm-dialog';
 
 interface InvitationRow {
   id: string;
@@ -145,7 +146,10 @@ export function GatheringInvitationManager({
           if (progress.status === 'COMPLETED') {
             router.refresh();
           } else {
-            setError(progress.error_message || `Pengiriman undangan gagal untuk ${progress.failed_count} penerima. Perbaiki kontak lalu submit kembali.`);
+            const failedRecipients = progress.failed_items.length
+              ? ` Penerima gagal: ${progress.failed_items.join(', ')}.`
+              : '';
+            setError(`${progress.error_message || `Pengiriman undangan gagal untuk ${progress.failed_count} penerima.`}${failedRecipients} Perbaiki kontak lalu submit kembali.`);
           }
         }
       } catch {
@@ -489,7 +493,6 @@ export function GatheringInvitationManager({
         </>
       ) : null}
 
-      {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
       {revokeOperation ? (
         <div className="mt-3 border-y py-3 text-xs" style={{ borderColor: 'var(--brand-border)' }} role="status">
           <span className="font-semibold">{revokeOperation.status === 'QUEUED' ? 'Pencabutan antre' : revokeOperation.status === 'RUNNING' ? 'Memproses pencabutan' : revokeOperation.status === 'COMPLETED' ? 'Undangan berhasil dicabut' : 'Pencabutan gagal'}</span>
@@ -553,6 +556,16 @@ export function GatheringInvitationManager({
         ) : null}
       </div>
       <p className="mt-2 text-[11px]" style={{ color: 'var(--brand-muted)' }}>WhatsApp belum memiliki engine pengiriman. Kontak WhatsApp menggunakan tautan manual.</p>
+      <ConfirmDialog
+        open={Boolean(error)}
+        title="Terjadi Kesalahan"
+        message={error}
+        confirmLabel="Tutup"
+        showCancel={false}
+        variant="danger"
+        onConfirm={() => setError('')}
+        onCancel={() => setError('')}
+      />
     </section>
   );
 }
