@@ -968,7 +968,7 @@ export function GatheringWorkflowSteps({
   return (
     <>
       <ol
-        className="sticky top-0 z-30 mt-6 grid grid-cols-2 gap-2 bg-[var(--brand-bg)] py-2 sm:grid-cols-4"
+        className="sticky top-[72px] z-30 mt-6 grid grid-cols-4 gap-1 bg-[var(--brand-bg)] py-2 shadow-sm sm:gap-2"
         aria-label="Tahapan gathering"
       >
         {STEPS.map((step, index) => {
