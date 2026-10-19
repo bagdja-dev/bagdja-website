@@ -6,6 +6,23 @@ interface RouteContext {
   params: { id: string; invitationId: string };
 }
 
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const websiteId = request.nextUrl.searchParams.get('website_id');
+  const query = websiteId ? `?website_id=${encodeURIComponent(websiteId)}` : '';
+  const body = await request.json().catch(() => null);
+  if (!body || (!body.email && !body.whatsapp)) {
+    return NextResponse.json({ message: 'Isi email atau nomor WhatsApp penerima.' }, { status: 400 });
+  }
+  const result = await backendFetch(
+    `/api/gathering/plans/${encodeURIComponent(params.id)}/invitations/${encodeURIComponent(params.invitationId)}${query}`,
+    { method: 'PATCH', body: JSON.stringify(body) },
+  );
+  if (!result.data || result.status >= 400) {
+    return NextResponse.json({ message: result.error ?? 'Gagal memperbarui undangan.' }, { status: result.status });
+  }
+  return NextResponse.json(result.data);
+}
+
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const websiteId = request.nextUrl.searchParams.get('website_id');
   const query = websiteId ? `?website_id=${encodeURIComponent(websiteId)}` : '';

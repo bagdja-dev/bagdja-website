@@ -75,9 +75,6 @@ export function GatheringInvitationManager({
 }) {
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
-  const [inviteeName, setInviteeName] = useState('');
-  const [email, setEmail] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [shareEmail, setShareEmail] = useState('');
   const [shareWhatsapp, setShareWhatsapp] = useState('');
@@ -92,8 +89,8 @@ export function GatheringInvitationManager({
   const [dispatchOperationId, setDispatchOperationId] = useState('');
   const [dispatchOperation, setDispatchOperation] = useState<InvitationOperationProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [pendingContacts, setPendingContacts] = useState<PendingContact[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingInvitation, setEditingInvitation] = useState<InvitationRow | null>(null);
   const [draftContact, setDraftContact] = useState<PendingContact>({
     invitee_name: '',
     email: '',
@@ -205,42 +202,8 @@ export function GatheringInvitationManager({
     return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  async function createInvitation(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveDraftContact() {
     if (saving) return;
-    setSaving(true);
-    setError('');
-    setShareUrl('');
-    setShareEmail('');
-    setShareWhatsapp('');
-    setCopied(false);
-    try {
-      const response = await fetch(collectionUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invitee_name: inviteeName.trim() || undefined,
-          email: email.trim() || undefined,
-          whatsapp: whatsapp.trim() || undefined,
-        }),
-      });
-      const payload = await response.json().catch(() => null) as (InvitationRow & { message?: string }) | null;
-      if (!response.ok || !payload?.id) throw new Error(payload?.message || 'Gagal membuat undangan.');
-      setShareUrl(makeShareUrl(payload.id, invitePolicy === 'INVITE_ONLY'));
-      setShareEmail(email.trim());
-      setShareWhatsapp(whatsapp.trim());
-      setInviteeName('');
-      setEmail('');
-      setWhatsapp('');
-      await loadInvitations();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Gagal membuat undangan.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function addDraftContact() {
     const contact = {
       invitee_name: draftContact.invitee_name?.trim() || undefined,
       email: draftContact.email?.trim() || undefined,
@@ -252,15 +215,38 @@ export function GatheringInvitationManager({
       return;
     }
 
-    setPendingContacts((current) => [...current, contact]);
-    setDraftContact({ invitee_name: '', email: '', whatsapp: '' });
-    setIsAddModalOpen(false);
+    setSaving(true);
     setError('');
+    try {
+      const url = editingInvitation
+        ? `/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/${encodeURIComponent(editingInvitation.id)}?website_id=${encodeURIComponent(websiteId)}`
+        : collectionUrl;
+      const response = await fetch(url, {
+        method: editingInvitation ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contact),
+      });
+      const payload = await response.json().catch(() => null) as (InvitationRow & { message?: string }) | null;
+      if (!response.ok || (!editingInvitation && !payload?.id)) {
+        throw new Error(payload?.message || (editingInvitation ? 'Gagal memperbarui undangan.' : 'Gagal membuat undangan.'));
+      }
+
+      setIsAddModalOpen(false);
+      setEditingInvitation(null);
+      setDraftContact({ invitee_name: '', email: '', whatsapp: '' });
+      await loadInvitations();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Gagal menyimpan undangan.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function importContacts(file?: File) {
     if (!file) return;
     setError('');
+    setSaving(true);
+    let savedCount = 0;
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -274,9 +260,29 @@ export function GatheringInvitationManager({
         };
       }).filter((contact) => contact.email || contact.whatsapp);
       if (!contacts.length) throw new Error('File tidak berisi email atau nomor WhatsApp yang valid.');
-      setPendingContacts((current) => [...current, ...contacts]);
+
+      for (const contact of contacts) {
+        const response = await fetch(collectionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contact),
+        });
+        const payload = await response.json().catch(() => null) as { message?: string } | null;
+        if (!response.ok) {
+          throw new Error(
+            savedCount
+              ? `${savedCount} kontak berhasil disimpan. Kontak berikutnya gagal: ${payload?.message || 'Gagal menyimpan undangan.'}`
+              : payload?.message || 'Gagal menyimpan undangan.',
+          );
+        }
+        savedCount += 1;
+      }
+      await loadInvitations();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal membaca file undangan.');
+    } finally {
+      setSaving(false);
+      if (savedCount > 0) await loadInvitations();
     }
   }
 
@@ -296,47 +302,12 @@ export function GatheringInvitationManager({
     XLSX.writeFile(workbook, 'template-undangan-gathering.xlsx');
   }
 
-  /** Simpan antrean kontak; `true` bila semua tersimpan. Kontak yang sudah tersimpan dikeluarkan dari antrean supaya retry tidak menggandakan undangan. */
-  async function savePendingContacts(): Promise<boolean> {
-    if (pendingContacts.length === 0) {
-      setError('Belum ada peserta untuk disimpan.');
-      return false;
-    }
-
-    setError('');
-    let remaining = pendingContacts;
-    try {
-      for (const contact of pendingContacts) {
-        const response = await fetch(collectionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(contact),
-        });
-        const payload = await response.json().catch(() => null) as { message?: string } | null;
-        if (!response.ok) throw new Error(payload?.message || 'Gagal menyimpan daftar penerima.');
-        remaining = remaining.slice(1);
-      }
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Gagal menyimpan daftar penerima.');
-      return false;
-    } finally {
-      setPendingContacts(remaining);
-      await loadInvitations();
-    }
-  }
-
   async function submitInvitationStage() {
     if (submitting) return;
     setSubmitting(true); setError(''); setShareUrl('');
     setDispatchOperationId('');
     setDispatchOperation(null);
     try {
-      if (invitePolicy === 'INVITE_ONLY' && pendingContacts.length) {
-        // Jangan baca `pendingContacts` di sini — nilainya masih snapshot render sebelum disimpan.
-        const saved = await savePendingContacts();
-        if (!saved) return;
-      }
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/submit?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
       const payload = await response.json().catch(() => null) as {
         submitted?: boolean;
@@ -428,6 +399,7 @@ export function GatheringInvitationManager({
     : '';
 
   const openShareUrl = shareUrl;
+  const visibleInvitations = invitations.filter((invitation) => invitation.status !== 'REVOKED');
 
   return (
     <section className="mt-8 border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
@@ -436,7 +408,7 @@ export function GatheringInvitationManager({
           <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>2. Buat undangan</h2>
           <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{invitePolicy === 'OPEN' ? 'Buat tautan dan QR yang dapat dibagikan.' : 'Kelola penerima, lalu submit untuk mengirim undangan ke email.'}</p>
         </div>
-        <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{invitations.length} undangan</span>
+        <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{visibleInvitations.length} undangan</span>
       </div>
 
       <GatheringInvitationAppearance
@@ -451,39 +423,25 @@ export function GatheringInvitationManager({
         <>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => setIsAddModalOpen(true)} className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingInvitation(null);
+                  setDraftContact({ invitee_name: '', email: '', whatsapp: '' });
+                  setIsAddModalOpen(true);
+                }}
+                disabled={saving}
+                className="rounded-full px-4 py-2 text-sm font-semibold"
+                style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+              >
                 + Tambah
               </button>
               <label className="cursor-pointer rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>
                 Import Excel/CSV
-                <input type="file" accept=".xlsx,.xls,.csv" className="sr-only" onChange={(event) => { void importContacts(event.target.files?.[0]); event.currentTarget.value = ''; }} />
+                <input type="file" accept=".xlsx,.xls,.csv" disabled={saving} className="sr-only" onChange={(event) => { void importContacts(event.target.files?.[0]); event.currentTarget.value = ''; }} />
               </label>
               <button type="button" onClick={() => downloadTemplate('xlsx')} className="text-xs font-semibold underline">Template Excel</button>
               <button type="button" onClick={() => downloadTemplate('csv')} className="text-xs font-semibold underline">Template CSV</button>
-            </div>
-            {pendingContacts.length ? <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{pendingContacts.length} kontak siap disimpan</span> : null}
-          </div>
-
-          <div className="mt-5 rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
-            <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-[1.2fr_1.2fr_1fr_auto] md:items-center">
-              <div>
-                <div className="text-sm font-semibold">{invitations[0]?.invitee_name || pendingContacts[0]?.invitee_name || 'Belum ada peserta'}</div>
-                <div className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{invitations[0]?.email || pendingContacts[0]?.email || 'Email belum diisi'}</div>
-              </div>
-              <div className="text-sm">{invitations[0]?.whatsapp || pendingContacts[0]?.whatsapp || '-'}</div>
-              <div className="text-xs" style={{ color: 'var(--brand-muted)' }}>
-                {invitations[0] ? (new Date(invitations[0].expires_at) <= new Date() ? 'Kedaluwarsa' : 'Menunggu RSVP') : 'Belum disimpan'}
-              </div>
-              <div className="flex gap-2 md:justify-end">
-                {invitations[0] ? (
-                  <>
-                    <a href={makeShareUrl(invitations[0].id, invitePolicy === 'INVITE_ONLY')} target="_blank" rel="noopener noreferrer" className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Buka undangan</a>
-                    <button type="button" onClick={() => void revokeInvitation(invitations[0].id)} disabled={busyId === invitations[0].id} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>Cabut</button>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => setIsAddModalOpen(true)} className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Tambah</button>
-                )}
-              </div>
             </div>
           </div>
 
@@ -491,8 +449,8 @@ export function GatheringInvitationManager({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
               <div className="w-full max-w-lg rounded-2xl border bg-white p-5 shadow-xl" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>
                 <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg font-bold">Tambah peserta undangan</h3>
-                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-sm font-semibold">Tutup</button>
+                  <h3 className="text-lg font-bold">{editingInvitation ? 'Edit peserta undangan' : 'Tambah peserta undangan'}</h3>
+                  <button type="button" onClick={() => { setIsAddModalOpen(false); setEditingInvitation(null); }} className="text-sm font-semibold">Tutup</button>
                 </div>
                 <div className="mt-4 space-y-4">
                   <label className="block text-xs font-medium">
@@ -510,8 +468,8 @@ export function GatheringInvitationManager({
                   <p className="text-[11px]" style={{ color: 'var(--brand-muted)' }}>Masa berlaku undangan mengikuti tanggal terakhir reservasi di tahap 1.</p>
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Batal</button>
-                  <button type="button" onClick={addDraftContact} className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Simpan</button>
+                  <button type="button" onClick={() => { setIsAddModalOpen(false); setEditingInvitation(null); }} disabled={saving} className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>Batal</button>
+                  <button type="button" onClick={() => void saveDraftContact()} disabled={saving} className="rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>{saving ? 'Menyimpan…' : 'Simpan'}</button>
                 </div>
               </div>
             </div>
@@ -545,7 +503,7 @@ export function GatheringInvitationManager({
       ) : null}
 
       <ul className="mt-5 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
-        {loading ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</li> : invitations.length === 0 ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada penerima yang diundang.</li> : invitations.map((invitation) => {
+        {loading ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</li> : visibleInvitations.length === 0 ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada penerima yang diundang.</li> : visibleInvitations.map((invitation) => {
           const expired = invitation.status === 'PENDING' && new Date(invitation.expires_at) <= new Date();
           const status = expired ? 'Kedaluwarsa' : invitation.status === 'PENDING' ? 'Menunggu RSVP' : invitation.status === 'ACCEPTED' ? 'Diterima' : invitation.status === 'REVOKED' ? 'Dicabut' : 'Kedaluwarsa';
           const contact = [invitation.email, invitation.whatsapp].filter(Boolean).join(' · ');
@@ -560,7 +518,23 @@ export function GatheringInvitationManager({
                 {invitation.status === 'PENDING' && !expired ? (
                   <>
                     <a href={makeShareUrl(invitation.id, invitePolicy === 'INVITE_ONLY')} target="_blank" rel="noopener noreferrer" className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Buka undangan</a>
-                    <button type="button" onClick={() => void revokeInvitation(invitation.id)} disabled={busyId === invitation.id} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>Cabut</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingInvitation(invitation);
+                        setDraftContact({
+                          invitee_name: invitation.invitee_name ?? '',
+                          email: invitation.email ?? '',
+                          whatsapp: invitation.whatsapp ?? '',
+                        });
+                        setIsAddModalOpen(true);
+                      }}
+                      className="rounded border px-3 py-2 text-xs font-semibold"
+                      style={{ borderColor: 'var(--brand-border)' }}
+                    >
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => void revokeInvitation(invitation.id)} disabled={busyId === invitation.id} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>{busyId === invitation.id ? 'Menghapus…' : 'Hapus'}</button>
                   </>
                 ) : null}
               </span>
@@ -569,10 +543,7 @@ export function GatheringInvitationManager({
         })}
       </ul>
       <div className="mt-5 flex flex-wrap gap-2">
-        <button type="button" onClick={() => void savePendingContacts()} disabled={pendingContacts.length === 0} className="rounded-full border px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>
-          Simpan
-        </button>
-        <button type="button" onClick={() => void submitInvitationStage()} disabled={submitting || dispatchOperation?.status === 'QUEUED' || dispatchOperation?.status === 'RUNNING' || (invitePolicy === 'INVITE_ONLY' && invitations.length === 0 && pendingContacts.length === 0)} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+        <button type="button" onClick={() => void submitInvitationStage()} disabled={submitting || dispatchOperation?.status === 'QUEUED' || dispatchOperation?.status === 'RUNNING' || (invitePolicy === 'INVITE_ONLY' && visibleInvitations.length === 0)} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
           {submitting ? 'Menyiapkan undangan…' : dispatchOperation?.status === 'QUEUED' || dispatchOperation?.status === 'RUNNING' ? 'Mengirim undangan…' : 'Submit'}
         </button>
         {canCancel && onCancel ? (
