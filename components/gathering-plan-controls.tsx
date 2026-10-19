@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ConfirmDialog } from './confirm-dialog';
 
 export interface GatheringPlanOption {
   product_option_id: string;
@@ -23,6 +24,26 @@ function toLocalParts(value?: string | null) {
 
 function toIso(date: string, time: string) {
   return date ? new Date(`${date}T${time || '00:00'}`).toISOString() : undefined;
+}
+
+function readableErrorMessage(message: string | undefined, fallback: string) {
+  if (!message) return fallback;
+
+  try {
+    const parsed: unknown = JSON.parse(message);
+    if (
+      typeof parsed === 'object'
+      && parsed !== null
+      && 'message' in parsed
+      && typeof parsed.message === 'string'
+    ) {
+      return parsed.message;
+    }
+  } catch {
+    return message;
+  }
+
+  return message;
 }
 
 export function GatheringPlanControls({
@@ -107,7 +128,7 @@ export function GatheringPlanControls({
         }),
       });
       const payload = await response.json().catch(() => null) as { message?: string } | null;
-      if (!response.ok) throw new Error(payload?.message || 'Gagal menyimpan rencana gathering.');
+      if (!response.ok) throw new Error(readableErrorMessage(payload?.message, 'Gagal menyimpan rencana gathering.'));
       setSaved(true);
       router.refresh();
     } catch (cause) {
@@ -201,7 +222,6 @@ export function GatheringPlanControls({
         </div>
       </fieldset>
 
-      {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
       {saved && <p role="status" className="mt-4 text-sm text-green-700">Perubahan rencana tersimpan.</p>}
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" onClick={() => void savePlan(false)} disabled={saving || title.trim().length < 3} className="rounded-full border px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>
@@ -216,6 +236,16 @@ export function GatheringPlanControls({
           </button>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={Boolean(error)}
+        title="Terjadi Kesalahan"
+        message={error}
+        confirmLabel="Tutup"
+        showCancel={false}
+        variant="danger"
+        onConfirm={() => setError('')}
+        onCancel={() => setError('')}
+      />
     </section>
   );
 }
