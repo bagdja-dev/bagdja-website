@@ -967,22 +967,27 @@ export function GatheringWorkflowSteps({
 
   return (
     <>
-      <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Tahapan gathering">
+      <ol
+        className="sticky top-0 z-30 mt-6 grid grid-cols-2 gap-2 bg-[var(--brand-bg)] py-2 sm:grid-cols-4"
+        aria-label="Tahapan gathering"
+      >
         {STEPS.map((step, index) => {
           const complete = index < currentIndex;
           const active = index === selectedIndex;
           const available = index <= currentIndex;
           return (
-            <li key={step.key} className="border-t-2" style={{ borderColor: active || complete ? 'var(--brand-accent)' : 'var(--brand-border)' }}>
+            <li key={step.key} className="min-w-0 border-t-2" style={{ borderColor: active || complete ? 'var(--brand-accent)' : 'var(--brand-border)' }}>
               <button
                 type="button"
                 onClick={() => setSelectedIndex(index)}
                 disabled={!available}
                 aria-current={active ? 'step' : undefined}
-                className="w-full py-2 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full min-w-0 items-center py-2 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ color: active ? 'var(--brand-text)' : 'var(--brand-muted)' }}
+                title={`${index + 1}. ${step.label}`}
               >
-                <span className="mr-1">{complete ? '✓' : `${index + 1}.`}</span>{step.label}
+                <span className="mr-1 shrink-0">{complete ? '✓' : `${index + 1}.`}</span>
+                <span className="truncate">{step.label}</span>
               </button>
             </li>
           );

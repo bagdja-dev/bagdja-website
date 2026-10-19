@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from './confirm-dialog';
 
@@ -89,6 +89,29 @@ export function GatheringPlanControls({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [invitePolicyOpen, setInvitePolicyOpen] = useState(false);
+  const invitePolicyDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!invitePolicyOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (invitePolicyDropdownRef.current && !invitePolicyDropdownRef.current.contains(event.target as Node)) {
+        setInvitePolicyOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setInvitePolicyOpen(false);
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [invitePolicyOpen]);
 
   const optionsByGroup = new Map<string, GatheringPlanOption[]>();
   for (const option of options) {
@@ -161,32 +184,94 @@ export function GatheringPlanControls({
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <fieldset className="space-y-2 text-xs font-medium">
           <legend>Terakhir reservasi</legend>
-          <input aria-label="Tanggal terakhir reservasi" type="date" required value={reservationDate} onChange={(event) => { setReservationDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-          <input aria-label="Jam terakhir reservasi" type="time" value={reservationTime} onChange={(event) => { setReservationTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-1">
+            <input aria-label="Tanggal terakhir reservasi" type="date" required value={reservationDate} onChange={(event) => { setReservationDate(event.target.value); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+            <input aria-label="Jam terakhir reservasi" type="time" value={reservationTime} onChange={(event) => { setReservationTime(event.target.value || '00:00'); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+          </div>
         </fieldset>
         <fieldset className="space-y-2 text-xs font-medium">
           <legend>Terakhir pembayaran</legend>
-          <input aria-label="Tanggal terakhir pembayaran" type="date" required value={paymentDate} onChange={(event) => { setPaymentDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-          <input aria-label="Jam terakhir pembayaran" type="time" value={paymentTime} onChange={(event) => { setPaymentTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-1">
+            <input aria-label="Tanggal terakhir pembayaran" type="date" required value={paymentDate} onChange={(event) => { setPaymentDate(event.target.value); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+            <input aria-label="Jam terakhir pembayaran" type="time" value={paymentTime} onChange={(event) => { setPaymentTime(event.target.value || '00:00'); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+          </div>
         </fieldset>
         <fieldset className="space-y-2 text-xs font-medium">
           <legend>Tanggal acara</legend>
-          <input aria-label="Tanggal acara" type="date" required value={eventDate} onChange={(event) => { setEventDate(event.target.value); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
-          <input aria-label="Jam acara" type="time" value={eventTime} onChange={(event) => { setEventTime(event.target.value || '00:00'); setSaved(false); }} className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-1">
+            <input aria-label="Tanggal acara" type="date" required value={eventDate} onChange={(event) => { setEventDate(event.target.value); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+            <input aria-label="Jam acara" type="time" value={eventTime} onChange={(event) => { setEventTime(event.target.value || '00:00'); setSaved(false); }} className="w-full min-w-0 rounded-lg border bg-transparent px-2 py-2.5 text-sm sm:px-3" style={{ borderColor: 'var(--brand-border)' }} />
+          </div>
         </fieldset>
       </div>
 
-      <label className="mt-5 block text-sm font-medium" htmlFor="gathering-invite-policy">Akses undangan</label>
-      <select
-        id="gathering-invite-policy"
-        value={invitePolicy}
-        onChange={(event) => { setInvitePolicy(event.target.value as 'OPEN' | 'INVITE_ONLY'); setSaved(false); }}
-        className="mt-2 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-accent)] sm:max-w-sm"
-        style={{ borderColor: 'var(--brand-border)' }}
-      >
-        <option value="OPEN">Terbuka</option>
-        <option value="INVITE_ONLY">Khusus undangan</option>
-      </select>
+      <span id="gathering-invite-policy-label" className="mt-5 block text-sm font-medium">Akses undangan</span>
+      <div ref={invitePolicyDropdownRef} className="relative mt-2 w-full sm:max-w-sm">
+        <button
+          id="gathering-invite-policy"
+          type="button"
+          aria-labelledby="gathering-invite-policy-label"
+          aria-haspopup="listbox"
+          aria-expanded={invitePolicyOpen}
+          aria-controls="gathering-invite-policy-options"
+          onClick={() => setInvitePolicyOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-3 rounded-lg border bg-transparent px-3 py-2.5 text-left text-sm outline-none focus:border-[var(--brand-accent)]"
+          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+        >
+          <span>{invitePolicy === 'OPEN' ? 'Terbuka' : 'Khusus undangan'}</span>
+          <svg
+            className={`h-4 w-4 shrink-0 transition-transform ${invitePolicyOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        {invitePolicyOpen ? (
+          <div
+            id="gathering-invite-policy-options"
+            role="listbox"
+            aria-labelledby="gathering-invite-policy-label"
+            className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border shadow-lg"
+            style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+          >
+            {([
+              { value: 'OPEN', label: 'Terbuka' },
+              { value: 'INVITE_ONLY', label: 'Khusus undangan' },
+            ] as const).map((option) => {
+              const selected = invitePolicy === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    setInvitePolicy(option.value);
+                    setSaved(false);
+                    setInvitePolicyOpen(false);
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
+                  style={{
+                    color: selected ? 'var(--brand-accent)' : 'var(--brand-text)',
+                    fontWeight: selected ? 600 : 400,
+                  }}
+                >
+                  {option.label}
+                  {selected ? (
+                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
 
       <fieldset className="mt-6">
         <legend className="text-sm font-medium">Pilihan yang dibuka</legend>
@@ -228,11 +313,11 @@ export function GatheringPlanControls({
           {saving ? 'Menyimpan…' : 'Simpan'}
         </button>
         <button type="button" onClick={() => void savePlan(true)} disabled={saving || title.trim().length < 3 || !reservationDate || !paymentDate || !eventDate} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
-          {saving ? 'Mengirim…' : 'Submit rencana'}
+          {saving ? 'Mengirim…' : 'Submit'}
         </button>
         {canCancel && onCancel ? (
           <button type="button" onClick={onCancel} disabled={saving || cancelling} className="rounded-full border border-red-500 px-6 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
-            {cancelling ? 'Membatalkan…' : 'Batalkan rencana'}
+            {cancelling ? 'Membatalkan…' : 'Batalkan'}
           </button>
         ) : null}
       </div>
