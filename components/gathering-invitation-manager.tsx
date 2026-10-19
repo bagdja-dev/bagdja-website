@@ -88,6 +88,8 @@ export function GatheringInvitationManager({
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [revokeOperationId, setRevokeOperationId] = useState('');
   const [revokeOperation, setRevokeOperation] = useState<InvitationOperationProgress | null>(null);
+  const [dispatchOperationId, setDispatchOperationId] = useState('');
+  const [dispatchOperation, setDispatchOperation] = useState<InvitationOperationProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pendingContacts, setPendingContacts] = useState<PendingContact[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -129,6 +131,34 @@ export function GatheringInvitationManager({
     source.onerror = () => source.close();
     return () => source.close();
   }, [groupId, websiteId, revokeOperationId]);
+
+  useEffect(() => {
+    if (!dispatchOperationId) return;
+    const source = new EventSource(`/api/gathering/plans/${encodeURIComponent(groupId)}/operations/${encodeURIComponent(dispatchOperationId)}/events?website_id=${encodeURIComponent(websiteId)}`);
+    source.onmessage = (event) => {
+      try {
+        const progress = JSON.parse(event.data) as InvitationOperationProgress;
+        setDispatchOperation(progress);
+        if (progress.status === 'COMPLETED' || progress.status === 'FAILED') {
+          source.close();
+          void loadInvitations();
+          if (progress.status === 'COMPLETED') {
+            router.refresh();
+          } else {
+            setError(progress.error_message || `Pengiriman undangan gagal untuk ${progress.failed_count} penerima. Perbaiki kontak lalu submit kembali.`);
+          }
+        }
+      } catch {
+        source.close();
+        setError('Tidak dapat membaca progres pengiriman undangan.');
+      }
+    };
+    source.onerror = () => {
+      source.close();
+      setError('Koneksi progres pengiriman undangan terputus. Muat ulang halaman untuk memeriksa status terbaru.');
+    };
+    return () => source.close();
+  }, [dispatchOperationId, groupId, loadInvitations, router, websiteId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,6 +299,8 @@ export function GatheringInvitationManager({
   async function submitInvitationStage() {
     if (submitting) return;
     setSubmitting(true); setError(''); setShareUrl('');
+    setDispatchOperationId('');
+    setDispatchOperation(null);
     try {
       if (invitePolicy === 'INVITE_ONLY' && pendingContacts.length) {
         // Jangan baca `pendingContacts` di sini — nilainya masih snapshot render sebelum disimpan.
@@ -276,11 +308,41 @@ export function GatheringInvitationManager({
         if (!saved) return;
       }
       const response = await fetch(`/api/gathering/plans/${encodeURIComponent(groupId)}/invitations/submit?website_id=${encodeURIComponent(websiteId)}`, { method: 'POST' });
-      const payload = await response.json().catch(() => null) as { submitted?: boolean; failed_emails?: number; public_invitation?: { id?: string }; message?: string } | null;
+      const payload = await response.json().catch(() => null) as {
+        submitted?: boolean;
+        public_invitation?: { id?: string };
+        operation_id?: string;
+        operation_status?: InvitationOperationProgress['status'];
+        total_count?: number;
+        processed_count?: number;
+        success_count?: number;
+        failed_count?: number;
+        failed_items?: string[];
+        error_message?: string | null;
+        message?: string;
+      } | null;
       if (!response.ok || !payload?.submitted) throw new Error(payload?.message || 'Undangan belum berhasil disubmit.');
       if (payload.public_invitation?.id) setShareUrl(makeShareUrl(payload.public_invitation.id, false));
       await loadInvitations();
-      router.refresh();
+      if (payload.operation_id) {
+        setDispatchOperationId(payload.operation_id);
+        setDispatchOperation({
+          id: payload.operation_id,
+          kind: 'INVITATION_DISPATCH',
+          status: payload.operation_status ?? 'QUEUED',
+          total_count: payload.total_count ?? 0,
+          processed_count: payload.processed_count ?? 0,
+          success_count: payload.success_count ?? 0,
+          failed_count: payload.failed_count ?? 0,
+          failed_items: payload.failed_items ?? [],
+          error_message: payload.error_message ?? null,
+        });
+        if (payload.operation_status === 'FAILED') {
+          setError(payload.error_message || 'Pengiriman undangan gagal dimulai.');
+        }
+      } else {
+        router.refresh();
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal submit undangan.');
     } finally {
@@ -435,6 +497,23 @@ export function GatheringInvitationManager({
           {revokeOperation.error_message ? <p className="mt-1 text-red-700">{revokeOperation.error_message}</p> : null}
         </div>
       ) : null}
+      {dispatchOperation ? (
+        <div className="mt-3 border-y py-3 text-xs" style={{ borderColor: 'var(--brand-border)' }} role="status" aria-live="polite">
+          <span className="font-semibold">
+            {dispatchOperation.status === 'QUEUED' ? 'Pengiriman undangan mengantre'
+              : dispatchOperation.status === 'RUNNING' ? 'Mengirim undangan'
+              : dispatchOperation.status === 'COMPLETED' ? 'Pengiriman undangan selesai'
+              : 'Pengiriman undangan gagal'}
+          </span>
+          <span className="ml-2" style={{ color: 'var(--brand-muted)' }}>
+            {dispatchOperation.processed_count}/{dispatchOperation.total_count} diproses · {dispatchOperation.success_count} terkirim · {dispatchOperation.failed_count} gagal
+          </span>
+          {dispatchOperation.error_message ? <p className="mt-1 text-red-700">{dispatchOperation.error_message}</p> : null}
+          {dispatchOperation.failed_items.length > 0 ? (
+            <p className="mt-1 text-red-700">Gagal: {dispatchOperation.failed_items.join(', ')}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <ul className="mt-5 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
         {loading ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Memuat undangan…</li> : invitations.length === 0 ? <li className="py-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada penerima yang diundang.</li> : invitations.map((invitation) => {
@@ -464,8 +543,8 @@ export function GatheringInvitationManager({
         <button type="button" onClick={() => void savePendingContacts()} disabled={pendingContacts.length === 0} className="rounded-full border px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ borderColor: 'var(--brand-border)' }}>
           Simpan
         </button>
-        <button type="button" onClick={() => void submitInvitationStage()} disabled={submitting || (invitePolicy === 'INVITE_ONLY' && invitations.length === 0 && pendingContacts.length === 0)} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
-          {submitting ? 'Submit undangan…' : 'Submit'}
+        <button type="button" onClick={() => void submitInvitationStage()} disabled={submitting || dispatchOperation?.status === 'QUEUED' || dispatchOperation?.status === 'RUNNING' || (invitePolicy === 'INVITE_ONLY' && invitations.length === 0 && pendingContacts.length === 0)} className="rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+          {submitting ? 'Menyiapkan undangan…' : dispatchOperation?.status === 'QUEUED' || dispatchOperation?.status === 'RUNNING' ? 'Mengirim undangan…' : 'Submit'}
         </button>
         {canCancel && onCancel ? (
           <button type="button" onClick={onCancel} disabled={submitting || cancelling} className="rounded-full border border-red-500 px-6 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
