@@ -10,7 +10,7 @@ function formatLocalDate(value?: string | null) {
 }
 
 interface InvitePreview {
-  invitation: { invitee_name?: string | null; expires_at: string };
+  invitation: { invitee_name?: string | null; invitee_email_masked?: string | null; expires_at: string };
   group: {
     id: string;
     title: string;
@@ -35,6 +35,23 @@ interface InvitePreview {
   };
   registration?: { id: string; registration_status: string; payment_status: string } | null;
 }
+
+/** Hasil `private-status`: kecocokan akun login dengan undangan privat. */
+interface PrivateInvitationAccount {
+  invitee_name?: string | null;
+  invitee_email?: string | null;
+  invitee_email_masked?: string | null;
+  account_email?: string | null;
+  account_matches: boolean;
+  requires_attendee_name: boolean;
+  requires_whatsapp: boolean;
+}
+
+type PrivateAccountState =
+  | { status: 'loading' }
+  | { status: 'signed_out' }
+  | { status: 'error' }
+  | { status: 'ready'; account: PrivateInvitationAccount };
 
 interface GatheringInviteOption {
   product_option_id: string;
@@ -66,6 +83,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
   const [paymentUrl, setPaymentUrl] = useState('');
   const [paying, setPaying] = useState(false);
   const [addingReservation, setAddingReservation] = useState(false);
+  const [privateAccount, setPrivateAccount] = useState<PrivateAccountState>({ status: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
@@ -96,9 +114,22 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
     let cancelled = false;
     void fetch(`/api/public/gathering-invitations/${encodeURIComponent(token)}/private-status`, { cache: 'no-store' })
       .then(async (response) => {
-        if (!response.ok) return;
-        const payload = await response.json().catch(() => null) as { registration?: { id: string; payment_status: string; selected_options?: Record<string, string> } | null } | null;
-        if (cancelled || !payload?.registration) return;
+        if (cancelled) return;
+        if (response.status === 401) {
+          setPrivateAccount({ status: 'signed_out' });
+          return;
+        }
+        const payload = await response.json().catch(() => null) as {
+          invitation?: PrivateInvitationAccount;
+          registration?: { id: string; payment_status: string; selected_options?: Record<string, string> } | null;
+        } | null;
+        if (cancelled) return;
+        if (!response.ok || !payload?.invitation) {
+          setPrivateAccount({ status: 'error' });
+          return;
+        }
+        setPrivateAccount({ status: 'ready', account: payload.invitation });
+        if (!payload.registration) return;
         setRegistrationId(payload.registration.id);
         setPaymentStatus(payload.registration.payment_status ?? 'UNPAID');
         if (payload.registration.selected_options) {
@@ -106,7 +137,9 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
           window.sessionStorage.setItem(`gathering-rsvp-options:${paramsSafeToken(token)}`, JSON.stringify(payload.registration.selected_options));
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setPrivateAccount({ status: 'error' });
+      });
     return () => { cancelled = true; };
   }, [preview?.group.invite_policy, token]);
 
@@ -144,18 +177,29 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
   occurrence.options.forEach((option) => groupedOptions.set(option.option_group_key, [...(groupedOptions.get(option.option_group_key) ?? []), option]));
   const rsvpAvailable = occurrence.status === 'RSVP_OPEN'
     && (!occurrence.rsvp_close_at || new Date(occurrence.rsvp_close_at) > new Date());
+  const matchedAccount = privateAccount.status === 'ready' && privateAccount.account.account_matches ? privateAccount.account : null;
+  const currentPath = typeof window === 'undefined' ? '/' : `${window.location.pathname}${window.location.search}`;
+  const loginHref = `/auth/login?next=${encodeURIComponent(currentPath)}`;
+  const switchAccountHref = `/auth/logout?returnTo=${encodeURIComponent(currentPath)}`;
 
   async function submitRsvp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
     setRsvpError('');
-    const body = {
-      attendee_name: attendeeName.trim(),
-      email: email.trim(),
-      whatsapp: whatsapp.trim() || undefined,
-      selected_options: selectedOptions,
-    };
+    // Undangan privat: nama & email diambil server dari undangan + akun login.
+    const body = privateInvite
+      ? {
+        attendee_name: matchedAccount?.requires_attendee_name ? attendeeName.trim() : undefined,
+        whatsapp: whatsapp.trim() || undefined,
+        selected_options: selectedOptions,
+      }
+      : {
+        attendee_name: attendeeName.trim(),
+        email: email.trim(),
+        whatsapp: whatsapp.trim() || undefined,
+        selected_options: selectedOptions,
+      };
     try {
       const endpoint = privateInvite
         ? `/api/public/gathering-invitations/${encodeURIComponent(token)}/private-rsvp`
@@ -168,8 +212,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
       const payload = await response.json().catch(() => null) as { id?: string; reservation_id?: string; expires_at?: string; selected_options?: Record<string, string>; voting_results?: typeof votingResults; message?: string } | null;
       if (!response.ok) {
         if (privateInvite && response.status === 401) {
-          const next = `${window.location.pathname}${window.location.search}`;
-          window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
+          window.location.assign(loginHref);
           return;
         }
         throw new Error(payload?.message || 'RSVP gagal dikirim.');
@@ -314,15 +357,65 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
     setAddingReservation(true);
   }
 
-  const reservationForm = (
+  // Undangan privat: cek akun dulu sebelum menampilkan form, supaya user tidak
+  // mengisi form lalu baru tahu harus login / akunnya salah.
+  const privateAccountGate = !privateInvite || matchedAccount ? null : (
+    <section className="mt-6 border-y border-zinc-200 py-5" aria-live="polite">
+      <h2 className="text-sm font-semibold">Konfirmasi kehadiran</h2>
+      {privateAccount.status === 'loading' ? (
+        <p className="mt-2 text-sm text-zinc-600">Memeriksa akun Anda…</p>
+      ) : privateAccount.status === 'signed_out' ? (
+        <>
+          <p className="mt-2 text-sm text-zinc-600">
+            Undangan ini khusus untuk {preview.invitation.invitee_name ? <strong className="text-zinc-800">{preview.invitation.invitee_name}</strong> : 'penerima undangan'}
+            {preview.invitation.invitee_email_masked ? <> ({preview.invitation.invitee_email_masked})</> : null}.
+            Masuk dengan akun email tersebut untuk mengonfirmasi kehadiran.
+          </p>
+          <a href={loginHref} className="mt-4 inline-block rounded bg-zinc-900 px-5 py-3 text-sm font-semibold text-white">Masuk untuk konfirmasi</a>
+        </>
+      ) : privateAccount.status === 'ready' ? (
+        <>
+          <p role="alert" className="mt-2 border-l-2 border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Anda masuk sebagai <strong>{privateAccount.account.account_email ?? 'akun tanpa email'}</strong>, sedangkan undangan ini dikirim ke{' '}
+            <strong>{privateAccount.account.invitee_email_masked ?? 'email lain'}</strong>.
+          </p>
+          <a href={switchAccountHref} className="mt-4 inline-block rounded border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50">Ganti akun</a>
+        </>
+      ) : (
+        <p role="alert" className="mt-2 text-sm text-red-700">Status undangan belum dapat dimuat. Muat ulang halaman untuk mencoba lagi.</p>
+      )}
+    </section>
+  );
+
+  const reservationForm = privateAccountGate ?? (
     <form onSubmit={submitRsvp} className="mt-6 border-y border-zinc-200 py-5">
-      <h2 className="text-sm font-semibold">Ajukan reservasi</h2>
-      <p className="mt-1 text-xs text-zinc-600">Harga seat {price}. Setelah mengirim, masukkan kode email untuk mengonfirmasi reservasi.</p>
-      {privateInvite ? <p className="mt-3 border-l-2 border-zinc-400 pl-3 text-xs text-zinc-600">Undangan privat: masuk dengan akun yang memakai email undangan untuk mengonfirmasi.</p> : null}
+      <h2 className="text-sm font-semibold">{privateInvite ? 'Konfirmasi kehadiran' : 'Ajukan reservasi'}</h2>
+      <p className="mt-1 text-xs text-zinc-600">
+        Harga seat {price}. {privateInvite ? 'RSVP langsung tercatat atas nama Anda setelah dikonfirmasi.' : 'Setelah mengirim, masukkan kode email untuk mengonfirmasi reservasi.'}
+      </p>
+      {privateInvite && matchedAccount ? (
+        <dl className="mt-4 grid gap-3 border-l-2 border-zinc-900 bg-zinc-50 px-4 py-3 text-sm sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="text-xs text-zinc-500">Konfirmasi sebagai</dt>
+            <dd className="mt-0.5 truncate font-semibold">{matchedAccount.invitee_name || 'Lengkapi nama di bawah'}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-xs text-zinc-500">Email</dt>
+            <dd className="mt-0.5 truncate font-semibold">{matchedAccount.invitee_email ?? matchedAccount.account_email}</dd>
+          </div>
+        </dl>
+      ) : null}
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <label className="text-xs font-medium">Nama peserta<input required maxLength={255} value={attendeeName} onChange={(event) => setAttendeeName(event.target.value)} className="mt-1.5 w-full rounded border border-zinc-300 px-3 py-2.5 text-sm" /></label>
-        <label className="text-xs font-medium">Email<input required type="email" maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1.5 w-full rounded border border-zinc-300 px-3 py-2.5 text-sm" /></label>
-        <label className="block text-xs font-medium sm:col-span-2">WhatsApp (opsional)<input type="tel" value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+62…" className="mt-2 block w-full rounded border border-zinc-300 px-3 py-2.5 text-sm sm:max-w-sm" /></label>
+        {!privateInvite || matchedAccount?.requires_attendee_name ? (
+          <label className="text-xs font-medium">Nama peserta<input required maxLength={255} value={attendeeName} onChange={(event) => setAttendeeName(event.target.value)} className="mt-1.5 w-full rounded border border-zinc-300 px-3 py-2.5 text-sm" /></label>
+        ) : null}
+        {!privateInvite ? (
+          <label className="text-xs font-medium">Email<input required type="email" maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1.5 w-full rounded border border-zinc-300 px-3 py-2.5 text-sm" /></label>
+        ) : null}
+        <label className="block text-xs font-medium sm:col-span-2">
+          {matchedAccount?.requires_whatsapp ? 'WhatsApp (nomor yang diundang)' : 'WhatsApp (opsional)'}
+          <input type="tel" required={Boolean(matchedAccount?.requires_whatsapp)} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+62…" className="mt-2 block w-full rounded border border-zinc-300 px-3 py-2.5 text-sm sm:max-w-sm" />
+        </label>
       </div>
       {[...groupedOptions.entries()].map(([groupKey, options]) => (
         <fieldset key={groupKey} className="mt-5">
@@ -345,7 +438,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
       ))}
       {rsvpError ? <p role="alert" className="mt-4 text-sm text-red-700">{rsvpError}</p> : null}
       {submitted ? <p role="status" className="mt-4 text-sm text-green-700">RSVP berhasil dikirim.</p> : null}
-      <button type="submit" disabled={submitting} className="mt-5 rounded bg-zinc-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{submitting ? 'Mengirim kode…' : privateInvite ? 'Konfirmasi RSVP' : 'Kirim kode verifikasi'}</button>
+      <button type="submit" disabled={submitting} className="mt-5 rounded bg-zinc-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{submitting ? (privateInvite ? 'Mengonfirmasi…' : 'Mengirim kode…') : privateInvite ? 'Konfirmasi RSVP' : 'Kirim kode verifikasi'}</button>
     </form>
   );
 
@@ -403,7 +496,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
               <h2 className="text-sm font-semibold">RSVP sudah tercatat</h2>
               <p className="mt-2 text-sm text-zinc-600">Status peserta: Terdaftar. Pembayaran: {paymentStatus === 'PAID' ? 'Lunas' : paymentStatus === 'PENDING_PAYMENT' ? 'Menunggu pembayaran' : 'Belum dibayar'}.</p>
               {occurrence.status === 'PAYMENT_OPEN' && paymentStatus !== 'PAID' ? <button type="button" onClick={() => void payForSeat()} disabled={paying} className="mt-4 rounded bg-zinc-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{paying ? 'Menyiapkan pembayaran…' : paymentUrl ? 'Lanjutkan pembayaran' : 'Bayar seat'}</button> : null}
-              {rsvpAvailable ? <button type="button" onClick={startAnotherReservation} className="mt-4 rounded border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50">Tambah reservasi</button> : null}
+              {rsvpAvailable && !privateInvite ? <button type="button" onClick={startAnotherReservation} className="mt-4 rounded border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50">Tambah reservasi</button> : null}
               {rsvpError ? <p role="alert" className="mt-3 text-sm text-red-700">{rsvpError}</p> : null}
               {occurrence.status !== 'PAYMENT_OPEN' ? <p className="mt-2 text-xs text-zinc-500">Pemilik gathering akan membuka pembayaran setelah konfirmasi reservasi.</p> : null}
             </section>
