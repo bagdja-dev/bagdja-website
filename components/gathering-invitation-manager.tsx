@@ -167,7 +167,9 @@ export function GatheringInvitationManager({
           source.close();
           void loadInvitations();
           if (progress.status === 'COMPLETED') {
-            router.refresh();
+            // Beri jeda singkat supaya progress bar 100% sempat terlihat sebelum
+            // halaman pindah ke tahap konfirmasi undangan.
+            window.setTimeout(() => router.refresh(), 1200);
           } else {
             const failedRecipients = progress.failed_items.length
               ? ` Penerima gagal: ${progress.failed_items.join(', ')}.`
@@ -487,16 +489,23 @@ export function GatheringInvitationManager({
       ) : null}
       {dispatchOperation ? (
         <div className="mt-3 border-y py-3 text-xs" style={{ borderColor: 'var(--brand-border)' }} role="status" aria-live="polite">
-          <span className="font-semibold">
-            {dispatchOperation.status === 'QUEUED' ? 'Pengiriman undangan mengantre'
-              : dispatchOperation.status === 'RUNNING' ? 'Mengirim undangan'
-              : dispatchOperation.status === 'COMPLETED' ? 'Pengiriman undangan selesai'
-              : 'Pengiriman undangan gagal'}
-          </span>
-          <span className="ml-2" style={{ color: 'var(--brand-muted)' }}>
-            {dispatchOperation.processed_count}/{dispatchOperation.total_count} diproses · {dispatchOperation.success_count} terkirim · {dispatchOperation.failed_count} gagal
-          </span>
-          {dispatchOperation.error_message ? <p className="mt-1 text-red-700">{dispatchOperation.error_message}</p> : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-semibold">
+              {dispatchOperation.status === 'QUEUED' ? 'Pengiriman undangan mengantre'
+                : dispatchOperation.status === 'RUNNING' ? 'Mengirim email undangan'
+                : dispatchOperation.status === 'COMPLETED' ? 'Pengiriman undangan selesai'
+                : 'Pengiriman undangan gagal'}
+            </span>
+            <span style={{ color: 'var(--brand-muted)' }}>
+              {dispatchOperation.processed_count}/{dispatchOperation.total_count} diproses · {dispatchOperation.success_count} terkirim · {dispatchOperation.failed_count} gagal
+            </span>
+          </div>
+          {dispatchOperation.total_count > 0 ? (
+            <div className="mt-2 h-1.5 overflow-hidden bg-zinc-100" role="progressbar" aria-label="Progres pengiriman email undangan" aria-valuemin={0} aria-valuemax={dispatchOperation.total_count} aria-valuenow={dispatchOperation.processed_count}>
+              <div className="h-full transition-[width]" style={{ width: `${Math.min(100, (dispatchOperation.processed_count / dispatchOperation.total_count) * 100)}%`, backgroundColor: 'var(--brand-accent)' }} />
+            </div>
+          ) : null}
+          {dispatchOperation.error_message ? <p className="mt-2 text-red-700">{dispatchOperation.error_message}</p> : null}
           {dispatchOperation.failed_items.length > 0 ? (
             <p className="mt-1 text-red-700">Gagal: {dispatchOperation.failed_items.join(', ')}</p>
           ) : null}

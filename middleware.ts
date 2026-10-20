@@ -104,7 +104,10 @@ export async function middleware(request: NextRequest) {
     if (slug && !RESERVED_TOP_LEVEL_PATHS.has(slug)) {
       const redirectUrl = new URL(request.nextUrl);
       redirectUrl.protocol = 'https:';
+      // `host` (bukan `hostname`) + port kosong: di belakang reverse proxy
+      // nextUrl membawa port internal container (mis. :3000) yang tidak publik.
       redirectUrl.host = `${slug}.${PLATFORM_HOST}`;
+      redirectUrl.port = '';
       redirectUrl.pathname = rest.length ? `/${rest.join('/')}` : '/';
       return NextResponse.redirect(redirectUrl, 308);
     }
