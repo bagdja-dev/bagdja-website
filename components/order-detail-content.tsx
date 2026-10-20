@@ -151,6 +151,12 @@ export interface TransactionDetail {
   fulfillment?: Record<string, OrderFulfillmentProgress>;
   metadata?: { shipping?: TransactionShippingMetadata } | null;
   parent_transaction_id?: string | null;
+  /** Human-readable payment reference from Payment Service (payment_requests.external_id), e.g., INV-BAGDJADEV-PRODUCT-43A57B5A */
+  ref_number?: string | null;
+  /** Payment Service payment_requests.id (UUID) — internal reference for API calls */
+  payment_request_id?: string | null;
+  /** Escrow ID from Payment Service */
+  escrow_id?: string | null;
 }
 
 export interface OrderDetail {
@@ -578,6 +584,24 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
                 Rp {transaction.total_amount.toLocaleString('id-ID')}
               </dd>
             </div>
+            {transaction.ref_number && (
+              <div className="flex items-center justify-between">
+                <dt style={{ color: 'var(--brand-muted)' }}>Payment Ref</dt>
+                <dd className="font-mono text-xs font-medium">{transaction.ref_number}</dd>
+              </div>
+            )}
+            {transaction.payment_request_id && (
+              <div className="flex items-center justify-between">
+                <dt style={{ color: 'var(--brand-muted)' }}>Payment Request ID</dt>
+                <dd className="font-mono text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>{transaction.payment_request_id}</dd>
+              </div>
+            )}
+            {transaction.escrow_id && (
+              <div className="flex items-center justify-between">
+                <dt style={{ color: 'var(--brand-muted)' }}>Escrow ID</dt>
+                <dd className="font-mono text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>{transaction.escrow_id}</dd>
+              </div>
+            )}
             <div className="flex items-center justify-between pt-1">
               <dt style={{ color: 'var(--brand-muted)' }}>Tanggal</dt>
               <dd className="text-xs">{new Date(transaction.created_at).toLocaleString('id-ID')}</dd>
