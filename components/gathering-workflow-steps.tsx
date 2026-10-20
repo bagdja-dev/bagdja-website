@@ -38,8 +38,36 @@ interface InvitationHistoryRow {
   expires_at: string;
 }
 
+type ParticipantFilter = 'ALL' | 'AWAITING' | 'UNPAID' | 'PENDING_PAYMENT' | 'PAID' | 'INACTIVE';
+
+const PARTICIPANT_FILTERS: Array<{ key: ParticipantFilter; label: string }> = [
+  { key: 'ALL', label: 'Semua' },
+  { key: 'AWAITING', label: 'Belum RSVP' },
+  { key: 'UNPAID', label: 'Belum dibayar' },
+  { key: 'PENDING_PAYMENT', label: 'Menunggu pembayaran' },
+  { key: 'PAID', label: 'Lunas' },
+  { key: 'INACTIVE', label: 'Ditolak / batal / tidak aktif' },
+];
+
+function registrationFilterKey(registration: RegistrationRow): ParticipantFilter {
+  if (registration.registration_status !== 'RSVP_CONFIRMED' || registration.payment_status === 'REFUNDED') return 'INACTIVE';
+  if (registration.payment_status === 'PAID') return 'PAID';
+  if (registration.payment_status === 'PENDING_PAYMENT') return 'PENDING_PAYMENT';
+  return 'UNPAID';
+}
+
+function invitationFilterKey(invitation: InvitationHistoryRow): ParticipantFilter {
+  return invitation.status === 'PENDING' && new Date(invitation.expires_at) > new Date() ? 'AWAITING' : 'INACTIVE';
+}
+
+function matchesParticipantQuery(query: string, ...values: Array<string | null | undefined>) {
+  if (!query) return true;
+  return values.some((value) => value?.toLowerCase().includes(query));
+}
+
 interface RegistrationRow {
   id: string;
+  invitation_id?: string | null;
   attendee_name: string;
   email: string;
   whatsapp: string | null;
@@ -164,6 +192,8 @@ function ReadOnlyInvitationHistory({
   const router = useRouter();
   const [invitations, setInvitations] = useState<InvitationHistoryRow[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+  const [participantQuery, setParticipantQuery] = useState('');
+  const [participantFilter, setParticipantFilter] = useState<ParticipantFilter>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -529,6 +559,27 @@ function ReadOnlyInvitationHistory({
     setShareUrl(`${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`);
   }, [basePath, invitePolicy, publicInvitationId]);
 
+  // Undangan privat yang belum punya registrasi digabung ke daftar peserta,
+  // supaya status undangan & RSVP tiap orang tampil di satu baris.
+  const registeredInvitationIds = new Set(registrations.flatMap((registration) => registration.invitation_id ? [registration.invitation_id] : []));
+  const awaitingInvitations = invitePolicy === 'INVITE_ONLY' && includeRegistrations
+    ? invitations.filter((invitation) => !registeredInvitationIds.has(invitation.id) && invitation.status !== 'ACCEPTED')
+    : [];
+  const participantCounts = PARTICIPANT_FILTERS.reduce<Record<ParticipantFilter, number>>((counts, filter) => ({ ...counts, [filter.key]: 0 }), {} as Record<ParticipantFilter, number>);
+  for (const registration of registrations) participantCounts[registrationFilterKey(registration)] += 1;
+  for (const invitation of awaitingInvitations) participantCounts[invitationFilterKey(invitation)] += 1;
+  participantCounts.ALL = registrations.length + awaitingInvitations.length;
+  const normalizedParticipantQuery = participantQuery.trim().toLowerCase();
+  const visibleRegistrations = registrations.filter((registration) => (
+    (participantFilter === 'ALL' || registrationFilterKey(registration) === participantFilter)
+    && matchesParticipantQuery(normalizedParticipantQuery, registration.attendee_name, registration.email, registration.whatsapp)
+  ));
+  const visibleInvitations = awaitingInvitations.filter((invitation) => (
+    (participantFilter === 'ALL' || invitationFilterKey(invitation) === participantFilter)
+    && matchesParticipantQuery(normalizedParticipantQuery, invitation.invitee_name, invitation.email, invitation.whatsapp)
+  ));
+  const participantFilterActive = participantFilter !== 'ALL' || Boolean(normalizedParticipantQuery);
+
   function statusLabel(invitation: InvitationHistoryRow) {
     if (invitation.status === 'PENDING' && new Date(invitation.expires_at) <= new Date()) return 'Kedaluwarsa';
     if (invitation.status === 'PENDING') return 'Belum RSVP';
@@ -572,7 +623,7 @@ function ReadOnlyInvitationHistory({
         </div>
       ) : null}
       {!loading && !error && invitations.length === 0 ? <p className="mt-4 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada undangan.</p> : null}
-      {invitePolicy === 'INVITE_ONLY' && invitations.length > 0 ? (
+      {invitePolicy === 'INVITE_ONLY' && !includeRegistrations && invitations.length > 0 ? (
         <ul className="mt-4 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
           {invitations.map((invitation) => (
             <li key={invitation.id} className="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4">
@@ -593,9 +644,35 @@ function ReadOnlyInvitationHistory({
             <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>
               {stageNumber === 4
                 ? `${registrations.filter((registration) => registration.payment_status === 'PAID' && registration.registration_status === 'RSVP_CONFIRMED').length} seat lunas / minimum ${minAttendees}`
-                  : `${activeRegistrations.length} RSVP aktif`}
+                  : invitePolicy === 'INVITE_ONLY'
+                    ? `${activeRegistrations.length} dari ${invitations.length} undangan sudah RSVP`
+                    : `${activeRegistrations.length} RSVP aktif`}
             </span>
           </div>
+          {participantCounts.ALL > 0 ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="search"
+                value={participantQuery}
+                onChange={(event) => setParticipantQuery(event.target.value)}
+                placeholder="Cari nama, email, atau WhatsApp"
+                aria-label="Cari peserta"
+                className="w-full min-w-0 rounded border bg-transparent px-3 py-2 text-sm sm:flex-1"
+                style={{ borderColor: 'var(--brand-border)' }}
+              />
+              <select
+                value={participantFilter}
+                onChange={(event) => setParticipantFilter(event.target.value as ParticipantFilter)}
+                aria-label="Filter status peserta"
+                className="w-full rounded border bg-transparent px-3 py-2 text-sm sm:w-auto"
+                style={{ borderColor: 'var(--brand-border)' }}
+              >
+                {PARTICIPANT_FILTERS
+                  .filter((filter) => filter.key !== 'AWAITING' || invitePolicy === 'INVITE_ONLY')
+                  .map((filter) => <option key={filter.key} value={filter.key}>{filter.label} ({participantCounts[filter.key]})</option>)}
+              </select>
+            </div>
+          ) : null}
             {canConfirmReservations && rejectableRegistrations.length ? (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y py-3" style={{ borderColor: 'var(--brand-border)' }}>
                 <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
@@ -660,11 +737,12 @@ function ReadOnlyInvitationHistory({
               {invoiceOperation.error_message ? <p className="mt-2 text-xs text-red-700">{invoiceOperation.error_message}</p> : null}
             </div>
           ) : null}
-          {registrations.length ? (
+          {visibleRegistrations.length || visibleInvitations.length ? (
             <ul className="mt-3 divide-y border-y" style={{ borderColor: 'var(--brand-border)' }}>
-              {registrations.map((registration) => (
+              {visibleRegistrations.map((registration, index) => (
                 <li key={registration.id} className="flex flex-col gap-3 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-6 shrink-0 text-right text-xs tabular-nums" style={{ color: 'var(--brand-muted)' }}>{index + 1}.</span>
                     {canRejectRegistration(registration) || collectivelyPayableRegistrations.some((item) => item.id === registration.id) ? (
                       <input
                         type="checkbox"
@@ -680,11 +758,11 @@ function ReadOnlyInvitationHistory({
                       <p className="truncate font-semibold">{registration.attendee_name}</p>
                       <p className="truncate text-xs" style={{ color: 'var(--brand-muted)' }}>{registration.email}</p>
                       <p className="mt-1 text-xs" style={{ color: registration.registration_status === 'REJECTED' ? '#b91c1c' : 'var(--brand-muted)' }}>
-                        {registration.registration_status === 'REJECTED' ? 'Ditolak' : registration.registration_status === 'CANCELLED' ? 'Dibatalkan' : registration.payment_status === 'PAID' ? 'Lunas' : registration.payment_status === 'PENDING_PAYMENT' ? 'Menunggu pembayaran' : 'Belum dibayar'}
+                        {registration.registration_status === 'REJECTED' ? 'Ditolak' : registration.registration_status === 'CANCELLED' ? 'Dibatalkan' : `RSVP diterima · ${registration.payment_status === 'PAID' ? 'Lunas' : registration.payment_status === 'PENDING_PAYMENT' ? 'Menunggu pembayaran' : registration.payment_status === 'REFUNDED' ? 'Direfund' : 'Belum dibayar'}`}
                       </p>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2 pl-7 sm:pl-0">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 pl-16 sm:pl-0">
                     {canConfirmEvent && registration.registration_status === 'RSVP_CONFIRMED' && registration.payment_status === 'PENDING_PAYMENT' && registration.order_id ? (
                       <button type="button" onClick={() => void cancelParticipantCheckout(registration)} disabled={Boolean(cancellingCheckoutId)} className="rounded border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">
                         {cancellingCheckoutId === registration.id ? 'Membatalkan…' : 'Batalkan pembayaran'}
@@ -706,7 +784,32 @@ function ReadOnlyInvitationHistory({
                   </div>
                 </li>
               ))}
+              {visibleInvitations.map((invitation, index) => (
+                <li key={`invitation-${invitation.id}`} className="flex flex-col gap-3 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-6 shrink-0 text-right text-xs tabular-nums" style={{ color: 'var(--brand-muted)' }}>{visibleRegistrations.length + index + 1}.</span>
+                    <span className="w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{invitation.invitee_name || invitation.email || invitation.whatsapp || 'Undangan'}</p>
+                      <p className="truncate text-xs" style={{ color: 'var(--brand-muted)' }}>{[invitation.email, invitation.whatsapp].filter(Boolean).join(' · ') || '-'}</p>
+                      <p className="mt-1 text-xs" style={{ color: invitation.status === 'REVOKED' ? '#b91c1c' : 'var(--brand-muted)' }}>{statusLabel(invitation)}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 pl-16 sm:pl-0">
+                    {invitation.status !== 'REVOKED' ? (
+                      <a href={`${basePath}/gathering/invite/id/${encodeURIComponent(invitation.id)}`} target="_blank" rel="noopener noreferrer" className="rounded border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>
+                        Buka undangan
+                      </a>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
             </ul>
+          ) : participantFilterActive && participantCounts.ALL > 0 ? (
+            <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
+              Tidak ada peserta yang cocok.{' '}
+              <button type="button" onClick={() => { setParticipantQuery(''); setParticipantFilter('ALL'); }} className="font-semibold underline">Reset pencarian</button>
+            </p>
           ) : <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada peserta yang mengirim RSVP.</p>}
           {options.length ? (
             <details className="mt-4 border-y" style={{ borderColor: 'var(--brand-border)' }}>
