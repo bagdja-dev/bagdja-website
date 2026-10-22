@@ -64,6 +64,8 @@ interface WebsiteTransactionRow {
   currency?: string | null;
   payment_mode?: 'ADD_TO_CART' | 'ESCROW' | string | null;
   status: string;
+  /** Nomor invoice payment-service (mis. "INV-..."); null untuk transaksi lama. */
+  ref_number?: string | null;
   checkout_url?: string | null;
   courier?: string | null;
   created_at: string;
@@ -430,7 +432,7 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
     >
       <div className="flex items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
         <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
-          <span className="font-mono font-semibold">#{shortId(row.id)}</span>
+          <span className="font-mono font-semibold">{row.ref_number ?? `#${shortId(row.id)}`}</span>
           <span>•</span>
           <span>{formatDate(row.created_at)}</span>
         </div>

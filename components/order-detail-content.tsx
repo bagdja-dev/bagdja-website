@@ -586,14 +586,8 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
             </div>
             {transaction.ref_number && (
               <div className="flex items-center justify-between">
-                <dt style={{ color: 'var(--brand-muted)' }}>Payment Ref</dt>
+                <dt style={{ color: 'var(--brand-muted)' }}>Ref Number</dt>
                 <dd className="font-mono text-xs font-medium">{transaction.ref_number}</dd>
-              </div>
-            )}
-            {transaction.payment_request_id && (
-              <div className="flex items-center justify-between">
-                <dt style={{ color: 'var(--brand-muted)' }}>Payment Request ID</dt>
-                <dd className="font-mono text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>{transaction.payment_request_id}</dd>
               </div>
             )}
             {transaction.escrow_id && (
