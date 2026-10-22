@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChatReferenceButton } from './chat-reference-button';
 import { RetryPaymentButton } from './retry-payment-button';
 import { buildChatReferenceHref } from './chat-reference';
+import { hasOutstandingTagihan, outstandingTagihanLabel, type TagihanSummary } from '../lib/termin-summary';
 
 /**
  * Daftar transaksi buyer (client component).
@@ -66,6 +67,8 @@ interface WebsiteTransactionRow {
   status: string;
   /** Nomor invoice payment-service (mis. "INV-..."); null untuk transaksi lama. */
   ref_number?: string | null;
+  /** Ringkasan tagihan (DP + Termin) — null kalau transaksi tanpa Termin. */
+  termin_summary?: TagihanSummary | null;
   checkout_url?: string | null;
   courier?: string | null;
   created_at: string;
@@ -232,14 +235,14 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
     if (tab === 'preorder-cancelled') return [];
     const t = TABS.find((x) => x.key === tab);
     if (!t || !t.match) return rows;
-    return rows.filter((r) => t.match!(r.status));
+    return rows.filter((r) => t.match!(tabStatusOf(r)));
   }, [rows, tab]);
 
   const tabCounts = useMemo(() => {
     const cnt: Record<TabKey, number> = { all: rows.length + cancelledPreorders.length, awaiting: 0, process: 0, done: 0, cancelled: 0, 'preorder-cancelled': cancelledPreorders.length };
     for (const r of rows) {
       for (const t of TABS) {
-        if (t.match?.(r.status)) {
+        if (t.match?.(tabStatusOf(r))) {
           cnt[t.key] += 1;
         }
       }
@@ -412,8 +415,17 @@ function EmptyState({
   );
 }
 
+/**
+ * Status untuk pengelompokan tab: checkout COMPLETED yang masih punya tagihan
+ * lanjutan belum lunas masuk "Diproses", bukan "Selesai".
+ */
+function tabStatusOf(row: WebsiteTransactionRow): string {
+  return hasOutstandingTagihan(row.status, row.termin_summary) ? 'HELD' : row.status;
+}
+
 function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransactionRow; basePath: string; websiteId: string }) {
-  const tone = STATUS_TONE[row.status] ?? 'muted';
+  const outstanding = hasOutstandingTagihan(row.status, row.termin_summary);
+  const tone = outstanding ? 'pending' : STATUS_TONE[row.status] ?? 'muted';
   const toneStyle = pillBg(tone);
   const items = row.items ?? [];
   const firstItem = items[0];
@@ -440,7 +452,7 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
           className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
           style={{ backgroundColor: toneStyle.bg, color: toneStyle.color }}
         >
-          {STATUS_LABEL[row.status] ?? row.status}
+          {outstanding ? outstandingTagihanLabel(row.termin_summary) : STATUS_LABEL[row.status] ?? row.status}
         </span>
       </div>
 

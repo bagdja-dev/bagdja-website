@@ -22,6 +22,12 @@ import { buildChatReferenceHref } from './chat-reference';
 import { RetryPaymentButton } from './retry-payment-button';
 import { DigitalAssetDownloadButton } from './digital-asset-download-button';
 import { DirectPaymentStatusRefresh } from './direct-payment-status-refresh';
+import {
+  hasOutstandingTagihan,
+  outstandingTagihanLabel,
+  tagihanProgressText,
+  type TagihanSummary,
+} from '../lib/termin-summary';
 
 export interface TransactionProduct {
   name?: string;
@@ -154,6 +160,8 @@ export interface TransactionDetail {
   metadata?: { shipping?: TransactionShippingMetadata } | null;
   parent_transaction_id?: string | null;
   /** File produk digital (delivery record) — hanya terisi untuk transaksi direct pay yang sudah COMPLETED. */
+  /** Ringkasan tagihan (DP + Termin) — null kalau transaksi tanpa Termin. */
+  termin_summary?: TagihanSummary | null;
   digital_assets?: Array<{
     id: string;
     role: 'download' | 'attachment';
@@ -376,16 +384,12 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
   const unpaidTerminsCount = Object.values(transaction.fulfillment ?? {})
     .flatMap((f) => f.termins)
     .filter((t) => t.status === 'ISSUED').length;
-  // Transaksi (DP) sudah COMPLETED tapi masih ada Termin yang belum
-  // PAID/CANCELLED — dari sudut pandang pesanan keseluruhan belum tuntas.
-  // Cuma label tampilan, TIDAK mengubah `transaction.status` asli.
-  const partiallyCompleted =
-    transaction.status === 'COMPLETED' &&
-    Object.values(transaction.fulfillment ?? {})
-      .flatMap((f) => f.termins)
-      .some((t) => t.status !== 'PAID' && t.status !== 'CANCELLED');
+  // Checkout (DP) sudah COMPLETED tapi masih ada tagihan lanjutan yang belum
+  // lunas — pesanan keseluruhan belum tuntas. Cuma label tampilan, TIDAK
+  // mengubah `transaction.status` asli.
+  const partiallyCompleted = hasOutstandingTagihan(transaction.status, transaction.termin_summary);
   const statusLabel = partiallyCompleted
-    ? 'Selesai Sebagian'
+    ? outstandingTagihanLabel(transaction.termin_summary)
     : STATUS_LABEL[transaction.status] ?? transaction.status;
 
   return (
@@ -409,6 +413,11 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
         >
           {statusLabel}
         </span>
+        {transaction.termin_summary && (
+          <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+            {tagihanProgressText(transaction.termin_summary)}
+          </span>
+        )}
       </div>
 
       {/* Direct pay (mis. produk digital) dikonfirmasi async lewat sync —
