@@ -26,9 +26,9 @@ import {
   type GalleryImageItem,
   type LocationItem,
   type NavPage,
-  type PaymentMetaEntry,
   type SectionEntry,
 } from '../../../lib/template-data';
+import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -349,9 +349,7 @@ export function ProductCard({
   tenantSlug?: string;
 }) {
   const href = websiteSlug !== undefined ? buildProductHref(websiteSlug, item.slug) : undefined;
-  const internalMode = (item.paymentMeta ?? []).find(
-    (m) => m.payment_mode === 'ADD_TO_CART' || m.payment_mode === 'ESCROW',
-  );
+  const internalMode = resolveCheckoutPaymentMode(item.type);
 
   const content = (
     <>
@@ -407,8 +405,8 @@ export function ProductCard({
               image: item.image ?? item.images?.[0],
               stock: item.stock,
             }}
-            paymentMode={internalMode.payment_mode}
-            label={internalMode.payment_mode === 'ESCROW' ? 'Beli (Escrow)' : 'Tambahkan ke Daftar Pesanan'}
+            paymentMode={internalMode}
+            label={internalMode === 'ESCROW' ? 'Beli (Escrow)' : 'Tambahkan ke Daftar Pesanan'}
           />
         </div>
       </div>
@@ -838,27 +836,6 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
 }
 
 /** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
-/** Tombol checkout EXTERNAL (LYNK) — mode internal ditangani PurchaseControls (di halaman detail). */
-function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
-  switch (entry.payment_mode) {
-    case 'LYNK':
-      if (!entry.payment_link) return null;
-      return (
-        <a
-          href={entry.payment_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex rounded-full border-2 px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-          style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent-muted)' }}
-        >
-          Beli via Lynk
-        </a>
-      );
-    default:
-      return null;
-  }
-}
-
 function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, isLoggedIn, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; isLoggedIn?: boolean; loginHref?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
@@ -866,10 +843,8 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
   const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
   const familyIds = new Set(family.map((p) => p.id));
 
-  // Mode internal pertama (ADD_TO_CART/ESCROW) — dipakai PurchaseControls.
-  const internalPaymentMode = (item.paymentMeta ?? []).find(
-    (m) => m.payment_mode === 'ADD_TO_CART' || m.payment_mode === 'ESCROW',
-  )?.payment_mode as 'ADD_TO_CART' | 'ESCROW' | undefined;
+  // Mode checkout dari tipe produk (digital = direct pay, lainnya escrow) — dipakai PurchaseControls.
+  const internalPaymentMode = resolveCheckoutPaymentMode(item.type);
 
   const related = allProducts
     .filter((p) => !familyIds.has(p.id) && !p.parentProductId && (p.type === item.type || p.category === item.category))
@@ -898,7 +873,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             <VariantTreeSelector family={family} currentId={item.id} websiteSlug={websiteSlug} />
 
             {/* Mode internal (ADD_TO_CART/ESCROW): quantity + stok + tombol cart
-                — urutan: varian → quantity → cart → WhatsApp → LYNK. */}
+                — urutan: varian → quantity → cart → WhatsApp. */}
             {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId && (
               <PurchaseControls
                 slug={tenantSlug}
@@ -983,10 +958,6 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     Tanya Produk
                   </ChatReferenceButton>
                 )}
-                {/* Mode external (LYNK) — dirender setelah WhatsApp */}
-                {item.paymentMeta?.map((entry, index) => (
-                  <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
-                ))}
               </>
             )}
           </div>

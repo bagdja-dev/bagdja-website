@@ -8,7 +8,7 @@
  *   [Varian] (di luar komponen ini)
  *   [Quantity - 1 +] Stok: N
  *   [+ Keranjang / Beli (Escrow)]
- *   (WhatsApp & Lynk dirender di luar, setelah komponen ini)
+ *   (WhatsApp dirender di luar, setelah komponen ini)
  *
  * Tombol cart async: POST /api/orders (BFF → website-api draft) lalu add ke
  * cart lokal dengan orderId. Pesan hasil/error ditampilkan inline.

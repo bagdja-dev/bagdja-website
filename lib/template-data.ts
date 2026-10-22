@@ -8,10 +8,7 @@ import type {
   ApiWebsitePage,
   ApiWebsiteProduct,
   ApiWebsiteTemplate,
-  PaymentMetaEntry,
 } from './api-client';
-
-export type { PaymentMetaEntry } from './api-client';
 
 export interface GatheringOptionGroup {
   key: string;
@@ -67,8 +64,6 @@ export interface CatalogItem {
   variantAttributes?: Record<string, string>;
   /** Stok (dari metadata.stock) — opsional, dipakai guard quantity di UI. */
   stock?: number;
-  /** Daftar cara/link pembayaran checkout (mis. Lynk.id) — dirender sebagai tombol beli di halaman detail. */
-  paymentMeta?: PaymentMetaEntry[];
 }
 
 export interface CategoryItem {
@@ -418,7 +413,6 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     locationIds: product.location_ids ?? [],
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
     stock: parseStock(product.metadata?.stock),
-    paymentMeta: product.payment_meta,
   };
 }
 

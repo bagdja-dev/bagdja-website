@@ -22,9 +22,9 @@ import {
   type FaqItem,
   type LocationItem,
   type NavPage,
-  type PaymentMetaEntry,
   type SectionEntry,
 } from '../../../lib/template-data';
+import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
@@ -629,16 +629,11 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
   return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{chatHref ? <a href={chatHref} className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">KIRIM KEBUTUHAN PROYEK →</a> : null}</div></section>;
 }
 
-function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
-  if (entry.payment_mode !== 'LYNK' || !entry.payment_link) return null;
-  return <a href={entry.payment_link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex border-2 px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent)' }}>Beli via Lynk</a>;
-}
-
   function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, websiteId, waHref, auth }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; websiteId?: string; waHref?: string; auth?: WorkshopViewProps['auth'] }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((product) => product.id === familyId || product.parentProductId === familyId);
-  const internalPaymentMode = (item.paymentMeta ?? []).find((entry) => entry.payment_mode === 'ADD_TO_CART' || entry.payment_mode === 'ESCROW')?.payment_mode as 'ADD_TO_CART' | 'ESCROW' | undefined;
+  const internalPaymentMode = resolveCheckoutPaymentMode(item.type);
   const related = allProducts.filter((product) => product.id !== item.id && !product.parentProductId && (product.type === item.type || product.category === item.category)).slice(0, 4);
   const specificationEntries = Object.entries(item.specifications ?? {}).filter(
     ([, value]) => value !== undefined && value !== null && String(value).trim() !== '',
@@ -847,7 +842,6 @@ function WorkshopPaymentLink({ entry }: { entry: PaymentMetaEntry }) {
                 {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
                   Tanya Produk
                 </ChatReferenceButton> : null}
-                {item.paymentMeta?.map((entry, index) => <WorkshopPaymentLink key={`${entry.payment_mode}-${index}`} entry={entry} />)}
               </>
             )}
           </div>

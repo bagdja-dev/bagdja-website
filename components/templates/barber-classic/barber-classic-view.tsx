@@ -22,7 +22,6 @@ import {
   type GalleryImageItem,
   type LocationItem,
   type NavPage,
-  type PaymentMetaEntry,
   type SectionEntry,
 } from '../../../lib/template-data';
 import {
@@ -833,27 +832,6 @@ function BlogArticleSection({ post, websiteSlug }: { post: BlogPostItem; website
   );
 }
 
-/** Tombol checkout per `payment_mode` — mode baru cukup nambah case, tanpa ubah pemanggilnya (ProductDetailSection). */
-function PaymentModeCta({ entry }: { entry: PaymentMetaEntry }) {
-  switch (entry.payment_mode) {
-    case 'LYNK':
-      if (!entry.payment_link) return null;
-      return (
-        <a
-          href={entry.payment_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex rounded-full border-2 px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
-          style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent-muted)' }}
-        >
-          Beli via Lynk
-        </a>
-      );
-    default:
-      return null;
-  }
-}
-
 /** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
 function ProductDetailSection({
   item,
@@ -1098,13 +1076,6 @@ function ProductDetailSection({
             >
               Tanya Produk
             </ChatReferenceButton>
-          )}
-          {item.paymentMeta && item.paymentMeta.length > 0 && (
-            <div className="mt-4 flex flex-wrap justify-center gap-3">
-              {item.paymentMeta.map((entry, index) => (
-                <PaymentModeCta key={`${entry.payment_mode}-${index}`} entry={entry} />
-              ))}
-            </div>
           )}
         </>
       )}
