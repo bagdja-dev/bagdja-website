@@ -69,7 +69,6 @@ interface ShippingCostOption {
 }
 
 /** Flow lama saja — dipakai kalau website belum punya lokasi shippable. */
-const COURIERS = ['JNE', 'J&T', 'SiCepat', 'GoSend', 'AnterAja', 'Lainnya'] as const;
 
 const EMPTY_SHIPPING: ShippingForm = {
   recipient_name: '',
@@ -102,7 +101,6 @@ export function CheckoutContent({
   const [draftsError, setDraftsError] = useState(false);
 
   const [shipping, setShipping] = useState<ShippingForm>(EMPTY_SHIPPING);
-  const [courier, setCourier] = useState<string | null>(null);
 
   // ─── Flow baru: lokasi asal + tujuan search-select + cost real ──────────
   const shippableLocations = useMemo(
@@ -296,7 +294,9 @@ export function CheckoutContent({
     hasAnyItem &&
     !missingSelection &&
     !shippingInvalid &&
-    (!cartNeedsShipping || (shippingEnabled ? Boolean(selectedCourierOption) : Boolean(courier))) &&
+    // Kurir hanya dipilih buyer di flow ongkir real-time; tanpa lokasi
+    // shippable ongkir ditentukan penjual (buyer cukup isi alamat).
+    (!shippingEnabled || Boolean(selectedCourierOption)) &&
     !loading;
 
   if (draftsLoading) {
@@ -443,17 +443,19 @@ export function CheckoutContent({
     setError(null);
     try {
       const orderIds = draftOrders.map((o) => o.id);
-      const payload: Record<string, unknown> = {
-        order_ids: orderIds,
-        shipping_address: {
+      const payload: Record<string, unknown> = { order_ids: orderIds };
+      // Cart tanpa item yang perlu dikirim (jasa on-site/digital) — tidak
+      // ada alamat/kurir sama sekali.
+      if (cartNeedsShipping) {
+        payload.shipping_address = {
           recipient_name: shipping.recipient_name.trim(),
           phone: shipping.phone.trim(),
           address: shipping.address.trim(),
           city: shippingEnabled ? destinationArea?.name : shipping.city.trim(),
           district: shippingEnabled ? undefined : shipping.district.trim() || undefined,
           postal_code: shipping.postal_code.trim() || undefined,
-        },
-      };
+        };
+      }
       if (shippingEnabled && selectedCourierOption && selectedLocationId && destinationArea) {
         payload.shipping = {
           location_id: selectedLocationId,
@@ -462,8 +464,6 @@ export function CheckoutContent({
           courier_code: selectedCourierOption.courierCode,
           courier_service_name: selectedCourierOption.serviceName,
         };
-      } else {
-        payload.courier = courier;
       }
 
       const res = await fetch('/api/transactions/checkout', {
@@ -601,120 +601,122 @@ export function CheckoutContent({
             </section>
           )}
 
-          {/* Alamat pengiriman */}
-          <section>
-            <h2
-              className="text-sm font-bold uppercase tracking-wide"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Alamat Pengiriman
-            </h2>
-            <div
-              className="mt-4 grid gap-4 rounded-xl border p-5 sm:grid-cols-2"
-              style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
-            >
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  Nama Penerima <span style={{ color: 'var(--brand-accent)' }}>*</span>
-                </span>
-                <input
-                  type="text"
-                  value={shipping.recipient_name}
-                  onChange={(e) => setField('recipient_name', e.target.value)}
-                  placeholder="Nama penerima"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  No. HP <span style={{ color: 'var(--brand-accent)' }}>*</span>
-                </span>
-                <input
-                  type="tel"
-                  value={shipping.phone}
-                  onChange={(e) => setField('phone', e.target.value)}
-                  placeholder="08xxxxxxxxxx"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  Alamat Lengkap <span style={{ color: 'var(--brand-accent)' }}>*</span>
-                </span>
-                <input
-                  type="text"
-                  value={shipping.address}
-                  onChange={(e) => setField('address', e.target.value)}
-                  placeholder="Jalan, nomor rumah, RT/RW, patokan"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
-
-              {shippingEnabled ? (
-                <div className="sm:col-span-2">
-                  <ShippingAreaSearch value={destinationArea} onChange={setDestinationArea} />
-                </div>
-              ) : (
+          {/* Alamat pengiriman — hanya kalau ada item yang perlu dikirim */}
+          {cartNeedsShipping && (
+            <section>
+              <h2
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Alamat Pengiriman
+              </h2>
+              <div
+                className="mt-4 grid gap-4 rounded-xl border p-5 sm:grid-cols-2"
+                style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
+              >
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                    Kota/Kabupaten <span style={{ color: 'var(--brand-accent)' }}>*</span>
+                    Nama Penerima <span style={{ color: 'var(--brand-accent)' }}>*</span>
                   </span>
                   <input
                     type="text"
-                    value={shipping.city}
-                    onChange={(e) => setField('city', e.target.value)}
-                    placeholder="Kota"
+                    value={shipping.recipient_name}
+                    onChange={(e) => setField('recipient_name', e.target.value)}
+                    placeholder="Nama penerima"
                     className={inputClass()}
                     style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
                   />
                 </label>
-              )}
-
-              {!shippingEnabled && (
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                    Kecamatan
+                    No. HP <span style={{ color: 'var(--brand-accent)' }}>*</span>
                   </span>
                   <input
-                    type="text"
-                    value={shipping.district}
-                    onChange={(e) => setField('district', e.target.value)}
-                    placeholder="Kecamatan (opsional)"
+                    type="tel"
+                    value={shipping.phone}
+                    onChange={(e) => setField('phone', e.target.value)}
+                    placeholder="08xxxxxxxxxx"
                     className={inputClass()}
                     style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
                   />
                 </label>
-              )}
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
-                  Kode Pos
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={shipping.postal_code}
-                  onChange={(e) => setField('postal_code', e.target.value)}
-                  placeholder="Kode pos (opsional)"
-                  className={inputClass()}
-                  style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
-                />
-              </label>
-            </div>
-          </section>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                    Alamat Lengkap <span style={{ color: 'var(--brand-accent)' }}>*</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={shipping.address}
+                    onChange={(e) => setField('address', e.target.value)}
+                    placeholder="Jalan, nomor rumah, RT/RW, patokan"
+                    className={inputClass()}
+                    style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                  />
+                </label>
 
-          {/* Kurir pengiriman */}
-          <section>
-            <h2
-              className="text-sm font-bold uppercase tracking-wide"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Kurir Pengiriman
-            </h2>
+                {shippingEnabled ? (
+                  <div className="sm:col-span-2">
+                    <ShippingAreaSearch value={destinationArea} onChange={setDestinationArea} />
+                  </div>
+                ) : (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                      Kota/Kabupaten <span style={{ color: 'var(--brand-accent)' }}>*</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={shipping.city}
+                      onChange={(e) => setField('city', e.target.value)}
+                      placeholder="Kota"
+                      className={inputClass()}
+                      style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                    />
+                  </label>
+                )}
 
-            {shippingEnabled ? (
+                {!shippingEnabled && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                      Kecamatan
+                    </span>
+                    <input
+                      type="text"
+                      value={shipping.district}
+                      onChange={(e) => setField('district', e.target.value)}
+                      placeholder="Kecamatan (opsional)"
+                      className={inputClass()}
+                      style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                    />
+                  </label>
+                )}
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
+                    Kode Pos
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={shipping.postal_code}
+                    onChange={(e) => setField('postal_code', e.target.value)}
+                    placeholder="Kode pos (opsional)"
+                    className={inputClass()}
+                    style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
+                  />
+                </label>
+              </div>
+            </section>
+          )}
+
+          {/* Kurir pengiriman — hanya flow ongkir real-time (website punya
+              lokasi shippable). Tanpa itu ongkir ditentukan penjual. */}
+          {shippingEnabled && (
+            <section>
+              <h2
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Kurir Pengiriman
+              </h2>
               <div
                 className="mt-4 rounded-xl border p-5"
                 style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
@@ -769,40 +771,8 @@ export function CheckoutContent({
                   </p>
                 )}
               </div>
-            ) : (
-              <>
-                <div
-                  className="mt-4 grid grid-cols-2 gap-2 rounded-xl border p-5 sm:grid-cols-3"
-                  style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
-                >
-                  {COURIERS.map((c) => {
-                    const active = courier === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setCourier(c)}
-                        aria-pressed={active}
-                        className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                          active ? '' : 'hover:opacity-80'
-                        }`}
-                        style={{
-                          borderColor: active ? 'var(--brand-accent)' : 'var(--brand-border)',
-                          backgroundColor: 'var(--brand-bg)',
-                          color: 'var(--brand-text)',
-                        }}
-                      >
-                        {c}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                  Biaya ongkir ditentukan penjual setelah pesanan diproses.
-                </p>
-              </>
-            )}
-          </section>
+            </section>
+          )}
         </div>
 
         {/* Kolom kanan: ringkasan */}
@@ -822,6 +792,7 @@ export function CheckoutContent({
               </dt>
               <dd className="font-semibold">Rp {subtotal.toLocaleString('id-ID')}</dd>
             </div>
+            {cartNeedsShipping && (
             <div className="flex items-center justify-between">
               <dt style={{ color: 'var(--brand-muted)' }}>Ongkir</dt>
               <dd style={{ color: selectedCourierOption ? undefined : 'var(--brand-muted)' }}>
@@ -832,6 +803,7 @@ export function CheckoutContent({
                   : 'Ditentukan penjual'}
               </dd>
             </div>
+            )}
             <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--brand-border)' }}>
               <dt className="font-semibold">Total</dt>
               <dd className="text-xl font-bold">Rp {total.toLocaleString('id-ID')}</dd>
@@ -856,11 +828,6 @@ export function CheckoutContent({
             </p>
           )}
           {!shippingInvalid && shippingEnabled && !selectedCourierOption && (
-            <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
-              Pilih kurir pengiriman dulu.
-            </p>
-          )}
-          {!shippingInvalid && !shippingEnabled && !courier && (
             <p className="mt-3 text-xs" style={{ color: 'var(--brand-muted)' }}>
               Pilih kurir pengiriman dulu.
             </p>
