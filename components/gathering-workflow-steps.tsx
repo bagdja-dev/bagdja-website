@@ -937,14 +937,14 @@ function ReadOnlyInvitationHistory({
                   })}
                 </div>
                 <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--brand-border)' }}>
-                  <p className="text-sm font-medium">DP booking (tetap ditahan di escrow)</p>
+                  <p className="text-sm font-medium">DP booking (dicairkan ke penyelenggara saat konfirmasi)</p>
                   <p className="mt-1 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(plannedBookingDeposit)}</p>
-                  <p className="mt-1 text-xs leading-5" style={{ color: 'var(--brand-muted)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(depositAmountPerSeat)} × {paidSeatCount} seat lunas. Seluruh dana tetap ditahan sampai admin memulai persiapan acara.</p>
+                  <p className="mt-1 text-xs leading-5" style={{ color: 'var(--brand-muted)' }}>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(depositAmountPerSeat)} × {paidSeatCount} seat lunas. DP dicairkan ke penyelenggara saat acara dikonfirmasi; sisa dana tetap ditahan di escrow sampai acara selesai.</p>
                 </div>
                 <button type="button" onClick={() => void confirmEvent()} disabled={finalizing || paidSeatCount < minAttendees || paidSeatCount > maxAttendees || Object.keys(finalSelections).length !== optionGroups.size} className="mt-4 rounded-full px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
                   {finalizing ? 'Menyimpan konfirmasi…' : 'Konfirmasi acara'}
                 </button>
-                <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Seat lunas: {paidSeatCount} · Minimum {minAttendees} · Maksimum {maxAttendees}. Opsi pilihan Anda akan dikunci. Admin akan memproses persiapan dan pencairan DP pada tahap berikutnya.</p>
+                <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Seat lunas: {paidSeatCount} · Minimum {minAttendees} · Maksimum {maxAttendees}. Opsi pilihan Anda akan dikunci. Bila acara dibatalkan setelah konfirmasi, DP yang sudah dicairkan tidak ikut direfund.</p>
               </section>
               {canCancelGathering && onCancelGathering ? (
                 <button type="button" onClick={onCancelGathering} disabled={cancelling} className="rounded-full border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">
@@ -1195,7 +1195,7 @@ export function GatheringWorkflowSteps({
             <h2 id="cancel-gathering-title" className="text-base font-semibold">Batalkan acara</h2>
             <p className="mt-2 text-sm text-zinc-600">
               {plan.status === 'CONFIRMED'
-                ? 'Acara akan dibatalkan. Seluruh dana peserta yang masih ditahan di escrow akan direfund; DP belum dicairkan.'
+                ? 'Acara akan dibatalkan. Sisa dana peserta yang masih ditahan di escrow akan direfund; DP yang sudah dicairkan ke penyelenggara tidak ikut direfund.'
                 : 'Acara akan dibatalkan dan proses refund akan dijalankan sesuai kebijakan.'}
             </p>
             <label htmlFor="cancel-gathering-reason" className="mt-5 block text-sm font-medium">Alasan pembatalan (opsional)</label>
