@@ -7,7 +7,8 @@
  * Urutan di halaman detail (sesuai arahan):
  *   [Varian] (di luar komponen ini)
  *   [Quantity - 1 +] Stok: N
- *   [+ Keranjang / Beli (Escrow)]
+ *   [Tombol beli — label per tipe produk, lihat resolvePurchaseAction]
+ *   [Catatan escrow — produk non-digital]
  *   (WhatsApp dirender di luar, setelah komponen ini)
  *
  * Tombol cart async: POST /api/orders (BFF → website-api draft) lalu add ke
@@ -17,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AddToCartButton } from './cart-button';
 import type { LocationItem } from '../lib/template-data';
+import { resolveCheckoutPaymentMode, resolvePurchaseAction } from '../lib/payment-mode';
 
 export interface PurchaseControlsProps {
   slug: string;
@@ -36,13 +38,13 @@ export interface PurchaseControlsProps {
     image?: string;
     stock?: number;
   };
-  paymentMode: 'ADD_TO_CART' | 'ESCROW';
+  /** Tipe produk (`website_products.type`) — menentukan label, perilaku tombol, & catatan escrow. */
+  productType: string;
   locationIds?: string[];
   locations?: LocationItem[];
-  cartLabel?: string;
 }
 
-export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref, websiteId, product, paymentMode, locationIds = [], locations = [], cartLabel = '+ Keranjang' }: PurchaseControlsProps) {
+export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref, websiteId, product, productType, locationIds = [], locations = [] }: PurchaseControlsProps) {
   const router = useRouter();
   const [qty, setQty] = useState(1);
   const [selectedLocationId, setSelectedLocationId] = useState('');
@@ -64,13 +66,12 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
   const minus = () => setQty((q) => Math.max(1, q - 1));
   const plus = () => setQty((q) => (max !== undefined ? Math.min(max, q + 1) : q + 1));
 
-  // `cartLabel` default ('+ Keranjang') = niat tambah banyak produk sekaligus
-  // sebelum checkout, jadi tetap silent add-to-cart. `cartLabel` lain (mis.
-  // "Pesan" di template workshop) = niat order 1 produk ini langsung, jadi
-  // harus langsung diarahkan ke halaman detail order setelah draft dibuat —
-  // sebelumnya cuma redirect untuk isQuoteRequest, produk harga tetap dengan
-  // cartLabel non-default diam saja (bug: tombol "Pesan" terasa tidak berefek).
-  const isDirectOrder = isQuoteRequest || cartLabel !== '+ Keranjang';
+  // Produk fisik ("+ Keranjang") = niat kumpulkan beberapa produk sebelum
+  // checkout → silent add-to-cart. Jasa/paket/digital = niat order 1 produk
+  // ini langsung → arahkan ke halaman detail order setelah draft dibuat.
+  // Quotation selalu langsung ke order (perlu lanjut minta penawaran).
+  const isDirectOrder = isQuoteRequest || resolvePurchaseAction(productType).directOrder;
+  const isEscrow = resolveCheckoutPaymentMode(productType) === 'ESCROW';
 
   const handleAdded = (orderId: string) => {
     if (isDirectOrder) {
@@ -165,15 +166,20 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
         slug={slug}
         websiteId={websiteId}
         product={product}
-        paymentMode={paymentMode}
+        productType={productType}
         quantity={qty}
         locationId={selectedLocationId || undefined}
-        label={paymentMode === 'ESCROW' ? 'Beli (Escrow)' : cartLabel}
         onAdded={handleAdded}
         onError={handleError}
         disabled={requiresLocation && !selectedLocationId}
         onBeforeAdd={handlePurchase}
       />
+
+      {isEscrow && (
+        <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+          🔒 Dana ditahan aman sampai pesanan selesai
+        </p>
+      )}
 
       {feedback && (
         <p

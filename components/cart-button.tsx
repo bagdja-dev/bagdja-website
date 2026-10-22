@@ -12,6 +12,7 @@
  * Error → onError.
  */
 import { useState } from 'react';
+import { resolvePurchaseAction } from '../lib/payment-mode';
 
 export interface AddToCartButtonProps {
   slug: string;
@@ -27,8 +28,8 @@ export interface AddToCartButtonProps {
     stock?: number;
   };
   locationId?: string;
-  paymentMode: 'ADD_TO_CART' | 'ESCROW';
-  label?: string;
+  /** Tipe produk (`website_products.type`) — sumber label tombol, lihat `resolvePurchaseAction`. */
+  productType: string;
   /** Quantity yang ditambahkan (default 1). */
   quantity?: number;
   /** Dipanggil setelah sukses — bisa tampilkan pesan "Ditambahkan". */
@@ -44,8 +45,7 @@ export function AddToCartButton({
   slug,
   websiteId,
   product,
-  paymentMode,
-  label = 'Masukkan ke Keranjang',
+  productType,
   quantity = 1,
   locationId,
   onAdded,
@@ -59,8 +59,9 @@ export function AddToCartButton({
   // Field `quotable` (website_products.quotable) adalah sumber kebenaran.
   // Rp 0 = sentinel "belum ada harga final" (fulfillment-praorder-plan.md
   // §2.1) dipertahankan sebagai fallback — CTA-nya minta penawaran, bukan
-  // beli, walau paymentMode ESCROW.
+  // beli.
   const isQuoteRequest = product.quotable === true || product.price <= 0;
+  const { label } = resolvePurchaseAction(productType);
 
   const handleClick = async () => {
     if (busy) return;
@@ -119,10 +120,8 @@ export function AddToCartButton({
         : busy
           ? 'Menambah...'
           : isQuoteRequest
-            ? 'Dapatkan Penawaran'
-            : paymentMode === 'ESCROW'
-              ? 'Beli (Escrow)'
-              : label}
+            ? 'Minta Penawaran'
+            : label}
     </button>
   );
 }

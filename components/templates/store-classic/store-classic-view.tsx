@@ -405,8 +405,7 @@ export function ProductCard({
               image: item.image ?? item.images?.[0],
               stock: item.stock,
             }}
-            paymentMode={internalMode}
-            label={internalMode === 'ESCROW' ? 'Beli (Escrow)' : 'Tambahkan ke Daftar Pesanan'}
+            productType={item.type}
           />
         </div>
       </div>
@@ -890,7 +889,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                   image: item.image ?? item.images?.[0],
                   stock: item.stock,
                 }}
-                paymentMode={internalPaymentMode}
+                productType={item.type}
                 locationIds={item.locationIds}
                 locations={locations}
               />
