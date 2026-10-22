@@ -60,6 +60,8 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
   }, [product.stock]);
 
   const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
+  // Produk digital selalu qty 1 (dipaksa juga di server) — stepper disembunyikan.
+  const isDigital = productType === 'digital';
   const displayStock = typeof product.stock === 'number' ? product.stock : undefined;
   const availableLocations = locations.filter((location) => locationIds.includes(location.id));
 
@@ -105,41 +107,43 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
           Harga belum ditentukan — kirim permintaan penawaran, tim kami akan menghubungi Anda.
         </p>
       )}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
-          Jumlah
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={minus}
-            className="flex h-9 w-9 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-            aria-label="Kurangi jumlah"
-            disabled={qty <= 1 || outOfStock}
-          >
-            −
-          </button>
-          <span className="w-10 text-center text-base font-bold" style={{ color: 'var(--brand-text)' }}>
-            {qty}
+      {!isDigital && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
+            Jumlah
           </span>
-          <button
-            type="button"
-            onClick={plus}
-            className="flex h-9 w-9 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-            aria-label="Tambah jumlah"
-            disabled={outOfStock || (max !== undefined && qty >= max)}
-          >
-            +
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={minus}
+              className="flex h-9 w-9 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+              aria-label="Kurangi jumlah"
+              disabled={qty <= 1 || outOfStock}
+            >
+              −
+            </button>
+            <span className="w-10 text-center text-base font-bold" style={{ color: 'var(--brand-text)' }}>
+              {qty}
+            </span>
+            <button
+              type="button"
+              onClick={plus}
+              className="flex h-9 w-9 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+              aria-label="Tambah jumlah"
+              disabled={outOfStock || (max !== undefined && qty >= max)}
+            >
+              +
+            </button>
+          </div>
+          {displayStock !== undefined && (
+            <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+              {outOfStock ? 'Stok habis' : `Stok: ${displayStock}`}
+            </span>
+          )}
         </div>
-        {displayStock !== undefined && (
-          <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>
-            {outOfStock ? 'Stok habis' : `Stok: ${displayStock}`}
-          </span>
-        )}
-      </div>
+      )}
 
       {requiresLocation && (
         <label className="flex flex-col gap-1 text-sm" style={{ color: 'var(--brand-text)' }}>
@@ -167,7 +171,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
         websiteId={websiteId}
         product={product}
         productType={productType}
-        quantity={qty}
+        quantity={isDigital ? 1 : qty}
         locationId={selectedLocationId || undefined}
         onAdded={handleAdded}
         onError={handleError}

@@ -20,6 +20,8 @@ import { ChatReferenceButton } from './chat-reference-button';
 import { GatheringWorkflowSteps } from './gathering-workflow-steps';
 import { buildChatReferenceHref } from './chat-reference';
 import { RetryPaymentButton } from './retry-payment-button';
+import { DigitalAssetDownloadButton } from './digital-asset-download-button';
+import { DirectPaymentStatusRefresh } from './direct-payment-status-refresh';
 
 export interface TransactionProduct {
   name?: string;
@@ -151,6 +153,15 @@ export interface TransactionDetail {
   fulfillment?: Record<string, OrderFulfillmentProgress>;
   metadata?: { shipping?: TransactionShippingMetadata } | null;
   parent_transaction_id?: string | null;
+  /** File produk digital (delivery record) — hanya terisi untuk transaksi direct pay yang sudah COMPLETED. */
+  digital_assets?: Array<{
+    id: string;
+    role: 'download' | 'attachment';
+    email_status: 'PENDING' | 'SENT' | 'FAILED';
+    email_sent_at: string | null;
+    last_url_expires_at: string | null;
+    asset: { name: string; filename: string; mime_type: string; size_bytes: number };
+  }>;
   /** Human-readable payment reference from Payment Service (payment_requests.external_id), e.g., INV-BAGDJADEV-PRODUCT-43A57B5A */
   ref_number?: string | null;
   /** Payment Service payment_requests.id (UUID) — internal reference for API calls */
@@ -400,6 +411,10 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
         </span>
       </div>
 
+      {/* Direct pay (mis. produk digital) dikonfirmasi async lewat sync —
+          refresh berkala supaya status & file digital muncul tanpa reload manual. */}
+      {needsPayment && transaction.payment_mode === 'ADD_TO_CART' && <DirectPaymentStatusRefresh />}
+
       {unpaidTerminsCount > 0 && (
         <div
           className="mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm"
@@ -482,6 +497,31 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
               })}
             </div>
           </section>
+
+          {(transaction.digital_assets?.length ?? 0) > 0 && (
+            <section>
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
+                File Digital
+              </h2>
+              <ul className="mt-3 divide-y rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
+                {transaction.digital_assets?.map((delivery) => (
+                  <li key={delivery.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{delivery.asset.name}</p>
+                      <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
+                        {delivery.email_status === 'SENT'
+                          ? 'Link juga dikirim melalui email'
+                          : 'Status email: ' + delivery.email_status.toLowerCase()}
+                      </p>
+                    </div>
+                    {transaction.status === 'COMPLETED' && (
+                      <DigitalAssetDownloadButton transactionId={transaction.id} deliveryId={delivery.id} />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {shippingLines.length > 0 && (
             <section>

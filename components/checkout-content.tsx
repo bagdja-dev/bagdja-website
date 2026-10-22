@@ -32,6 +32,7 @@ interface DraftProduct {
   images?: string[];
   price?: number;
   description?: string | null;
+  type?: string;
   /** fulfillment-praorder-plan.md §2.6/§0.1 (Q10) — independen dari `type`/vendor-routing. */
   requires_shipping?: boolean;
   uom?: { symbol?: string } | null;
@@ -163,7 +164,10 @@ export function CheckoutContent({
   // di-checkout ini requires_shipping=false (mis. jasa on-site/digital), flow
   // ongkir (baik lama maupun baru) tidak relevan sama sekali, terlepas dari
   // apakah website ini punya lokasi shippable untuk produk fisiknya yang lain.
-  const cartNeedsShipping = draftOrders.some((o) => o.product?.requires_shipping !== false);
+  // Produk digital tidak pernah dikirim fisik — abaikan requires_shipping-nya.
+  const cartNeedsShipping = draftOrders.some(
+    (o) => o.product?.type !== 'digital' && o.product?.requires_shipping !== false,
+  );
   const shippingEnabled = websiteHasShippableLocations && cartNeedsShipping;
 
   // Item yang sengaja TIDAK dicentang di cart tetap tinggal di keranjang.
