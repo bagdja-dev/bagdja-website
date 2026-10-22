@@ -8,3 +8,6 @@ build/
 *.log
 next-env.d.ts
 *.tsbuildinfo
+
+# graphify knowledge graph — dibangun lokal (`graphify update .`), tidak di-commit
+graphify-out/
