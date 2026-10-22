@@ -78,6 +78,11 @@ export async function middleware(request: NextRequest) {
   const hostHeader = request.headers.get('host') ?? '';
   const hostname = hostHeader.split(':')[0];
 
+  // Digital Asset Links must be served from the host root, never tenant-rewritten.
+  if (request.nextUrl.pathname === '/.well-known/assetlinks.json') {
+    return NextResponse.next();
+  }
+
   // W1: route auth (/auth/*) TIDAK boleh di-rewrite jadi slug tenant —
   // dilayani di host asal (localhost / custom domain) supaya callback OAuth
   // dan login jalan di domain tempat user memulai.
