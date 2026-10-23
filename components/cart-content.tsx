@@ -70,6 +70,7 @@ const GATHERING_STATUS_LABELS: Record<string, string> = {
   RSVP_OPEN: 'RSVP dibuka',
   PAYMENT_OPEN: 'Pembayaran dibuka',
   CONFIRMED: 'Terkonfirmasi',
+  IN_PROGRESS: 'Acara berlangsung',
 };
 
 /** Item cart — 1:1 dengan 1 draft order server. */

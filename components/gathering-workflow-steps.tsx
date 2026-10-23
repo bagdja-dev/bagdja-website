@@ -1124,7 +1124,7 @@ export function GatheringWorkflowSteps({
           initialReservationDeadline={occurrence.rsvp_close_at}
           initialPaymentDeadline={occurrence.payment_deadline}
           initialEventAt={occurrence.final_schedule}
-          canCancel={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          canCancel={selectedIndex === currentIndex && !['CANCELLED', 'IN_PROGRESS', 'COMPLETED'].includes(plan.status)}
           cancelling={cancelling}
           onCancel={() => { setCancelError(''); setShowCancelDialog(true); }}
         />
@@ -1141,7 +1141,7 @@ export function GatheringWorkflowSteps({
             setInvitationBannerUrl(content.bannerUrl);
             setInvitationDescription(content.description);
           }}
-          canCancel={plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          canCancel={!['CANCELLED', 'IN_PROGRESS', 'COMPLETED'].includes(plan.status)}
           cancelling={cancelling}
           onCancel={() => { setCancelError(''); setShowCancelDialog(true); }}
         />
@@ -1155,7 +1155,7 @@ export function GatheringWorkflowSteps({
           options={occurrence.option_groups_snapshot.filter((option) => (occurrence.opened_option_ids_snapshot ?? []).includes(option.product_option_id))}
           includeRegistrations
           canConfirmReservations={selectedIndex === currentIndex && plan.workflow_step === 'INVITATION_CONFIRMATION'}
-          canCancelGathering={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          canCancelGathering={selectedIndex === currentIndex && !['CANCELLED', 'IN_PROGRESS', 'COMPLETED'].includes(plan.status)}
           cancelling={cancelling}
           onCancelGathering={() => { setCancelError(''); setShowCancelDialog(true); }}
           minAttendees={occurrence.min_attendees}
@@ -1184,7 +1184,7 @@ export function GatheringWorkflowSteps({
           )}
           stageNumber={4}
           canConfirmEvent={plan.workflow_step === 'PAYMENT_CONFIRMATION' && plan.status === 'PAYMENT_OPEN'}
-          canCancelGathering={selectedIndex === currentIndex && plan.status !== 'CANCELLED' && plan.status !== 'COMPLETED'}
+          canCancelGathering={selectedIndex === currentIndex && !['CANCELLED', 'IN_PROGRESS', 'COMPLETED'].includes(plan.status)}
           cancelling={cancelling}
           onCancelGathering={() => { setCancelError(''); setShowCancelDialog(true); }}
         />

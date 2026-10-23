@@ -32,6 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   RSVP_OPEN: 'RSVP dibuka',
   PAYMENT_OPEN: 'Menunggu pembayaran seat',
   CONFIRMED: 'Acara dikonfirmasi',
+  IN_PROGRESS: 'Acara berlangsung',
   COMPLETED: 'Selesai',
   CANCELLED: 'Dibatalkan',
 };
@@ -41,7 +42,7 @@ const CALENDAR_TABS = [
   { key: 'planning', label: 'Perencanaan', matches: (plan: PlanRow) => plan.workflow_step === 'PLAN' && plan.status === 'PREORDER' },
   { key: 'rsvp', label: 'RSVP', matches: (plan: PlanRow) => plan.status === 'RSVP_OPEN' },
   { key: 'payment', label: 'Pembayaran', matches: (plan: PlanRow) => plan.status === 'PAYMENT_OPEN' },
-  { key: 'confirmed', label: 'Dikonfirmasi', matches: (plan: PlanRow) => plan.status === 'CONFIRMED' },
+  { key: 'confirmed', label: 'Dikonfirmasi', matches: (plan: PlanRow) => plan.status === 'CONFIRMED' || plan.status === 'IN_PROGRESS' },
   { key: 'completed', label: 'Selesai', matches: (plan: PlanRow) => plan.status === 'COMPLETED' },
   { key: 'cancelled', label: 'Dibatalkan', matches: (plan: PlanRow) => plan.status === 'CANCELLED' },
 ] as const;
