@@ -78,16 +78,16 @@ const CALENDAR_TABS = [
   { key: 'cancelled', label: 'Dibatalkan', matches: (plan: PlanRow) => plan.status === 'CANCELLED' },
 ] as const;
 
-/** Tombol utama per status seat; label tanpa tombol bila tidak ada tindakan. */
-const ACTION_COPY: Record<InvitationAction, { button?: string; label?: string }> = {
-  RSVP: { button: 'Jawab undangan' },
-  WAITING_INVOICE: { label: 'Menunggu tagihan' },
-  PAY: { button: 'Bayar seat' },
-  PAYMENT_PENDING: { button: 'Lanjutkan pembayaran' },
-  WAITING_CONFIRMATION: { label: 'Lunas · menunggu konfirmasi acara', button: 'Lihat tagihan' },
-  TICKET: { button: 'Lihat tiket' },
-  ATTENDED: { label: 'Hadir', button: 'Lihat tiket' },
-  NONE: {},
+/** Ringkasan status per kartu; aksinya (bayar, tiket QR) ada di detail reservasi. */
+const ACTION_LABEL: Record<InvitationAction, string> = {
+  RSVP: 'Belum dijawab',
+  WAITING_INVOICE: 'Menunggu tagihan',
+  PAY: 'Perlu pembayaran',
+  PAYMENT_PENDING: 'Pembayaran diproses',
+  WAITING_CONFIRMATION: 'Lunas · menunggu konfirmasi acara',
+  TICKET: 'Tiket tersedia',
+  ATTENDED: 'Hadir',
+  NONE: '',
 };
 
 const NEEDS_ATTENTION: InvitationAction[] = ['RSVP', 'PAY', 'PAYMENT_PENDING'];
@@ -192,9 +192,8 @@ function PlansTab({ basePath, plans, loading, error }: { basePath: string; plans
 }
 
 function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRow }) {
-  const copy = ACTION_COPY[row.action];
-  const label = row.action === 'NONE' ? noneLabel(row) : copy.label;
-  const primary = NEEDS_ATTENTION.includes(row.action) || row.action === 'TICKET';
+  const label = row.action === 'NONE' ? noneLabel(row) : ACTION_LABEL[row.action];
+  const primary = NEEDS_ATTENTION.includes(row.action);
   return (
     <article className="grid gap-4 py-5 sm:grid-cols-[1fr_auto] sm:items-center">
       <div className="min-w-0">
@@ -214,7 +213,7 @@ function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRo
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end">
         {label ? <span className="text-xs font-medium" style={{ color: row.action === 'ATTENDED' ? 'var(--brand-accent)' : 'var(--brand-muted)' }}>{label}</span> : null}
-        {copy.button && row.action_path ? (
+        {row.action_path ? (
           <Link
             href={`${basePath}${row.action_path}`}
             className="inline-flex w-fit items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold"
@@ -222,11 +221,8 @@ function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRo
               ? { backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }
               : { borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
           >
-            {copy.button}
+            Lihat undangan
           </Link>
-        ) : null}
-        {row.action === 'NONE' && row.action_path ? (
-          <Link href={`${basePath}${row.action_path}`} className="text-xs font-semibold underline" style={{ color: 'var(--brand-text)' }}>Lihat tagihan</Link>
         ) : null}
       </div>
     </article>
@@ -312,7 +308,7 @@ export function GatheringCalendarContent({ basePath, websiteId }: { basePath: st
         <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
           {mainTab === 'plans'
             ? 'Kelola rencana, peserta, voting, dan pembayaran seat acara yang Anda buat.'
-            : 'Acara yang mengundang Anda: jawab undangan, bayar seat, dan buka tiket masuk.'}
+            : 'Acara yang mengundang Anda. Buka undangan untuk menjawab RSVP, membayar seat, dan melihat tiket masuk.'}
         </p>
       </header>
 
