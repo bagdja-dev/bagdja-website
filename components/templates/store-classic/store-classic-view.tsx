@@ -1512,20 +1512,6 @@ export function StoreClassicView({
             }
           })}
 
-        {(chatHref || waHref) && !isChatPage && (
-          <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">
-            <a
-              href={chatHref || waHref || '#'}
-              target={chatHref ? undefined : '_blank'}
-              rel={chatHref ? undefined : 'noopener noreferrer'}
-              className="flex w-full items-center justify-center rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide shadow-lg"
-              style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
-            >
-              Hubungi Kami
-            </a>
-          </div>
-        )}
-
         <TemplateFooter
           blocks={footerBlocks}
           title={title}
