@@ -13,6 +13,7 @@ import {
   buildProductHref,
   buildWhatsAppHref,
   formatIDR,
+  normalizeFooterBlocks,
   parseGalleryImages,
   parseSocialLinks,
   type BlogPostItem,
@@ -35,7 +36,7 @@ import { BlogRelatedProducts } from '../../blog-related-products';
 import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from './barber-classic-catalog';
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
-import { SocialIcon } from './barber-classic-icons';
+import { TemplateFooter } from '../shared/template-footer';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
@@ -56,10 +57,12 @@ export interface BarberClassicProfile {
   phone?: string;
   email?: string;
   socialLinks?: Record<string, unknown>;
+  /** `websites.footer_settings` mentah — blok footer global */
+  footerSettings?: unknown;
 }
 
 export interface BarberClassicViewProps {
-  /** true saat dirender di dalam iframe live-preview admin — sembunyikan footer branding */
+  /** true saat dirender di dalam iframe live-preview admin */
   isPreview: boolean;
   profile: BarberClassicProfile;
   templateTheme?: WebsiteTheme;
@@ -664,47 +667,6 @@ function ContactSection({ title, profile }: { title: string; profile: BarberClas
   );
 }
 
-function MapPinIcon() {
-  return (
-    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0Z"
-      />
-    </svg>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.25 6.75c0 8.284 6.716 15 15 15h1.5a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106a1.5 1.5 0 0 0-1.417.39l-.97.97a1.5 1.5 0 0 1-1.65.313 11.25 11.25 0 0 1-5.373-5.373 1.5 1.5 0 0 1 .313-1.65l.97-.97a1.5 1.5 0 0 0 .39-1.417L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"
-      />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
-      />
-    </svg>
-  );
-}
-
 function BlogPostCard({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?: string }) {
   const href = websiteSlug !== undefined ? buildBlogPostHref(websiteSlug, post.slug) : '#';
   return (
@@ -1084,7 +1046,6 @@ function ProductDetailSection({
 }
 
 export function BarberClassicView({
-  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1497,117 +1458,20 @@ export function BarberClassicView({
           </div>
         )}
 
-        {!isPreview && (
-          <footer className="border-t" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-            <div className="mx-auto grid max-w-5xl gap-8 px-4 py-12 text-sm sm:grid-cols-3 sm:px-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  {profile.logoUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profile.logoUrl} alt="" className="h-8 w-8 rounded-lg object-contain" />
-                  )}
-                  <span
-                    className="text-sm tracking-widest"
-                    style={{
-                      color: 'var(--brand-accent-muted)',
-                      fontFamily: 'var(--font-heading)',
-                      fontWeight: 'var(--font-heading-weight)',
-                    }}
-                  >
-                    {title.toUpperCase()}
-                  </span>
-                </div>
-                {profile.tagline && <p className="mt-3 leading-relaxed" style={{ opacity: 0.85 }}>{profile.tagline}</p>}
-                {socialLinks.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {socialLinks.map((social) => (
-                      <a
-                        key={social.platform}
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={social.platform}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:opacity-80"
-                        style={{ borderColor: 'var(--brand-border)' }}
-                      >
-                        <SocialIcon platform={social.platform} />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {footerNavLinks.length > 0 && (
-                <div>
-                  <p
-                    className="mb-3 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--brand-accent-muted)' }}
-                  >
-                    Halaman
-                  </p>
-                  <nav className="flex flex-col gap-2">
-                    {footerNavLinks.map((link) => (
-                      <a key={link.href} href={link.href} className="hover:underline" style={{ opacity: 0.85 }}>
-                        {link.label}
-                      </a>
-                    ))}
-                  </nav>
-                </div>
-              )}
-
-              {(footerAddress || profile.phone || waHref || profile.email) && (
-                <div>
-                  <p
-                    className="mb-3 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--brand-accent-muted)' }}
-                  >
-                    Kontak
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {footerAddress && (
-                      <span className="flex items-start gap-2" style={{ opacity: 0.85 }}>
-                        <MapPinIcon />
-                        {footerAddress}
-                      </span>
-                    )}
-                    {waHref && (
-                      <a
-                        href={waHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 hover:underline"
-                        style={{ opacity: 0.85 }}
-                      >
-                        <PhoneIcon />
-                        {profile.whatsapp}
-                      </a>
-                    )}
-                    {!waHref && profile.phone && (
-                      <span className="flex items-center gap-2" style={{ opacity: 0.85 }}>
-                        <PhoneIcon />
-                        {profile.phone}
-                      </span>
-                    )}
-                    {profile.email && (
-                      <a
-                        href={`mailto:${profile.email}`}
-                        className="flex items-center gap-2 hover:underline"
-                        style={{ opacity: 0.85 }}
-                      >
-                        <MailIcon />
-                        {profile.email}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <p className="border-t py-6 text-center text-xs" style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
-              © Bagdja Website Builder
-            </p>
-          </footer>
-        )}
+        <TemplateFooter
+          blocks={normalizeFooterBlocks(profile.footerSettings)}
+          title={title}
+          tagline={profile.tagline}
+          logoUrl={profile.logoUrl}
+          socialLinks={socialLinks}
+          pageLinks={footerNavLinks}
+          address={footerAddress}
+          whatsapp={profile.whatsapp}
+          waHref={waHref}
+          phone={profile.phone}
+          email={profile.email}
+          containerClassName="max-w-5xl"
+        />
       </div>
     </>
   );

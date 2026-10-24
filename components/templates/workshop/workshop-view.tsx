@@ -15,7 +15,9 @@ import {
   buildBlogPostHref,
   buildWhatsAppHref,
   formatIDR,
+  normalizeFooterBlocks,
   parseGalleryImages,
+  parseSocialLinks,
   type BlogPostItem,
   type CatalogItem,
   type CategoryItem,
@@ -40,6 +42,7 @@ import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 import { ModelViewerElement } from '../../model-viewer-element';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
+import { TemplateFooter } from '../shared/template-footer';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -59,6 +62,8 @@ export interface WorkshopViewProps {
     phone?: string;
     email?: string;
     socialLinks?: Record<string, unknown>;
+    /** `websites.footer_settings` mentah — blok footer global */
+    footerSettings?: unknown;
   };
   templateTheme?: WebsiteTheme;
   websiteTheme?: WebsiteTheme;
@@ -945,7 +950,6 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 }
 
 export function WorkshopView({
-  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -978,6 +982,13 @@ export function WorkshopView({
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
   const waHref = buildWhatsAppHref(profile.whatsapp);
   const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
+  const primaryLocation = locations.find((location) => location.isPrimary) ?? locations[0];
+  const footerAddress = primaryLocation
+    ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ')
+    : undefined;
+  const footerNavLinks = pages
+    .filter((page) => page.placement === 'footer')
+    .map((page) => ({ href: buildPageHref(homeHref === '/' ? '' : homeHref, page), label: page.title }));
 
   return (
     <>
@@ -1080,10 +1091,21 @@ export function WorkshopView({
             default: return null;
           }
         })}
-        <footer className="border-t px-4 py-8 text-center text-xs text-[var(--brand-muted)]" style={{ borderColor: 'var(--brand-border)' }}>
-          © {new Date().getFullYear()} {name}. Dibangun dengan presisi.
-          {isPreview ? ' Preview template.' : ''}
-        </footer>
+        <TemplateFooter
+          blocks={normalizeFooterBlocks(profile.footerSettings)}
+          title={name}
+          tagline={profile.tagline}
+          logoUrl={profile.logoUrl}
+          socialLinks={parseSocialLinks(profile.socialLinks)}
+          pageLinks={footerNavLinks}
+          address={footerAddress}
+          whatsapp={profile.whatsapp}
+          waHref={waHref}
+          phone={profile.phone}
+          email={profile.email}
+          compact={sections.some((section) => section.type === 'chat')}
+          headingClassName="font-mono tracking-[0.18em]"
+        />
       </div>
     </>
   );

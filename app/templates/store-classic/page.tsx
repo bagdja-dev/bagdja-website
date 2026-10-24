@@ -9,9 +9,8 @@ import { StoreClassicView } from '../../../components/templates/store-classic/st
 import { getTemplateBySlug } from '../../../lib/api-client';
 import {
   buildTemplateDefaultsPreview,
-  normalizeWebsiteFooterSettings,
+  parseFooterSettingsParam,
   resolveSections,
-  type WebsiteFooterSettings,
 } from '../../../lib/template-data';
 import { parseThemeFromSearchParams } from '../../../lib/website-theme';
 
@@ -20,15 +19,7 @@ type SearchParams = Record<string, string | undefined>;
 export default async function StoreClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
   const isPreview = searchParams.preview === '1';
   const websiteTheme = parseThemeFromSearchParams(searchParams);
-  let footerSettings: WebsiteFooterSettings | undefined;
-  if (searchParams.footer_settings) {
-    try {
-      footerSettings = normalizeWebsiteFooterSettings(JSON.parse(searchParams.footer_settings));
-    } catch (error) {
-      console.warn('Ignoring invalid footer settings in template preview', error);
-      footerSettings = undefined;
-    }
-  }
+  const footerSettings = parseFooterSettingsParam(searchParams.footer_settings);
 
   let template = null;
   try {

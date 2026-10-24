@@ -152,56 +152,44 @@ export interface SectionEntry {
   content: Record<string, unknown>;
 }
 
-export interface WebsiteFooterSettings {
-  enabled?: boolean;
-  show_logo?: boolean;
-  show_business_name?: boolean;
-  show_tagline?: boolean;
-  show_social_links?: boolean;
-  show_pages?: boolean;
-  show_address?: boolean;
-  show_whatsapp?: boolean;
-  show_phone?: boolean;
-  show_email?: boolean;
-  show_copyright?: boolean;
-  contact_heading?: string;
-  pages_heading?: string;
-  copyright_text?: string;
+export const FOOTER_BLOCK_TYPES = ['brand', 'page_links', 'contact', 'social_links', 'text', 'copyright'] as const;
+export type FooterBlockType = (typeof FOOTER_BLOCK_TYPES)[number];
+
+/** Satu blok di komponen footer global (`websites.footer_settings.blocks`). */
+export interface FooterBlock {
+  id: string;
+  type: FooterBlockType;
+  content: Record<string, unknown>;
 }
 
-export function normalizeWebsiteFooterSettings(raw: unknown): WebsiteFooterSettings | undefined {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+/**
+ * Ambil daftar blok footer yang valid dari `footer_settings` mentah.
+ * Bentuk lama (toggle tanpa `blocks`) atau kosong → [] = footer tidak dirender.
+ */
+export function normalizeFooterBlocks(raw: unknown): FooterBlock[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const blocks = (raw as { blocks?: unknown }).blocks;
+  if (!Array.isArray(blocks)) return [];
 
-  const input = raw as Record<string, unknown>;
-  const settings: WebsiteFooterSettings = {};
-  const booleanKeys = [
-    'enabled',
-    'show_logo',
-    'show_business_name',
-    'show_tagline',
-    'show_social_links',
-    'show_pages',
-    'show_address',
-    'show_whatsapp',
-    'show_phone',
-    'show_email',
-    'show_copyright',
-  ] as const;
-  const stringLimits = {
-    contact_heading: 80,
-    pages_heading: 80,
-    copyright_text: 160,
-  } as const;
+  return blocks.flatMap((item, index): FooterBlock[] => {
+    if (!item || typeof item !== 'object') return [];
+    const entry = item as Record<string, unknown>;
+    if (!(FOOTER_BLOCK_TYPES as readonly string[]).includes(entry.type as string)) return [];
+    const content = entry.content && typeof entry.content === 'object' && !Array.isArray(entry.content)
+      ? (entry.content as Record<string, unknown>)
+      : {};
+    return [{ id: typeof entry.id === 'string' && entry.id ? entry.id : `block-${index}`, type: entry.type as FooterBlockType, content }];
+  });
+}
 
-  for (const key of booleanKeys) {
-    if (typeof input[key] === 'boolean') settings[key] = input[key];
+/** Parse param `footer_settings` (JSON) dari URL live-preview admin; rusak/kosong → undefined. */
+export function parseFooterSettingsParam(raw: string | undefined): unknown {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
   }
-  for (const key of ['contact_heading', 'pages_heading', 'copyright_text'] as const) {
-    const value = input[key];
-    if (typeof value === 'string') settings[key] = value.slice(0, stringLimits[key]);
-  }
-
-  return settings;
 }
 
 export interface GalleryImageItem {

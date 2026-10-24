@@ -86,6 +86,17 @@ export function StoreClassicHeader({
   const navLinks = [...leftNavLinks, ...rightNavLinks];
   const hasNav = navLinks.length > 0;
   const basePath = (chatHref ?? homeHref ?? '').replace(/\/chat\/?$/, '').replace(/\/$/, '');
+  const brand = logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={logoUrl} alt="" className="h-9 rounded object-contain" />
+  ) : (
+    <span
+      className="text-base font-bold uppercase tracking-[0.2em] sm:text-lg"
+      style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+    >
+      {title}
+    </span>
+  );
 
   return (
     <header
@@ -93,18 +104,20 @@ export function StoreClassicHeader({
       style={{ borderColor: 'var(--c-header-border)', backgroundColor: 'var(--c-header-bg)', color: 'var(--c-header-text)' }}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <a href={homeHref} className="flex shrink-0 items-center gap-2">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="h-9 rounded object-contain" />
-          ) : (
-            <span
-              className="text-base font-bold uppercase tracking-[0.2em] sm:text-lg"
-              style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
-            >
-              {title}
-            </span>
-          )}
+        {/* Mobile: logo jadi tombol pembuka drawer menu (kiri). Desktop: logo tetap link ke beranda. */}
+        {hasNav && (
+          <button
+            type="button"
+            onClick={openDrawer}
+            className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80 sm:hidden"
+            aria-label="Buka menu"
+          >
+            <HamburgerIcon />
+            {brand}
+          </button>
+        )}
+        <a href={homeHref} className={`shrink-0 items-center gap-2 ${hasNav ? 'hidden sm:flex' : 'flex'}`}>
+          {brand}
         </a>
 
         <nav className="hidden min-w-0 flex-1 items-center justify-start gap-8 overflow-x-auto sm:ml-8 sm:flex">
@@ -229,17 +242,6 @@ export function StoreClassicHeader({
                 </a>
               )
             ))}
-          {hasNav && (
-            <button
-              type="button"
-              className="rounded-lg p-1 transition-colors hover:opacity-80 sm:hidden"
-              style={{ color: 'var(--c-header-text)' }}
-              onClick={openDrawer}
-              aria-label="Buka menu"
-            >
-              <HamburgerIcon />
-            </button>
-          )}
         </div>
       </div>
 
@@ -254,8 +256,8 @@ export function StoreClassicHeader({
             onClick={closeDrawer}
           />
           <div
-            className={`absolute right-0 top-0 flex h-full w-80 max-w-[85vw] flex-col shadow-2xl transition-transform duration-300 ease-out ${
-              drawerVisible ? 'translate-x-0' : 'translate-x-full'
+            className={`absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col shadow-2xl transition-transform duration-300 ease-out ${
+              drawerVisible ? 'translate-x-0' : '-translate-x-full'
             }`}
             style={{ backgroundColor: 'var(--brand-surface)' }}
           >
@@ -296,70 +298,6 @@ export function StoreClassicHeader({
                 Hubungi Kami
               </a>
             )}
-
-            {auth &&
-              (auth.isLoggedIn ? (
-                <div className="mx-6 mb-4 rounded-xl border" style={{ borderColor: 'var(--brand-border)' }}>
-                  <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
-                    {auth.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={auth.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-                    ) : (
-                      <span
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold uppercase"
-                        style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
-                        aria-hidden="true"
-                      >
-                        {(auth.username ?? 'U').charAt(0)}
-                      </span>
-                    )}
-                    <span className="truncate text-sm font-semibold" style={{ color: 'var(--brand-text)' }}>
-                      {auth.username}
-                    </span>
-                  </div>
-                  {[
-                    { href: auth.cartHref, label: cartLabel },
-                    { href: auth.ordersHref, label: 'Transaction' },
-                    { href: auth.tagihanHref, label: 'Tagihan' },
-                    { href: auth.calendarHref, label: 'Kalender' },
-                    { href: auth.profileHref, label: 'Profile' },
-                  ].map(
-                    (item) =>
-                      item.href && (
-                        <a
-                          key={item.label}
-                          href={item.href}
-                          onClick={closeDrawer}
-                          className="block border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
-                          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
-                        >
-                          {item.label}
-                        </a>
-                      ),
-                  )}
-                  {auth.logoutHref && (
-                    <a
-                      href={auth.logoutHref}
-                      onClick={closeDrawer}
-                      className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
-                      style={{ color: 'var(--brand-text)' }}
-                    >
-                      Logout
-                    </a>
-                  )}
-                </div>
-              ) : (
-                auth.loginHref && (
-                  <a
-                    href={auth.loginHref}
-                    onClick={closeDrawer}
-                    className="mx-6 mb-4 block rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
-                    style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
-                  >
-                    Masuk
-                  </a>
-                )
-              ))}
 
             {socialLinks.length > 0 && (
               <div

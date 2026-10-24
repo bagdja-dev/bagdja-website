@@ -7,7 +7,7 @@
 
 import { WorkshopView } from '../../../components/templates/workshop/workshop-view';
 import { getTemplateBySlug } from '../../../lib/api-client';
-import { buildTemplateDefaultsPreview, resolveSections } from '../../../lib/template-data';
+import { buildTemplateDefaultsPreview, parseFooterSettingsParam, resolveSections } from '../../../lib/template-data';
 import { extractTemplateTheme, parseThemeFromSearchParams } from '../../../lib/website-theme';
 
 type SearchParams = Record<string, string | undefined>;
@@ -48,6 +48,7 @@ export default async function WorkshopTemplate({ searchParams }: { searchParams:
           whatsapp: searchParams.whatsapp,
           phone: searchParams.phone,
           email: searchParams.email,
+          footerSettings: parseFooterSettingsParam(searchParams.footer_settings),
         }}
         templateTheme={template ? extractTemplateTheme(template.structure) : { mode: 'light', accent: 'orange' }}
         websiteTheme={websiteTheme}

@@ -11,7 +11,6 @@ import type {
   LocationItem,
   NavPage,
   SectionEntry,
-  WebsiteFooterSettings,
 } from './template-data';
 import type { WebsiteTheme } from './website-theme';
 
@@ -32,7 +31,8 @@ export interface TemplateRenderProps {
     phone?: string;
     email?: string;
     socialLinks?: Record<string, unknown>;
-    footerSettings?: WebsiteFooterSettings;
+    /** `websites.footer_settings` mentah — dinormalisasi oleh renderer (lihat normalizeFooterBlocks) */
+    footerSettings?: unknown;
   };
   templateTheme?: WebsiteTheme;
   websiteTheme?: WebsiteTheme;

@@ -27,8 +27,7 @@ import {
   type LocationItem,
   type NavPage,
   type SectionEntry,
-  normalizeWebsiteFooterSettings,
-  type WebsiteFooterSettings,
+  normalizeFooterBlocks,
 } from '../../../lib/template-data';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
@@ -42,6 +41,7 @@ import { StoreClassicBlogSidebar } from './store-classic-blog-sidebar';
 import { BlogRelatedProducts } from '../../blog-related-products';
 import { CategoryListingSection, ProductGridSection, VariantTreeSelector } from './store-classic-catalog';
 import { StoreClassicProductGallery } from './store-classic-gallery';
+import { TemplateFooter } from '../shared/template-footer';
 import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
@@ -51,7 +51,6 @@ import { GatheringCalendarContent } from '../../gathering-calendar-content';
 import { ProfileContent } from '../../profile-content';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
-import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from './store-classic-icons';
 import { AddToCartButton } from '../../cart-button';
 import { CartBadge } from '../../cart-badge';
 import { PurchaseControls } from '../../purchase-controls';
@@ -67,7 +66,8 @@ export interface StoreClassicProfile {
   phone?: string;
   email?: string;
   socialLinks?: Record<string, unknown>;
-  footerSettings?: WebsiteFooterSettings;
+  /** `websites.footer_settings` mentah — blok footer global */
+  footerSettings?: unknown;
 }
 
 export interface StoreClassicViewProps {
@@ -1158,7 +1158,6 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
 }
 
 export function StoreClassicView({
-  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1234,41 +1233,11 @@ export function StoreClassicView({
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
 
   const socialLinks = parseSocialLinks(profile.socialLinks);
-  // Section `footer` di halaman menimpa pengaturan footer global (Settings).
-  const footerSection = sections.find((s) => s.type === 'footer');
-  const footerSettings: WebsiteFooterSettings = {
-    ...profile.footerSettings,
-    ...(footerSection ? normalizeWebsiteFooterSettings(footerSection.content) : undefined),
-  };
-  const showFooterLogo = footerSettings.show_logo !== false;
-  const showFooterBusinessName = footerSettings.show_business_name !== false;
-  const showFooterTagline = footerSettings.show_tagline !== false;
-  const showFooterSocialLinks = footerSettings.show_social_links !== false;
-  const showFooterPages = footerSettings.show_pages !== false;
-  const showFooterAddress = footerSettings.show_address !== false;
-  const showFooterWhatsapp = footerSettings.show_whatsapp !== false;
-  const showFooterPhone = footerSettings.show_phone !== false;
-  const showFooterEmail = footerSettings.show_email !== false;
+  const footerBlocks = normalizeFooterBlocks(profile.footerSettings);
   const primaryLocation = locations.find((l) => l.isPrimary) ?? locations[0];
-  const footerAddress = showFooterAddress && primaryLocation
+  const footerAddress = primaryLocation
     ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ')
     : undefined;
-  const footerWhatsappHref = showFooterWhatsapp ? waHref : undefined;
-  const footerPhone = showFooterPhone && (profile.phone !== profile.whatsapp || !footerWhatsappHref)
-    ? profile.phone
-    : undefined;
-  const footerEmail = showFooterEmail ? profile.email : undefined;
-  const footerHasContact = Boolean(footerAddress || footerWhatsappHref || footerPhone || footerEmail);
-  const footerHasPages = showFooterPages && footerNavLinks.length > 0;
-  const footerHasBrand = Boolean(
-    (showFooterLogo && profile.logoUrl) ||
-      (showFooterBusinessName && title) ||
-      (showFooterTagline && profile.tagline) ||
-      (showFooterSocialLinks && socialLinks.length > 0),
-  );
-  const footerColumnCount = [footerHasBrand, footerHasPages, footerHasContact].filter(Boolean).length;
-  const footerGridColumns =
-    footerColumnCount === 3 ? 'sm:grid-cols-3' : footerColumnCount === 2 ? 'sm:grid-cols-2' : 'grid-cols-1';
 
   const productsById = new Map(products.map((p) => [p.id, p]));
   // Sembunyikan row varian (warna/ukuran) dari grid/listing — 1 keluarga
@@ -1557,98 +1526,20 @@ export function StoreClassicView({
           </div>
         )}
 
-        {(!isPreview || footerSection) && footerSettings.enabled !== false && (
-          <footer className="border-t" style={{ backgroundColor: 'var(--c-footer-bg)', borderColor: 'var(--c-footer-border)', color: 'var(--c-footer-text)' }}>
-            <div className={`mx-auto grid max-w-6xl px-4 text-sm sm:px-6 ${footerGridColumns} ${isChatPage ? 'gap-4 py-5' : 'gap-8 py-12'}`}>
-              {footerHasBrand && <div>
-                <div className="flex items-center gap-2">
-                  {showFooterLogo && profile.logoUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profile.logoUrl} alt="" className="h-8 w-8 rounded-lg object-contain" />
-                  )}
-                  {showFooterBusinessName && (
-                    <span className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--c-footer-heading)', fontFamily: 'var(--font-heading)' }}>
-                      {title}
-                    </span>
-                  )}
-                </div>
-                {showFooterTagline && profile.tagline && <p className={`${isChatPage ? 'mt-2' : 'mt-3'} leading-relaxed`} style={{ opacity: 0.85 }}>{profile.tagline}</p>}
-                {showFooterSocialLinks && socialLinks.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {socialLinks.map((social) => (
-                      <a
-                        key={social.platform}
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={social.platform}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:opacity-80"
-                        style={{ borderColor: 'var(--c-footer-border)' }}
-                      >
-                        <SocialIcon platform={social.platform} />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>}
-
-              {footerHasPages && (
-                <div>
-                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--c-footer-heading)' }}>
-                    {footerSettings.pages_heading?.trim() || 'Halaman'}
-                  </p>
-                  <nav className="flex flex-col gap-2">
-                    {footerNavLinks.map((link) => (
-                      <a key={link.href} href={link.href} className="hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
-                        {link.label}
-                      </a>
-                    ))}
-                  </nav>
-                </div>
-              )}
-
-              {footerHasContact && (
-                <div>
-                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--c-footer-heading)' }}>
-                    {footerSettings.contact_heading?.trim() || 'Kontak'}
-                  </p>
-                  <div className={`flex flex-col ${isChatPage ? 'gap-1' : 'gap-2'}`}>
-                    {footerAddress && (
-                      <span className="flex items-start gap-2" style={{ opacity: 0.85 }}>
-                        <MapPinIcon />
-                        {footerAddress}
-                      </span>
-                    )}
-                    {footerWhatsappHref && (
-                      <a href={footerWhatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
-                        <PhoneIcon />
-                        {profile.whatsapp}
-                      </a>
-                    )}
-                    {footerPhone && (
-                      <span className="flex items-center gap-2" style={{ opacity: 0.85 }}>
-                        <PhoneIcon />
-                        <a href={`tel:${footerPhone}`} className="hover:underline" style={{ color: 'var(--c-footer-link)' }}>{footerPhone}</a>
-                      </span>
-                    )}
-                    {footerEmail && (
-                      <a href={`mailto:${profile.email}`} className="flex items-center gap-2 hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
-                        <MailIcon />
-                        {profile.email}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {footerSettings.show_copyright !== false && footerSettings.copyright_text?.trim() !== '' && (
-              <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--c-footer-border)', opacity: 0.7 }}>
-                {footerSettings.copyright_text ?? '© Bagdja Website Builder'}
-              </p>
-            )}
-          </footer>
-        )}
+        <TemplateFooter
+          blocks={footerBlocks}
+          title={title}
+          tagline={profile.tagline}
+          logoUrl={profile.logoUrl}
+          socialLinks={socialLinks}
+          pageLinks={footerNavLinks}
+          address={footerAddress}
+          whatsapp={profile.whatsapp}
+          waHref={waHref}
+          phone={profile.phone}
+          email={profile.email}
+          compact={isChatPage}
+        />
       </div>
     </>
   );

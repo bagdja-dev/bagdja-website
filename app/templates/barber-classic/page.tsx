@@ -7,7 +7,7 @@
 
 import { BarberClassicView } from '../../../components/templates/barber-classic/barber-classic-view';
 import { getTemplateBySlug } from '../../../lib/api-client';
-import { buildTemplateDefaultsPreview, resolveSections } from '../../../lib/template-data';
+import { buildTemplateDefaultsPreview, parseFooterSettingsParam, resolveSections } from '../../../lib/template-data';
 import { parseThemeFromSearchParams } from '../../../lib/website-theme';
 
 type SearchParams = Record<string, string | undefined>;
@@ -52,6 +52,7 @@ export default async function BarberClassicTemplate({ searchParams }: { searchPa
           whatsapp: searchParams.whatsapp,
           phone: searchParams.phone,
           email: searchParams.email,
+          footerSettings: parseFooterSettingsParam(searchParams.footer_settings),
         }}
         websiteTheme={websiteTheme}
         sections={sections}
