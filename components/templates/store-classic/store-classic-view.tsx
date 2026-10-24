@@ -42,6 +42,8 @@ import { BlogRelatedProducts } from '../../blog-related-products';
 import { CategoryListingSection, ProductGridSection, VariantTreeSelector } from './store-classic-catalog';
 import { StoreClassicProductGallery } from './store-classic-gallery';
 import { TemplateFooter } from '../shared/template-footer';
+import { ChatBubbleIcon, WhatsAppIcon } from './store-classic-icons';
+import { StoreClassicStickyCta } from './store-classic-sticky-cta';
 import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
@@ -838,6 +840,8 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
 }
 
 /** Klik swatch/tombol navigasi ke halaman produk varian itu sendiri (setiap varian punya slug sendiri) — tidak butuh state client. */
+const PRODUCT_CTA_ID = 'product-cta';
+
 function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, isLoggedIn, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; isLoggedIn?: boolean; loginHref?: string }) {
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
@@ -858,12 +862,26 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
     ? item.estimation.filter((entry) => entry && typeof entry.label === 'string' && entry.label.trim() !== '')
     : [];
 
+  // CTA utama: Beli/Penawaran (PurchaseControls) atau Rencanakan Gathering; fallback "Pesan via WhatsApp"
+  const hasPurchaseControls = item.type !== 'gathering' && Boolean(tenantSlug && internalPaymentMode && item.websiteId);
+  const hasInternalPrimary = item.type === 'gathering' ? Boolean(websiteId) : hasPurchaseControls;
+  const chatReference = {
+    type: 'product' as const,
+    id: item.id,
+    title: item.name,
+    imageUrl: item.image ?? item.images?.[0],
+    meta: item.priceLabel,
+    href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined,
+  };
+  const iconButtonClass = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border';
+  const iconButtonStyle = { borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' };
+
   return (
     <>
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="grid gap-10 sm:grid-cols-2">
           <StoreClassicProductGallery images={images} videoUrl={item.videoUrl} model3dUrl={item.model3dUrl} />
-          <div>
+          <div id={PRODUCT_CTA_ID}>
             <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
               {item.name}
             </h1>
@@ -876,7 +894,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
 
             {/* Mode internal (ADD_TO_CART/ESCROW): quantity + stok + tombol cart
                 — urutan: varian → quantity → cart → WhatsApp. */}
-            {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId && (
+            {hasPurchaseControls && tenantSlug && item.websiteId && (
               <PurchaseControls
                 slug={tenantSlug}
                 basePath={websiteSlug}
@@ -901,15 +919,17 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {item.type === 'gathering' ? (
               <div className="mt-6 flex flex-col gap-3">
                 {websiteId && (
-                  <GatheringPlanButton
-                    websiteId={websiteId}
-                    productId={item.id}
-                    basePath={websiteSlug}
-                    loginHref={loginHref}
-                    className="inline-flex w-full justify-center rounded-full bg-[var(--c-btn-primary-bg)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--c-btn-primary-text)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    Rencanakan Gathering
-                  </GatheringPlanButton>
+                  <div data-primary-cta>
+                    <GatheringPlanButton
+                      websiteId={websiteId}
+                      productId={item.id}
+                      basePath={websiteSlug}
+                      loginHref={loginHref}
+                      className="inline-flex w-full justify-center rounded-full bg-[var(--c-btn-primary-bg)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--c-btn-primary-text)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    >
+                      Rencanakan Gathering
+                    </GatheringPlanButton>
+                  </div>
                 )}
                 {waHref && (
                   <a
@@ -928,7 +948,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     basePath={websiteSlug}
                     loginHref={loginHref}
                     productId={item.id}
-                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                    reference={chatReference}
                     className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
@@ -943,6 +963,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     href={waHref}
                     target="_blank"
                     rel="noopener noreferrer"
+                    data-primary-cta={hasPurchaseControls ? undefined : ''}
                     className="mt-6 inline-flex w-full justify-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                   >
@@ -955,7 +976,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     basePath={websiteSlug}
                     loginHref={loginHref}
                     productId={item.id}
-                    reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
+                    reference={chatReference}
                     className="mt-3 inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
@@ -966,6 +987,35 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             )}
           </div>
         </div>
+        {(hasInternalPrimary || waHref) && (
+          <StoreClassicStickyCta
+            targetId={PRODUCT_CTA_ID}
+            secondaryActions={
+              <>
+                {waHref && hasInternalPrimary && (
+                  <a href={waHref} target="_blank" rel="noopener noreferrer" aria-label="Konsultasi via WhatsApp" className={iconButtonClass} style={iconButtonStyle}>
+                    <WhatsAppIcon />
+                  </a>
+                )}
+                {websiteId && (
+                  <ChatReferenceButton
+                    websiteId={websiteId}
+                    basePath={websiteSlug}
+                    loginHref={loginHref}
+                    productId={item.id}
+                    reference={chatReference}
+                    wrapperClassName=""
+                    className={iconButtonClass}
+                    style={iconButtonStyle}
+                  >
+                    <ChatBubbleIcon />
+                    <span className="sr-only">Tanya Produk</span>
+                  </ChatReferenceButton>
+                )}
+              </>
+            }
+          />
+        )}
         {(item.type === 'gathering' && item.gatheringMeta) || specificationEntries.length > 0 || estimationEntries.length > 0 || item.detail ? (
           <div className="mt-10 w-full space-y-8">
             {item.type === 'gathering' && item.gatheringMeta && (

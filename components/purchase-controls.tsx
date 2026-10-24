@@ -166,6 +166,8 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
         </label>
       )}
 
+      {/* data-primary-cta: dipicu juga oleh action bar melayang di mobile (StoreClassicStickyCta) */}
+      <div data-primary-cta>
       <AddToCartButton
         slug={slug}
         websiteId={websiteId}
@@ -178,6 +180,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
         disabled={requiresLocation && !selectedLocationId}
         onBeforeAdd={handlePurchase}
       />
+      </div>
 
       {isEscrow && (
         <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
