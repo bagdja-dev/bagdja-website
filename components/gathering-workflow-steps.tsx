@@ -459,6 +459,8 @@ function ReadOnlyInvitationHistory({
   const selectedCollectiveTotal = collectivelyPayableRegistrations
     .filter((registration) => selectedRegistrationIds.includes(registration.id))
     .reduce((total, registration) => total + Number(registration.invoice_amount ?? 0), 0);
+  const collectiveSelectedCount = collectivelyPayableRegistrations.filter((registration) => selectedRegistrationIds.includes(registration.id)).length;
+  const formatRupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
   const optionGroups = new Map<string, GatheringOptionSnapshot[]>();
   options.forEach((option) => optionGroups.set(option.option_group_key, [...(optionGroups.get(option.option_group_key) ?? []), option]));
   const paidSeatCount = paidActiveRegistrations.reduce((total, registration) => total + Number(registration.order_id ? 1 : 0), 0);
@@ -708,11 +710,6 @@ function ReadOnlyInvitationHistory({
                 Pilih tagihan belum dibayar
               </label>
               <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Refund pembayaran kolektif kembali ke dompet initiator.</span>
-              {collectivelyPayableRegistrations.some((registration) => selectedRegistrationIds.includes(registration.id)) ? (
-                <button type="button" onClick={() => setShowCollectivePaymentDialog(true)} disabled={collectivePaying} className="rounded px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)' }}>
-                  {collectivePaying ? 'Menyiapkan checkout…' : `Bayar kolektif · ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedCollectiveTotal)}`}
-                </button>
-              ) : null}
             </div>
           ) : null}
           {canConfirmEvent && registrations.some((registration) => registration.registration_status === 'RSVP_CONFIRMED' && !['PAID', 'REFUNDED'].includes(registration.payment_status)) ? (
@@ -811,6 +808,30 @@ function ReadOnlyInvitationHistory({
               <button type="button" onClick={() => { setParticipantQuery(''); setParticipantFilter('ALL'); }} className="font-semibold underline">Reset pencarian</button>
             </p>
           ) : <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>Belum ada peserta yang mengirim RSVP.</p>}
+          {collectiveSelectedCount ? (
+            <>
+              {/* Desktop: ringkasan + tombol di bawah list peserta */}
+              <div className="mt-3 hidden items-center justify-between gap-3 border-b pb-3 sm:flex" style={{ borderColor: 'var(--brand-border)' }}>
+                <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{collectiveSelectedCount} tagihan dipilih</span>
+                <button type="button" onClick={() => setShowCollectivePaymentDialog(true)} disabled={collectivePaying} className="rounded px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)' }}>
+                  {collectivePaying ? 'Menyiapkan checkout…' : `Bayar kolektif · ${formatRupiah(selectedCollectiveTotal)}`}
+                </button>
+              </div>
+              {/* Mobile: footer melayang; spacer supaya baris terakhir tidak tertutup */}
+              <div className="h-20 sm:hidden" aria-hidden="true" />
+              <div className="fixed inset-x-0 bottom-0 z-20 border-t px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] sm:hidden" style={{ backgroundColor: 'var(--brand-bg)', borderColor: 'var(--brand-border)' }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>{collectiveSelectedCount} tagihan dipilih</p>
+                    <p className="truncate text-sm font-semibold">{formatRupiah(selectedCollectiveTotal)}</p>
+                  </div>
+                  <button type="button" onClick={() => setShowCollectivePaymentDialog(true)} disabled={collectivePaying} className="shrink-0 rounded px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--brand-accent)' }}>
+                    {collectivePaying ? 'Menyiapkan…' : 'Bayar kolektif'}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : null}
           {options.length ? (
             <details className="mt-4 border-y" style={{ borderColor: 'var(--brand-border)' }}>
               <summary className="cursor-pointer py-3 text-sm font-semibold">Ringkasan pilihan peserta <span className="ml-1 text-xs font-normal" style={{ color: 'var(--brand-muted)' }}>{optionGroups.size} kategori</span></summary>
