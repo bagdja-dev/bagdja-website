@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { SocialLink } from '../../../lib/template-data';
 import { CloseIcon, HamburgerIcon, SocialIcon } from './store-classic-icons';
@@ -66,8 +67,11 @@ export function StoreClassicHeader({
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const openDrawer = () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    setPortalTarget(headerRef.current?.parentElement ?? null);
     setDrawerMounted(true);
     requestAnimationFrame(() => setDrawerVisible(true));
   };
@@ -100,7 +104,8 @@ export function StoreClassicHeader({
 
   return (
     <header
-      className="sticky top-0 z-20 border-b-2"
+      ref={headerRef}
+      className="sticky top-0 z-40 border-b-2"
       style={{ borderColor: 'var(--c-header-border)', backgroundColor: 'var(--c-header-bg)', color: 'var(--c-header-text)' }}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
@@ -245,8 +250,11 @@ export function StoreClassicHeader({
         </div>
       </div>
 
-      {drawerMounted && (
-        <div className="fixed inset-0 z-30">
+      {/* Portal ke root template (induk header, pemilik CSS var tema): keluar dari stacking
+          context header (sticky) supaya drawer selalu di atas elemen sticky/fixed lain
+          di halaman (mis. stepper gathering). */}
+      {drawerMounted && createPortal(
+        <div className="fixed inset-0 z-[100]" style={{ color: 'var(--c-header-text)' }}>
           <button
             type="button"
             className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${
@@ -320,7 +328,8 @@ export function StoreClassicHeader({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        portalTarget ?? document.body,
       )}
     </header>
   );
