@@ -152,6 +152,58 @@ export interface SectionEntry {
   content: Record<string, unknown>;
 }
 
+export interface WebsiteFooterSettings {
+  enabled?: boolean;
+  show_logo?: boolean;
+  show_business_name?: boolean;
+  show_tagline?: boolean;
+  show_social_links?: boolean;
+  show_pages?: boolean;
+  show_address?: boolean;
+  show_whatsapp?: boolean;
+  show_phone?: boolean;
+  show_email?: boolean;
+  show_copyright?: boolean;
+  contact_heading?: string;
+  pages_heading?: string;
+  copyright_text?: string;
+}
+
+export function normalizeWebsiteFooterSettings(raw: unknown): WebsiteFooterSettings | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+
+  const input = raw as Record<string, unknown>;
+  const settings: WebsiteFooterSettings = {};
+  const booleanKeys = [
+    'enabled',
+    'show_logo',
+    'show_business_name',
+    'show_tagline',
+    'show_social_links',
+    'show_pages',
+    'show_address',
+    'show_whatsapp',
+    'show_phone',
+    'show_email',
+    'show_copyright',
+  ] as const;
+  const stringLimits = {
+    contact_heading: 80,
+    pages_heading: 80,
+    copyright_text: 160,
+  } as const;
+
+  for (const key of booleanKeys) {
+    if (typeof input[key] === 'boolean') settings[key] = input[key];
+  }
+  for (const key of ['contact_heading', 'pages_heading', 'copyright_text'] as const) {
+    const value = input[key];
+    if (typeof value === 'string') settings[key] = value.slice(0, stringLimits[key]);
+  }
+
+  return settings;
+}
+
 export interface GalleryImageItem {
   url: string;
   alt?: string;

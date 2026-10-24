@@ -7,7 +7,12 @@
 
 import { StoreClassicView } from '../../../components/templates/store-classic/store-classic-view';
 import { getTemplateBySlug } from '../../../lib/api-client';
-import { buildTemplateDefaultsPreview, resolveSections } from '../../../lib/template-data';
+import {
+  buildTemplateDefaultsPreview,
+  normalizeWebsiteFooterSettings,
+  resolveSections,
+  type WebsiteFooterSettings,
+} from '../../../lib/template-data';
 import { parseThemeFromSearchParams } from '../../../lib/website-theme';
 
 type SearchParams = Record<string, string | undefined>;
@@ -15,6 +20,15 @@ type SearchParams = Record<string, string | undefined>;
 export default async function StoreClassicTemplate({ searchParams }: { searchParams: SearchParams }) {
   const isPreview = searchParams.preview === '1';
   const websiteTheme = parseThemeFromSearchParams(searchParams);
+  let footerSettings: WebsiteFooterSettings | undefined;
+  if (searchParams.footer_settings) {
+    try {
+      footerSettings = normalizeWebsiteFooterSettings(JSON.parse(searchParams.footer_settings));
+    } catch (error) {
+      console.warn('Ignoring invalid footer settings in template preview', error);
+      footerSettings = undefined;
+    }
+  }
 
   let template = null;
   try {
@@ -52,6 +66,7 @@ export default async function StoreClassicTemplate({ searchParams }: { searchPar
           whatsapp: searchParams.whatsapp,
           phone: searchParams.phone,
           email: searchParams.email,
+          footerSettings,
         }}
         websiteTheme={websiteTheme}
         sections={sections}

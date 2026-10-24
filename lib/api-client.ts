@@ -26,6 +26,7 @@ export interface ApiWebsite {
   social_links: Record<string, unknown>;
   opening_hours: Record<string, unknown>;
   theme: Record<string, unknown>;
+  footer_settings?: Record<string, unknown>;
   is_active: boolean;
   pages: ApiWebsitePage[];
   /** Fase 5 paywall: true kalau website milik owner yang subscription-nya tidak aktif. */

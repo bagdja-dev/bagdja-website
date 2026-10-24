@@ -65,7 +65,7 @@ export default async function DraftOrderPageContent({
     <CartProvider slug={websiteSlug}>
       <Renderer
         isPreview={false}
-        profile={{ name: website.name, tagline: website.tagline ?? undefined, logoUrl: website.logo_url ?? undefined, whatsapp: website.whatsapp ?? undefined, phone: website.phone ?? undefined, email: website.email ?? undefined, socialLinks: website.social_links }}
+        profile={{ name: website.name, tagline: website.tagline ?? undefined, logoUrl: website.logo_url ?? undefined, whatsapp: website.whatsapp ?? undefined, phone: website.phone ?? undefined, email: website.email ?? undefined, socialLinks: website.social_links, footerSettings: website.footer_settings }}
         templateTheme={extractTemplateTheme(website.template?.structure)}
         websiteTheme={sanitizeWebsiteTheme(website.theme)}
         sections={sections}

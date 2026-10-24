@@ -11,6 +11,7 @@ import type {
   LocationItem,
   NavPage,
   SectionEntry,
+  WebsiteFooterSettings,
 } from './template-data';
 import type { WebsiteTheme } from './website-theme';
 
@@ -31,6 +32,7 @@ export interface TemplateRenderProps {
     phone?: string;
     email?: string;
     socialLinks?: Record<string, unknown>;
+    footerSettings?: WebsiteFooterSettings;
   };
   templateTheme?: WebsiteTheme;
   websiteTheme?: WebsiteTheme;

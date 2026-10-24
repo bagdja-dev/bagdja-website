@@ -27,6 +27,8 @@ import {
   type LocationItem,
   type NavPage,
   type SectionEntry,
+  normalizeWebsiteFooterSettings,
+  type WebsiteFooterSettings,
 } from '../../../lib/template-data';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
@@ -65,6 +67,7 @@ export interface StoreClassicProfile {
   phone?: string;
   email?: string;
   socialLinks?: Record<string, unknown>;
+  footerSettings?: WebsiteFooterSettings;
 }
 
 export interface StoreClassicViewProps {
@@ -1229,8 +1232,41 @@ export function StoreClassicView({
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
 
   const socialLinks = parseSocialLinks(profile.socialLinks);
+  // Section `footer` di halaman menimpa pengaturan footer global (Settings).
+  const footerSection = sections.find((s) => s.type === 'footer');
+  const footerSettings: WebsiteFooterSettings = {
+    ...profile.footerSettings,
+    ...(footerSection ? normalizeWebsiteFooterSettings(footerSection.content) : undefined),
+  };
+  const showFooterLogo = footerSettings.show_logo !== false;
+  const showFooterBusinessName = footerSettings.show_business_name !== false;
+  const showFooterTagline = footerSettings.show_tagline !== false;
+  const showFooterSocialLinks = footerSettings.show_social_links !== false;
+  const showFooterPages = footerSettings.show_pages !== false;
+  const showFooterAddress = footerSettings.show_address !== false;
+  const showFooterWhatsapp = footerSettings.show_whatsapp !== false;
+  const showFooterPhone = footerSettings.show_phone !== false;
+  const showFooterEmail = footerSettings.show_email !== false;
   const primaryLocation = locations.find((l) => l.isPrimary) ?? locations[0];
-  const footerAddress = primaryLocation ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ') : undefined;
+  const footerAddress = showFooterAddress && primaryLocation
+    ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ')
+    : undefined;
+  const footerWhatsappHref = showFooterWhatsapp ? waHref : undefined;
+  const footerPhone = showFooterPhone && (profile.phone !== profile.whatsapp || !footerWhatsappHref)
+    ? profile.phone
+    : undefined;
+  const footerEmail = showFooterEmail ? profile.email : undefined;
+  const footerHasContact = Boolean(footerAddress || footerWhatsappHref || footerPhone || footerEmail);
+  const footerHasPages = showFooterPages && footerNavLinks.length > 0;
+  const footerHasBrand = Boolean(
+    (showFooterLogo && profile.logoUrl) ||
+      (showFooterBusinessName && title) ||
+      (showFooterTagline && profile.tagline) ||
+      (showFooterSocialLinks && socialLinks.length > 0),
+  );
+  const footerColumnCount = [footerHasBrand, footerHasPages, footerHasContact].filter(Boolean).length;
+  const footerGridColumns =
+    footerColumnCount === 3 ? 'sm:grid-cols-3' : footerColumnCount === 2 ? 'sm:grid-cols-2' : 'grid-cols-1';
 
   const productsById = new Map(products.map((p) => [p.id, p]));
   // Sembunyikan row varian (warna/ukuran) dari grid/listing — 1 keluarga
@@ -1519,21 +1555,23 @@ export function StoreClassicView({
           </div>
         )}
 
-        {!isPreview && (
+        {(!isPreview || footerSection) && footerSettings.enabled !== false && (
           <footer className="border-t" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-            <div className={`mx-auto grid max-w-6xl px-4 text-sm sm:grid-cols-3 sm:px-6 ${isChatPage ? 'gap-4 py-5' : 'gap-8 py-12'}`}>
-              <div>
+            <div className={`mx-auto grid max-w-6xl px-4 text-sm sm:px-6 ${footerGridColumns} ${isChatPage ? 'gap-4 py-5' : 'gap-8 py-12'}`}>
+              {footerHasBrand && <div>
                 <div className="flex items-center gap-2">
-                  {profile.logoUrl && (
+                  {showFooterLogo && profile.logoUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={profile.logoUrl} alt="" className="h-8 w-8 rounded-lg object-contain" />
                   )}
-                  <span className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--brand-accent-muted)', fontFamily: 'var(--font-heading)' }}>
-                    {title}
-                  </span>
+                  {showFooterBusinessName && (
+                    <span className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--brand-accent-muted)', fontFamily: 'var(--font-heading)' }}>
+                      {title}
+                    </span>
+                  )}
                 </div>
-                {profile.tagline && <p className={`${isChatPage ? 'mt-2' : 'mt-3'} leading-relaxed`} style={{ opacity: 0.85 }}>{profile.tagline}</p>}
-                {socialLinks.length > 0 && (
+                {showFooterTagline && profile.tagline && <p className={`${isChatPage ? 'mt-2' : 'mt-3'} leading-relaxed`} style={{ opacity: 0.85 }}>{profile.tagline}</p>}
+                {showFooterSocialLinks && socialLinks.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {socialLinks.map((social) => (
                       <a
@@ -1550,12 +1588,12 @@ export function StoreClassicView({
                     ))}
                   </div>
                 )}
-              </div>
+              </div>}
 
-              {footerNavLinks.length > 0 && (
+              {footerHasPages && (
                 <div>
                   <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
-                    Halaman
+                    {footerSettings.pages_heading?.trim() || 'Halaman'}
                   </p>
                   <nav className="flex flex-col gap-2">
                     {footerNavLinks.map((link) => (
@@ -1567,10 +1605,10 @@ export function StoreClassicView({
                 </div>
               )}
 
-              {(footerAddress || profile.phone || waHref || profile.email) && (
+              {footerHasContact && (
                 <div>
                   <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
-                    Kontak
+                    {footerSettings.contact_heading?.trim() || 'Kontak'}
                   </p>
                   <div className={`flex flex-col ${isChatPage ? 'gap-1' : 'gap-2'}`}>
                     {footerAddress && (
@@ -1579,19 +1617,19 @@ export function StoreClassicView({
                         {footerAddress}
                       </span>
                     )}
-                    {waHref && (
-                      <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline" style={{ opacity: 0.85 }}>
+                    {footerWhatsappHref && (
+                      <a href={footerWhatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline" style={{ opacity: 0.85 }}>
                         <PhoneIcon />
                         {profile.whatsapp}
                       </a>
                     )}
-                    {!waHref && profile.phone && (
+                    {footerPhone && (
                       <span className="flex items-center gap-2" style={{ opacity: 0.85 }}>
                         <PhoneIcon />
-                        {profile.phone}
+                        <a href={`tel:${footerPhone}`} className="hover:underline">{footerPhone}</a>
                       </span>
                     )}
-                    {profile.email && (
+                    {footerEmail && (
                       <a href={`mailto:${profile.email}`} className="flex items-center gap-2 hover:underline" style={{ opacity: 0.85 }}>
                         <MailIcon />
                         {profile.email}
@@ -1602,9 +1640,11 @@ export function StoreClassicView({
               )}
             </div>
 
-            <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
-              © Bagdja Website Builder
-            </p>
+            {footerSettings.show_copyright !== false && footerSettings.copyright_text?.trim() !== '' && (
+              <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
+                {footerSettings.copyright_text ?? '© Bagdja Website Builder'}
+              </p>
+            )}
           </footer>
         )}
       </div>

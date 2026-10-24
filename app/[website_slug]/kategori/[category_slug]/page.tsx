@@ -70,6 +70,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         phone: website.phone ?? undefined,
         email: website.email ?? undefined,
         socialLinks: website.social_links,
+        footerSettings: website.footer_settings,
       }}
       templateTheme={extractTemplateTheme(website.template?.structure)}
       websiteTheme={sanitizeWebsiteTheme(website.theme)}
