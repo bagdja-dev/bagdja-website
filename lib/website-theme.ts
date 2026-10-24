@@ -23,7 +23,31 @@ export interface ThemeColors {
   accentHover?: string;
   border?: string;
   onAccent?: string;
+  heading?: string;
+  accentMuted?: string;
+  success?: string;
+  warning?: string;
+  danger?: string;
 }
+
+const COLOR_KEYS = [
+  'background', 'surface', 'text', 'textMuted', 'accent', 'accentHover', 'border', 'onAccent',
+  'heading', 'accentMuted', 'success', 'warning', 'danger',
+] as const;
+/** Token global tambahan (di luar 8 token v2) — dikirim ke preview via param `theme_x` */
+const EXTENDED_COLOR_KEYS = ['heading', 'accentMuted', 'success', 'warning', 'danger'] as const;
+
+/** Token warna per komponen — semua opsional, fallback ke token global saat di-resolve. */
+export const THEME_COMPONENT_KEYS = {
+  header: ['background', 'text', 'border'],
+  footer: ['background', 'text', 'heading', 'link', 'border'],
+  button: ['primaryBackground', 'primaryText', 'secondaryText', 'secondaryBorder'],
+} as const;
+
+export type ThemeComponentName = keyof typeof THEME_COMPONENT_KEYS;
+export type ThemeComponentColors<C extends ThemeComponentName> = Record<(typeof THEME_COMPONENT_KEYS)[C][number], string>;
+export type ThemeComponents = { [C in ThemeComponentName]?: Partial<ThemeComponentColors<C>> };
+export type ResolvedThemeComponents = { [C in ThemeComponentName]: ThemeComponentColors<C> };
 
 export interface ThemeTypography {
   headingFont?: string;
@@ -39,11 +63,13 @@ export interface WebsiteTheme {
   font?: string;
   preset?: ThemePreset;
   colors?: ThemeColors;
+  components?: ThemeComponents;
   typography?: ThemeTypography;
 }
 
 export interface ResolvedTheme {
   colors: Required<ThemeColors>;
+  components: ResolvedThemeComponents;
   typography: Required<ThemeTypography>;
 }
 
@@ -78,6 +104,8 @@ const MODE_BASE: Record<ThemeMode, Pick<ThemeColors, 'background' | 'surface' | 
   dark: { background: '#09090b', surface: '#18181b', text: '#fafafa', textMuted: '#a1a1aa', border: '#27272a' },
   light: { background: '#ffffff', surface: '#f4f4f5', text: '#18181b', textMuted: '#71717a', border: '#e4e4e7' },
 };
+
+const STATUS_COLORS = { success: '#10b981', warning: '#f59e0b', danger: '#ef4444' } as const;
 
 const DEFAULT_TYPOGRAPHY: Required<ThemeTypography> = {
   headingFont: 'Inter', bodyFont: 'Inter', headingWeight: '600', bodyWeight: '400', headingScale: 'default',
@@ -125,17 +153,42 @@ export function darkenHex(hex: string, amount = 0.12): string {
 function paletteFromModeAccent(mode: ThemeMode, accent: ThemeAccent): Required<ThemeColors> {
   const base = MODE_BASE[mode];
   const a = ACCENT_TOKENS[accent];
-  return { ...base, accent: a.primary, accentHover: a.primaryHover, onAccent: a.onPrimary } as Required<ThemeColors>;
+  return {
+    ...base,
+    ...STATUS_COLORS,
+    accent: a.primary,
+    accentHover: a.primaryHover,
+    onAccent: a.onPrimary,
+    heading: base.text,
+    accentMuted: a.primary,
+  } as Required<ThemeColors>;
 }
 
 function sanitizeColors(input: unknown): ThemeColors {
   if (!input || typeof input !== 'object') return {};
   const raw = input as Record<string, unknown>;
   const colors: ThemeColors = {};
-  for (const key of ['background', 'surface', 'text', 'textMuted', 'accent', 'accentHover', 'border', 'onAccent'] as const) {
+  for (const key of COLOR_KEYS) {
     if (isValidHex(raw[key])) colors[key] = normalizeHex(raw[key] as string);
   }
   return colors;
+}
+
+function sanitizeComponents(input: unknown): ThemeComponents {
+  if (!input || typeof input !== 'object') return {};
+  const raw = input as Record<string, unknown>;
+  const components: Record<string, Record<string, string>> = {};
+  for (const [name, keys] of Object.entries(THEME_COMPONENT_KEYS)) {
+    const group = raw[name];
+    if (!group || typeof group !== 'object') continue;
+    const values: Record<string, string> = {};
+    for (const key of keys) {
+      const value = (group as Record<string, unknown>)[key];
+      if (isValidHex(value)) values[key] = normalizeHex(value);
+    }
+    if (Object.keys(values).length > 0) components[name] = values;
+  }
+  return components as ThemeComponents;
 }
 
 function sanitizeTypography(input: unknown): ThemeTypography {
@@ -161,6 +214,8 @@ export function sanitizeWebsiteTheme(input: unknown): WebsiteTheme {
   if (typeof raw.font === 'string' && raw.font.trim()) theme.font = raw.font.trim();
   const colors = sanitizeColors(raw.colors);
   if (Object.keys(colors).length > 0) theme.colors = colors;
+  const components = sanitizeComponents(raw.components);
+  if (Object.keys(components).length > 0) theme.components = components;
   const typography = sanitizeTypography(raw.typography);
   if (Object.keys(typography).length > 0) theme.typography = typography;
   return theme;
@@ -177,9 +232,47 @@ function deriveColorsFromTheme(theme: WebsiteTheme): Required<ThemeColors> {
     const merged = { ...fallback, ...theme.colors };
     if (!merged.onAccent && merged.accent) merged.onAccent = pickOnAccent(merged.accent);
     if (!merged.accentHover && merged.accent) merged.accentHover = darkenHex(merged.accent);
+    // Token turunan ikut warna yang di-override, kecuali di-set eksplisit
+    if (!theme.colors.heading) merged.heading = merged.text;
+    if (!theme.colors.accentMuted) merged.accentMuted = merged.accent;
     return merged as Required<ThemeColors>;
   }
   return paletteFromModeAccent(theme.mode ?? 'dark', theme.accent ?? 'amber');
+}
+
+function resolveComponents(colors: Required<ThemeColors>, components: ThemeComponents = {}): ResolvedThemeComponents {
+  return {
+    header: {
+      background: colors.background,
+      text: colors.text,
+      border: colors.accent,
+      ...components.header,
+    },
+    footer: {
+      background: colors.background,
+      text: colors.textMuted,
+      heading: colors.accentMuted,
+      link: colors.textMuted,
+      border: colors.border,
+      ...components.footer,
+    },
+    button: {
+      primaryBackground: colors.accent,
+      primaryText: colors.onAccent,
+      secondaryText: colors.text,
+      secondaryBorder: colors.border,
+      ...components.button,
+    },
+  };
+}
+
+function mergeComponents(template: ThemeComponents = {}, website: ThemeComponents = {}): ThemeComponents {
+  const merged: Record<string, Record<string, string>> = {};
+  for (const name of Object.keys(THEME_COMPONENT_KEYS) as ThemeComponentName[]) {
+    const group = { ...template[name], ...website[name] };
+    if (Object.keys(group).length > 0) merged[name] = group;
+  }
+  return merged as ThemeComponents;
 }
 
 export function resolveTheme(templateTheme: WebsiteTheme = {}, websiteTheme: WebsiteTheme = {}): ResolvedTheme {
@@ -187,8 +280,10 @@ export function resolveTheme(templateTheme: WebsiteTheme = {}, websiteTheme: Web
   if (websiteTheme.colors) merged.colors = { ...templateTheme.colors, ...websiteTheme.colors };
   if (websiteTheme.typography) merged.typography = { ...templateTheme.typography, ...websiteTheme.typography };
   const legacyFont = merged.font ?? merged.typography?.bodyFont;
+  const colors = deriveColorsFromTheme(merged);
   return {
-    colors: deriveColorsFromTheme(merged),
+    colors,
+    components: resolveComponents(colors, mergeComponents(templateTheme.components, websiteTheme.components)),
     typography: {
       ...DEFAULT_TYPOGRAPHY,
       ...merged.typography,
@@ -213,7 +308,7 @@ export function getGoogleFontsUrl(typography: ThemeTypography): string | null {
 }
 
 export function themeToCssVariables(resolved: ResolvedTheme): Record<string, string | number> {
-  const { colors, typography } = resolved;
+  const { colors, components, typography } = resolved;
   return {
     '--brand-bg': colors.background,
     '--brand-text': colors.text,
@@ -222,9 +317,25 @@ export function themeToCssVariables(resolved: ResolvedTheme): Record<string, str
     '--brand-border': colors.border,
     '--brand-accent': colors.accent,
     '--brand-accent-hover': colors.accentHover,
-    '--brand-accent-muted': colors.accent,
+    '--brand-accent-muted': colors.accentMuted,
     '--brand-accent-border': `${colors.accent}66`,
     '--brand-on-accent': colors.onAccent,
+    '--brand-heading': colors.heading,
+    '--brand-success': colors.success,
+    '--brand-warning': colors.warning,
+    '--brand-danger': colors.danger,
+    '--c-header-bg': components.header.background,
+    '--c-header-text': components.header.text,
+    '--c-header-border': components.header.border,
+    '--c-footer-bg': components.footer.background,
+    '--c-footer-text': components.footer.text,
+    '--c-footer-heading': components.footer.heading,
+    '--c-footer-link': components.footer.link,
+    '--c-footer-border': components.footer.border,
+    '--c-btn-primary-bg': components.button.primaryBackground,
+    '--c-btn-primary-text': components.button.primaryText,
+    '--c-btn-secondary-text': components.button.secondaryText,
+    '--c-btn-secondary-border': components.button.secondaryBorder,
     '--font-heading': `'${typography.headingFont}', system-ui, sans-serif`,
     '--font-body': `'${typography.bodyFont}', system-ui, sans-serif`,
     '--font-heading-weight': typography.headingWeight,
@@ -233,7 +344,7 @@ export function themeToCssVariables(resolved: ResolvedTheme): Record<string, str
   };
 }
 
-const COLOR_PARAM_MAP: Record<keyof ThemeColors, string> = {
+const COLOR_PARAM_MAP: Partial<Record<keyof ThemeColors, string>> = {
   background: 'c_bg', surface: 'c_surface', text: 'c_text', textMuted: 'c_muted',
   accent: 'c_accent', accentHover: 'c_accent_h', border: 'c_border', onAccent: 'c_on_accent',
 };
@@ -245,6 +356,18 @@ export function parseThemeFromSearchParams(params: Record<string, string | undef
     const raw = params[param];
     if (raw && /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(raw)) {
       colors[key] = normalizeHex(raw.startsWith('#') ? raw : `#${raw}`);
+    }
+  }
+  // Token global tambahan + token komponen dikirim sebagai satu JSON supaya URL preview tidak membengkak
+  if (params.theme_x) {
+    try {
+      const extended = sanitizeWebsiteTheme(JSON.parse(params.theme_x));
+      for (const key of EXTENDED_COLOR_KEYS) {
+        if (extended.colors?.[key]) colors[key] = extended.colors[key];
+      }
+      if (extended.components) theme.components = extended.components;
+    } catch {
+      // param rusak — abaikan, preview tetap jalan dengan token v2
     }
   }
   if (Object.keys(colors).length > 0) theme.colors = colors;

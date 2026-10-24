@@ -90,7 +90,7 @@ export function StoreClassicHeader({
   return (
     <header
       className="sticky top-0 z-20 border-b-2"
-      style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'var(--brand-bg)' }}
+      style={{ borderColor: 'var(--c-header-border)', backgroundColor: 'var(--c-header-bg)', color: 'var(--c-header-text)' }}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <a href={homeHref} className="flex shrink-0 items-center gap-2">
@@ -113,7 +113,7 @@ export function StoreClassicHeader({
               key={link.href}
               href={link.href}
               className="whitespace-nowrap text-xs font-semibold uppercase tracking-wider transition-colors hover:opacity-70"
-              style={{ color: 'var(--brand-text)' }}
+              style={{ color: 'var(--c-header-text)' }}
             >
               {link.label}
             </a>
@@ -139,7 +139,7 @@ export function StoreClassicHeader({
               target={chatHref ? undefined : '_blank'}
               rel={chatHref ? undefined : 'noopener noreferrer'}
               className="hidden rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 sm:inline-flex"
-              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+              style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
               Hubungi Kami
             </a>
@@ -151,7 +151,7 @@ export function StoreClassicHeader({
                   type="button"
                   onClick={() => setAccountOpen((v) => !v)}
                   className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 transition-colors hover:opacity-80"
-                  style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                  style={{ borderColor: 'var(--brand-border)', color: 'var(--c-header-text)' }}
                   aria-haspopup="menu"
                   aria-expanded={accountOpen}
                 >
@@ -223,7 +223,7 @@ export function StoreClassicHeader({
                 <a
                   href={auth.loginHref}
                   className="rounded-full px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
-                  style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                  style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                 >
                   Masuk
                 </a>
@@ -233,7 +233,7 @@ export function StoreClassicHeader({
             <button
               type="button"
               className="rounded-lg p-1 transition-colors hover:opacity-80 sm:hidden"
-              style={{ color: 'var(--brand-text)' }}
+              style={{ color: 'var(--c-header-text)' }}
               onClick={openDrawer}
               aria-label="Buka menu"
             >
@@ -291,7 +291,7 @@ export function StoreClassicHeader({
                 target={chatHref ? undefined : '_blank'}
                 rel={chatHref ? undefined : 'noopener noreferrer'}
                 className="mx-6 mb-4 rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
-                style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
               >
                 Hubungi Kami
               </a>
@@ -354,7 +354,7 @@ export function StoreClassicHeader({
                     href={auth.loginHref}
                     onClick={closeDrawer}
                     className="mx-6 mb-4 block rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
-                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                    style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                   >
                     Masuk
                   </a>

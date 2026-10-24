@@ -157,7 +157,7 @@ function HeroSection({
               target={chatHref ? undefined : '_blank'}
               rel={chatHref ? undefined : 'noopener noreferrer'}
               className="mt-8 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+              style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
               Hubungi Kami
             </a>
@@ -474,7 +474,7 @@ function FeaturedProductSection({
             <a
               href={href}
               className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+              style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
               {buttonText?.trim() || 'Lihat Detail'}
             </a>
@@ -697,7 +697,7 @@ function CtaSection({ title, subtitle, buttonText, buttonUrl }: { title?: string
           target="_blank"
           rel="noopener noreferrer"
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
-          style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+          style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
         >
           {buttonText?.trim() || 'Hubungi Kami'}
         </a>
@@ -906,7 +906,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     productId={item.id}
                     basePath={websiteSlug}
                     loginHref={loginHref}
-                    className="inline-flex w-full justify-center rounded-full bg-[var(--brand-accent)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--brand-on-accent)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    className="inline-flex w-full justify-center rounded-full bg-[var(--c-btn-primary-bg)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--c-btn-primary-text)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
                   >
                     Rencanakan Gathering
                   </GatheringPlanButton>
@@ -917,7 +917,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                    style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+                    style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
                     Konsultasi via WhatsApp
                   </a>
@@ -930,6 +930,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     productId={item.id}
                     reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
                     className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
                     Tanya Produk
                   </ChatReferenceButton>
@@ -943,7 +944,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-6 inline-flex w-full justify-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                    style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+                    style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                   >
                     Pesan via WhatsApp
                   </a>
@@ -956,6 +957,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     productId={item.id}
                     reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
                     className="mt-3 inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
                     Tanya Produk
                   </ChatReferenceButton>
@@ -1278,7 +1280,7 @@ export function StoreClassicView({
     <>
       {fontsUrl ? <link rel="stylesheet" href={fontsUrl} /> : null}
       <div
-        className="min-h-screen"
+        className="min-h-screen [&_h1]:text-[color:var(--brand-heading)] [&_h2]:text-[color:var(--brand-heading)] [&_h3]:text-[color:var(--brand-heading)]"
         style={{
           ...cssVars,
           backgroundColor: 'var(--brand-bg)',
@@ -1548,7 +1550,7 @@ export function StoreClassicView({
               target={chatHref ? undefined : '_blank'}
               rel={chatHref ? undefined : 'noopener noreferrer'}
               className="flex w-full items-center justify-center rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide shadow-lg"
-              style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+              style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
               Hubungi Kami
             </a>
@@ -1556,7 +1558,7 @@ export function StoreClassicView({
         )}
 
         {(!isPreview || footerSection) && footerSettings.enabled !== false && (
-          <footer className="border-t" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+          <footer className="border-t" style={{ backgroundColor: 'var(--c-footer-bg)', borderColor: 'var(--c-footer-border)', color: 'var(--c-footer-text)' }}>
             <div className={`mx-auto grid max-w-6xl px-4 text-sm sm:px-6 ${footerGridColumns} ${isChatPage ? 'gap-4 py-5' : 'gap-8 py-12'}`}>
               {footerHasBrand && <div>
                 <div className="flex items-center gap-2">
@@ -1565,7 +1567,7 @@ export function StoreClassicView({
                     <img src={profile.logoUrl} alt="" className="h-8 w-8 rounded-lg object-contain" />
                   )}
                   {showFooterBusinessName && (
-                    <span className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--brand-accent-muted)', fontFamily: 'var(--font-heading)' }}>
+                    <span className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--c-footer-heading)', fontFamily: 'var(--font-heading)' }}>
                       {title}
                     </span>
                   )}
@@ -1581,7 +1583,7 @@ export function StoreClassicView({
                         rel="noopener noreferrer"
                         aria-label={social.platform}
                         className="flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:opacity-80"
-                        style={{ borderColor: 'var(--brand-border)' }}
+                        style={{ borderColor: 'var(--c-footer-border)' }}
                       >
                         <SocialIcon platform={social.platform} />
                       </a>
@@ -1592,12 +1594,12 @@ export function StoreClassicView({
 
               {footerHasPages && (
                 <div>
-                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
+                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--c-footer-heading)' }}>
                     {footerSettings.pages_heading?.trim() || 'Halaman'}
                   </p>
                   <nav className="flex flex-col gap-2">
                     {footerNavLinks.map((link) => (
-                      <a key={link.href} href={link.href} className="hover:underline" style={{ opacity: 0.85 }}>
+                      <a key={link.href} href={link.href} className="hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
                         {link.label}
                       </a>
                     ))}
@@ -1607,7 +1609,7 @@ export function StoreClassicView({
 
               {footerHasContact && (
                 <div>
-                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--brand-accent-muted)' }}>
+                  <p className={`${isChatPage ? 'mb-2' : 'mb-3'} text-xs font-semibold uppercase tracking-wider`} style={{ color: 'var(--c-footer-heading)' }}>
                     {footerSettings.contact_heading?.trim() || 'Kontak'}
                   </p>
                   <div className={`flex flex-col ${isChatPage ? 'gap-1' : 'gap-2'}`}>
@@ -1618,7 +1620,7 @@ export function StoreClassicView({
                       </span>
                     )}
                     {footerWhatsappHref && (
-                      <a href={footerWhatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline" style={{ opacity: 0.85 }}>
+                      <a href={footerWhatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
                         <PhoneIcon />
                         {profile.whatsapp}
                       </a>
@@ -1626,11 +1628,11 @@ export function StoreClassicView({
                     {footerPhone && (
                       <span className="flex items-center gap-2" style={{ opacity: 0.85 }}>
                         <PhoneIcon />
-                        <a href={`tel:${footerPhone}`} className="hover:underline">{footerPhone}</a>
+                        <a href={`tel:${footerPhone}`} className="hover:underline" style={{ color: 'var(--c-footer-link)' }}>{footerPhone}</a>
                       </span>
                     )}
                     {footerEmail && (
-                      <a href={`mailto:${profile.email}`} className="flex items-center gap-2 hover:underline" style={{ opacity: 0.85 }}>
+                      <a href={`mailto:${profile.email}`} className="flex items-center gap-2 hover:underline" style={{ color: 'var(--c-footer-link)', opacity: 0.85 }}>
                         <MailIcon />
                         {profile.email}
                       </a>
@@ -1641,7 +1643,7 @@ export function StoreClassicView({
             </div>
 
             {footerSettings.show_copyright !== false && footerSettings.copyright_text?.trim() !== '' && (
-              <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--brand-border)', opacity: 0.7 }}>
+              <p className={`border-t text-center text-xs ${isChatPage ? 'py-3' : 'py-6'}`} style={{ borderColor: 'var(--c-footer-border)', opacity: 0.7 }}>
                 {footerSettings.copyright_text ?? '© Bagdja Website Builder'}
               </p>
             )}

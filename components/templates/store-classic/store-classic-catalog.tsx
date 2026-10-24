@@ -161,7 +161,7 @@ export function ProductGridSection({
             onClick={loadMore}
             disabled={loading}
             className="rounded-full px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
-            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+            style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
           >
             {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
           </button>
@@ -345,7 +345,7 @@ export function CategoryListingSection({
             onClick={loadMore}
             disabled={loading}
             className="rounded-full px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
-            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+            style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
           >
             {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
           </button>
