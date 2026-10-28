@@ -1132,18 +1132,24 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     {item.gatheringMeta.optionGroups.length} kelompok pilihan
                   </span>
                 </div>
-                <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {/* Satu kelompok = satu baris; pilihannya berjejer ke samping (geser
+                    horizontal bila tidak muat, terutama di mobile). */}
+                <div className="space-y-6">
                   {item.gatheringMeta.optionGroups.map((group) => (
-                    <div key={group.key} className="overflow-hidden border" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-                      <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                    <div key={group.key}>
+                      <div className="mb-3 flex items-baseline justify-between gap-3">
                         <h3 className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{group.label}</h3>
                         <span className="shrink-0 text-xs" style={{ color: 'var(--brand-muted)' }}>
                           {group.options.length} pilihan
                         </span>
                       </div>
-                      <ol className="divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+                      <ol className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
                         {group.options.map((option, index) => (
-                          <li key={option.id} className="flex gap-3 px-4 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                          <li
+                            key={option.id}
+                            className="flex w-[80%] max-w-xs shrink-0 snap-start gap-3 border p-4 sm:w-72"
+                            style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
+                          >
                             <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
                               {String(index + 1).padStart(2, '0')}
                             </span>
@@ -1153,7 +1159,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                                 <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
                               ) : null}
                               {(option.venueLocation || option.availabilityNote) && (
-                                <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <dl className="mt-3 grid gap-2">
                                   {option.venueLocation && (
                                     <div>
                                       <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Lokasi</dt>
