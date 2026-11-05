@@ -12,6 +12,12 @@ import type {
   NavPage,
   SectionEntry,
 } from './template-data';
+import {
+  BUILT_TEMPLATE_MANIFESTS,
+  UNSUPPORTED_TEMPLATE_DIGEST,
+  isBuiltTemplateSlug,
+  type BuiltTemplateSlug,
+} from './template-manifests';
 import type { WebsiteTheme } from './website-theme';
 
 /**
@@ -61,12 +67,42 @@ export interface TemplateRenderProps {
   };
 }
 
-const TEMPLATE_REGISTRY: Record<string, ComponentType<TemplateRenderProps>> = {
+/**
+ * Diketik `Record<BuiltTemplateSlug, ...>` → setiap manifest di
+ * `BUILT_TEMPLATE_MANIFESTS` wajib punya View, dan sebaliknya (dicek compiler).
+ */
+const TEMPLATE_REGISTRY: Record<BuiltTemplateSlug, ComponentType<TemplateRenderProps>> = {
   'barber-classic': BarberClassicView,
   'store-classic': StoreClassicView,
   workshop: WorkshopView,
 };
 
-export function getTemplateRenderer(templateSlug: string): ComponentType<TemplateRenderProps> | null {
-  return TEMPLATE_REGISTRY[templateSlug] ?? null;
+/**
+ * Record API menunjuk template yang tidak ter-build di renderer ini
+ * (template-contract.md §3). `digest` dipertahankan Next.js sampai ke error
+ * boundary (`app/[website_slug]/error.tsx`) sehingga pengunjung melihat pesan
+ * yang jelas, bukan 404 diam-diam; status HTTP 500 (galat konfigurasi).
+ */
+export class UnsupportedTemplateError extends Error {
+  readonly digest = UNSUPPORTED_TEMPLATE_DIGEST;
+
+  constructor(readonly templateSlug: string) {
+    super(`Template "${templateSlug}" is not built into this renderer.`);
+    this.name = 'UnsupportedTemplateError';
+  }
+}
+
+/**
+ * Slug ter-build → View template (perilaku lama). Slug tidak ter-build →
+ * dicatat (hanya slug template + daftar yang tersedia, tanpa data tenant)
+ * lalu melempar `UnsupportedTemplateError`.
+ */
+export function getTemplateRenderer(templateSlug: string): ComponentType<TemplateRenderProps> {
+  if (isBuiltTemplateSlug(templateSlug)) return TEMPLATE_REGISTRY[templateSlug];
+
+  const error = new UnsupportedTemplateError(templateSlug);
+  console.error(
+    `[template-registry] ${error.message} Built templates: ${Object.keys(BUILT_TEMPLATE_MANIFESTS).join(', ')}.`,
+  );
+  throw error;
 }

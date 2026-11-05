@@ -25,6 +25,7 @@ import {
   type NavPage,
   type SectionEntry,
 } from '../../../lib/template-data';
+import { warnUnknownSection } from '../../../lib/template-manifests';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -1437,6 +1438,7 @@ export function BarberClassicView({
                 );
               }
               default:
+                warnUnknownSection('barber-classic', section.type);
                 return null;
             }
           })}

@@ -50,6 +50,7 @@ import {
   type WebsiteTheme,
 } from '../../../lib/website-theme';
 import { resolvePageHeadingLabel } from '../../../lib/page-title';
+import { warnUnknownSection } from '../../../lib/template-manifests';
 import { BlogRelatedProducts } from '../../blog-related-products';
 
 export interface WorkshopViewProps {
@@ -1088,7 +1089,9 @@ export function WorkshopView({
               const gatheringPlan = section.content.gatheringPlan as import('../../order-detail-content').GatheringPlanDetail | null | undefined;
               return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
             }
-            default: return null;
+            default:
+              warnUnknownSection('workshop', section.type);
+              return null;
           }
         })}
         <TemplateFooter

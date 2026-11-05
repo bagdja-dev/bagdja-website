@@ -29,6 +29,7 @@ import {
   type SectionEntry,
   normalizeFooterBlocks,
 } from '../../../lib/template-data';
+import { warnUnknownSection } from '../../../lib/template-manifests';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
   getGoogleFontsUrl,
@@ -1564,6 +1565,7 @@ export function StoreClassicView({
                 return <ProductDetailSection key={key} item={item} allProducts={products} locations={locations} waHref={waHref} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} />;
               }
               default:
+                warnUnknownSection('store-classic', section.type);
                 return null;
             }
           })}

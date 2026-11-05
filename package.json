@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 5005",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:contract": "node scripts/check-template-contract.mjs"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",
