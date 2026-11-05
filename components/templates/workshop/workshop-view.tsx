@@ -28,6 +28,7 @@ import {
 } from '../../../lib/template-data';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
+import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
@@ -1029,8 +1030,8 @@ export function WorkshopView({
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
             <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
-        ) : utilityPage || isCategoryListingPage ? null : <WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} chatHref={chatHref} />}
-        {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map((section, index) => {
+        ) : utilityPage || isCategoryListingPage ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
+        {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map(withSectionFrame((section, index) => {
           const key = `${section.type}-${index}`;
           switch (section.type) {
             case 'features_grid': return <WorkshopFeatures key={key} content={section.content} />;
@@ -1093,7 +1094,7 @@ export function WorkshopView({
               warnUnknownSection('workshop', section.type);
               return null;
           }
-        })}
+        }))}
         <TemplateFooter
           blocks={normalizeFooterBlocks(profile.footerSettings)}
           title={name}

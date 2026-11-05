@@ -131,9 +131,14 @@ export interface ApiFulfillmentFlow {
   }>;
 }
 
-export async function getFulfillmentFlow(slug: string, flowId: string): Promise<ApiFulfillmentFlow | null> {
+export async function getFulfillmentFlow(
+  slug: string,
+  flowId: string,
+  options?: PublicFetchOptions,
+): Promise<ApiFulfillmentFlow | null> {
   return fetchPublic<ApiFulfillmentFlow>(
     `/api/public/sites/${encodeURIComponent(slug)}/fulfillment-flows/${encodeURIComponent(flowId)}`,
+    options,
   );
 }
 
@@ -213,8 +218,17 @@ export interface ApiWebsiteBlogPost {
   created_at: string;
 }
 
-async function fetchPublic<T>(path: string): Promise<T | null> {
-  const res = await fetch(`${API_URL}${path}`, { next: { revalidate: 60 } });
+/**
+ * `fresh: true` = tanpa cache (`cache: 'no-store'`) — hanya untuk route
+ * preview Studio (S8). Default (route publik) tetap ISR `revalidate: 60`.
+ */
+export interface PublicFetchOptions {
+  fresh?: boolean;
+}
+
+async function fetchPublic<T>(path: string, options: PublicFetchOptions = {}): Promise<T | null> {
+  const init: RequestInit = options.fresh ? { cache: 'no-store' } : { next: { revalidate: 60 } };
+  const res = await fetch(`${API_URL}${path}`, init);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Bagdja API ${res.status} on ${path}`);
@@ -226,17 +240,22 @@ export function getTemplateBySlug(slug: string): Promise<ApiWebsiteTemplate | nu
   return fetchPublic<ApiWebsiteTemplate>(`/api/templates/${slug}`);
 }
 
-export function getWebsiteBySlug(slug: string): Promise<ApiWebsite | null> {
-  return fetchPublic<ApiWebsite>(`/api/public/sites/${encodeURIComponent(slug)}`);
+export function getWebsiteBySlug(slug: string, options?: PublicFetchOptions): Promise<ApiWebsite | null> {
+  return fetchPublic<ApiWebsite>(`/api/public/sites/${encodeURIComponent(slug)}`, options);
 }
 
-export function getHomePage(slug: string): Promise<ApiWebsitePage | null> {
-  return fetchPublic<ApiWebsitePage>(`/api/public/sites/${encodeURIComponent(slug)}/home`);
+export function getHomePage(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePage | null> {
+  return fetchPublic<ApiWebsitePage>(`/api/public/sites/${encodeURIComponent(slug)}/home`, options);
 }
 
-export function getPageBySlug(slug: string, pageSlug: string): Promise<ApiWebsitePage | null> {
+export function getPageBySlug(
+  slug: string,
+  pageSlug: string,
+  options?: PublicFetchOptions,
+): Promise<ApiWebsitePage | null> {
   return fetchPublic<ApiWebsitePage>(
     `/api/public/sites/${encodeURIComponent(slug)}/pages/${encodeURIComponent(pageSlug)}`,
+    options,
   );
 }
 
@@ -258,7 +277,11 @@ const EMPTY_GRID_META: GridMeta = { totalItems: 0, itemCount: 0, itemsPerPage: 0
  * `common/grid/grid-query.util.ts` di API). Dipakai untuk fetch awal (SSR,
  * `size` besar) maupun "Muat Lebih Banyak"/filter kategori dari browser.
  */
-export async function getProducts(slug: string, opts: ProductsQuery = {}): Promise<GridResult<ApiWebsiteProduct>> {
+export async function getProducts(
+  slug: string,
+  opts: ProductsQuery = {},
+  options?: PublicFetchOptions,
+): Promise<GridResult<ApiWebsiteProduct>> {
   const params = new URLSearchParams();
   if (opts.page) params.set('page', String(opts.page));
   if (opts.size) params.set('size', String(opts.size));
@@ -270,36 +293,48 @@ export async function getProducts(slug: string, opts: ProductsQuery = {}): Promi
 
   const result = await fetchPublic<GridResult<ApiWebsiteProduct>>(
     `/api/public/sites/${encodeURIComponent(slug)}/products${qs}`,
+    options,
   );
   return result ?? { data: [], meta: EMPTY_GRID_META };
 }
 
-export async function getCategories(slug: string): Promise<ApiWebsiteCategory[]> {
+export async function getCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsiteCategory[]> {
   const result = await fetchPublic<ApiWebsiteCategory[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/categories`,
+    options,
   );
   return result ?? [];
 }
 
-export async function getLocations(slug: string, type?: string): Promise<ApiWebsiteLocation[]> {
+export async function getLocations(
+  slug: string,
+  type?: string,
+  options?: PublicFetchOptions,
+): Promise<ApiWebsiteLocation[]> {
   const qs = type ? `?type=${encodeURIComponent(type)}` : '';
   const result = await fetchPublic<ApiWebsiteLocation[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/locations${qs}`,
+    options,
   );
   return result ?? [];
 }
 
-export async function getFaqs(slug: string, category?: string): Promise<ApiWebsiteFaq[]> {
+export async function getFaqs(
+  slug: string,
+  category?: string,
+  options?: PublicFetchOptions,
+): Promise<ApiWebsiteFaq[]> {
   const qs = category ? `?category=${encodeURIComponent(category)}` : '';
   const result = await fetchPublic<ApiWebsiteFaq[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/faqs${qs}`,
+    options,
   );
   return result ?? [];
 }
 
 export async function getBlogPosts(
   slug: string,
-  options?: { search?: string; ids?: string[] },
+  options?: { search?: string; ids?: string[] } & PublicFetchOptions,
 ): Promise<ApiWebsiteBlogPost[]> {
   const params = new URLSearchParams();
   if (options?.search) params.set('search', options.search);
@@ -307,6 +342,7 @@ export async function getBlogPosts(
   const qs = params.toString() ? `?${params.toString()}` : '';
   const result = await fetchPublic<ApiWebsiteBlogPost[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/blog-posts${qs}`,
+    { fresh: options?.fresh },
   );
   return result ?? [];
 }

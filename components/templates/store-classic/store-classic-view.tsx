@@ -30,6 +30,7 @@ import {
   normalizeFooterBlocks,
 } from '../../../lib/template-data';
 import { warnUnknownSection } from '../../../lib/template-manifests';
+import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
   getGoogleFontsUrl,
@@ -1337,20 +1338,22 @@ export function StoreClassicView({
         ) : isChatPage ? null : pageBannerLabel ? (
           <PageHeroBanner label={pageBannerLabel} />
         ) : (
-          <HeroSection
-            title={title}
-            tagline={tagline}
-            subtitle={heroSubtitle}
-            imageUrl={heroImageUrl}
-            waHref={waHref}
-            chatHref={chatHref}
-            showWhatsappCta={showWhatsappCta}
-          />
+          <SectionFrame section={sections.find((s) => s.type === 'hero')}>
+            <HeroSection
+              title={title}
+              tagline={tagline}
+              subtitle={heroSubtitle}
+              imageUrl={heroImageUrl}
+              waHref={waHref}
+              chatHref={chatHref}
+              showWhatsappCta={showWhatsappCta}
+            />
+          </SectionFrame>
         )}
 
         {sections
           .filter((section) => section.type !== 'hero')
-          .map((section, index) => {
+          .map(withSectionFrame((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
               case 'features_grid': {
@@ -1568,7 +1571,7 @@ export function StoreClassicView({
                 warnUnknownSection('store-classic', section.type);
                 return null;
             }
-          })}
+          }))}
 
         <TemplateFooter
           blocks={footerBlocks}

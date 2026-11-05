@@ -3,21 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { getWebsiteBySlug } from '../../../lib/api-client';
 import { CartProvider } from '../../../lib/cart';
-import { getAuthViewState } from '../../../lib/auth-view';
-import { loadTenant } from '../../../lib/tenant-loader';
+import { loadTenantPageView } from '../../../lib/tenant-page-view';
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
-import {
-  resolveSections,
-  toBlogPostItem,
-  toCatalogItem,
-  toCategoryItem,
-  toFaqItem,
-  toLocationItem,
-  toNavPage,
-} from '../../../lib/template-data';
 import { getTemplateRenderer } from '../../../lib/template-registry';
-import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
 
 export const revalidate = 60;
 
@@ -37,47 +25,16 @@ export async function generateMetadata({ params }: TenantSubPageProps): Promise<
 }
 
 export default async function TenantSubPage({ params }: TenantSubPageProps) {
-  const tenant = await loadTenant(params.website_slug, params.page_slug);
-  if (!tenant || !tenant.page) notFound();
-  if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
-  const auth = await getAuthViewState(
-    `${resolveTenantLinkBase(params.website_slug)}/${params.page_slug}`,
-    resolveTenantLinkBase(params.website_slug),
-  );
+  const view = await loadTenantPageView(params.website_slug, params.page_slug);
+  if (view.status === 'not_found') notFound();
+  if (view.status === 'inactive') return <WebsiteInactiveNotice />;
 
-  const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
-
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  const Renderer = view.templateSlug ? getTemplateRenderer(view.templateSlug) : null;
   if (!Renderer) notFound();
 
   return (
     <CartProvider slug={params.website_slug}>
-    <Renderer
-      isPreview={false}
-      profile={{
-        name: website.name,
-        tagline: website.tagline ?? undefined,
-        logoUrl: website.logo_url ?? undefined,
-        whatsapp: website.whatsapp ?? undefined,
-        phone: website.phone ?? undefined,
-        email: website.email ?? undefined,
-        socialLinks: website.social_links,
-        footerSettings: website.footer_settings,
-      }}
-      templateTheme={extractTemplateTheme(website.template?.structure)}
-      websiteTheme={sanitizeWebsiteTheme(website.theme)}
-      sections={resolveSections(page, website.template, false)}
-      products={products.map(toCatalogItem)}
-      categories={categories.map(toCategoryItem)}
-      locations={locations.map(toLocationItem)}
-      faqs={faqs.map(toFaqItem)}
-      websiteSlug={resolveTenantLinkBase(website.slug)}
-      websiteId={website.id}
-      tenantSlug={website.slug}
-      pages={website.pages.map(toNavPage)}
-      blogPosts={blogPosts.map(toBlogPostItem)}
-      auth={auth}
-    />
+      <Renderer {...view.props} />
     </CartProvider>
   );
 }

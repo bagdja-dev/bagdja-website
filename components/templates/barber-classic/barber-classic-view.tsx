@@ -38,6 +38,7 @@ import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from 
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
 import { TemplateFooter } from '../shared/template-footer';
+import { withSectionFrame } from '../shared/section-frame';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
@@ -1202,7 +1203,7 @@ export function BarberClassicView({
 
         {sections
           .filter((section) => section.type !== 'hero')
-          .map((section, index) => {
+          .map(withSectionFrame((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
               case 'category_grid': {
@@ -1441,7 +1442,7 @@ export function BarberClassicView({
                 warnUnknownSection('barber-classic', section.type);
                 return null;
             }
-          })}
+          }))}
 
         {(chatHref || waHref) && (
           <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">

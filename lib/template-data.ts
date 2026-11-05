@@ -148,6 +148,8 @@ export interface FaqItem {
 }
 
 export interface SectionEntry {
+  /** `website_sections.id` — hanya untuk penanda section di route preview Studio (S8); fallback template tidak punya id. */
+  id?: string;
   type: string;
   content: Record<string, unknown>;
 }
@@ -729,7 +731,7 @@ export function resolveSections(
   if (page?.sections?.length) {
     return [...page.sections]
       .sort((a, b) => a.order - b.order)
-      .map((s) => ({ type: s.type, content: s.content ?? {} }));
+      .map((s) => ({ id: s.id, type: s.type, content: s.content ?? {} }));
   }
 
   if (!allowTemplateFallback) return [];
