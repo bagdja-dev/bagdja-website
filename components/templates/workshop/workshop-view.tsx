@@ -16,6 +16,7 @@ import {
   buildWhatsAppHref,
   formatIDR,
   normalizeFooterBlocks,
+  parseFeatureItems,
   parseGalleryImages,
   parseSocialLinks,
   type BlogPostItem,
@@ -51,6 +52,7 @@ import {
   type WebsiteTheme,
 } from '../../../lib/website-theme';
 import { resolvePageHeadingLabel } from '../../../lib/page-title';
+import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { BlogRelatedProducts } from '../../blog-related-products';
 
@@ -297,13 +299,35 @@ function SectionHeading({ title, subtitle }: { title?: string; subtitle?: string
 
 function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
   const title = getString(content, 'title');
-  const features = [1, 2, 3, 4].map((n) => ({
-    icon: getString(content, `feature_${n}_icon`) ?? `0${n}`,
-    title: getString(content, `feature_${n}_title`),
-    desc: getString(content, `feature_${n}_desc`),
-  })).filter((item) => item.title);
+  const features = parseFeatureItems(content)
+    .map((item) => ({ ...item, icon: item.icon || '⭐' }))
+    .filter((item) => item.title.trim());
   if (!features.length) return null;
   return <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6"><SectionHeading title={title} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{features.map((item) => <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}><span className="font-mono text-sm font-bold text-[var(--brand-accent)]">{item.icon}</span><h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>{item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}</article>)}</div></section>;
+}
+
+function WorkshopCta({ content, cta }: { content: Record<string, unknown>; cta: CtaHref | null }) {
+  const title = getString(content, 'title');
+  const subtitle = getString(content, 'subtitle');
+  if (!title && !subtitle && !cta) return null;
+  return (
+    <section className="bg-[var(--brand-surface)] py-14">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 border-l-4 px-4 sm:px-6 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--brand-accent)' }}>
+        <div>
+          <SectionHeading title={title} subtitle={subtitle} />
+        </div>
+        {cta ? (
+          <a
+            href={cta.href}
+            {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            className="inline-flex w-full justify-center rounded-full bg-[var(--brand-accent)] px-6 py-3 text-center text-sm font-bold uppercase tracking-wide text-[var(--brand-on-accent)] md:w-auto"
+          >
+            {getString(content, 'button_text')?.trim() || 'Hubungi Kami'} →
+          </a>
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 function pickCategoryImage(category: CategoryItem): string | undefined {
@@ -359,7 +383,8 @@ function WorkshopCategories({ categories, websiteSlug, content }: { categories: 
 }
 
 function WorkshopServices({ products, websiteSlug, content }: { products: CatalogItem[]; websiteSlug?: string; content: Record<string, unknown> }) {
-  const services = products.filter((item) => item.type === 'service' && !item.parentProductId);
+  const filterType = getString(content, 'filter_type') ?? 'service';
+  const services = products.filter((item) => item.type === filterType && !item.parentProductId);
   if (!services.length) return null;
   return (
     <section id="layanan" className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
@@ -627,8 +652,10 @@ function WorkshopTestimonials({ content }: { content: Record<string, unknown> })
 }
 
 function WorkshopFaq({ faqs, content }: { faqs: FaqItem[]; content: Record<string, unknown> }) {
-  if (!faqs.length) return null;
-  return <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-3xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} />{faqs.map((faq) => <details key={faq.id} className="border-t py-4" style={{ borderColor: 'var(--brand-border)' }}><summary className="cursor-pointer font-bold">{faq.question}</summary><p className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)]">{faq.answer}</p></details>)}</div></section>;
+  const category = getString(content, 'filter_category');
+  const items = faqs.filter((faq) => !category || faq.category === category);
+  if (!items.length) return null;
+  return <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-3xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} />{items.map((faq) => <details key={faq.id} className="border-t py-4" style={{ borderColor: 'var(--brand-border)' }}><summary className="cursor-pointer font-bold">{faq.question}</summary><p className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)]">{faq.answer}</p></details>)}</div></section>;
 }
 
 function WorkshopContact({ content, chatHref, locations }: { content: Record<string, unknown>; chatHref?: string; locations: LocationItem[] }) {
@@ -1014,7 +1041,6 @@ export function WorkshopView({
           leftNavLinks={[]}
           rightNavLinks={pages
             .filter((page) => page.placement === 'header' || page.placement === 'regular')
-            .slice(0, 5)
             .map((page): HeaderNavLink => ({
               href: buildPageHref(homeHref === '/' ? '' : homeHref, page),
               label: page.title,
@@ -1070,6 +1096,7 @@ export function WorkshopView({
               const post = section.content.post as BlogPostItem | undefined;
               return post ? <WorkshopBlogArticle key={key} post={post} websiteSlug={websiteSlug} /> : null;
             }
+            case 'cta': return <WorkshopCta key={key} content={section.content} cta={resolveCtaHref(section.content, profile)} />;
             case 'contact': return <WorkshopContact key={key} content={section.content} chatHref={chatHref} locations={locations} />;
             case 'cart': return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
             case 'checkout': {

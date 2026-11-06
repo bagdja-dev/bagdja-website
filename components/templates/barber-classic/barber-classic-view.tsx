@@ -45,6 +45,7 @@ import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
 import { GatheringCalendarContent } from '../../gathering-calendar-content';
 import { ProfileContent } from '../../profile-content';
+import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { ChatReferenceButton } from '../../chat-reference-button';
@@ -584,14 +585,14 @@ function CtaSection({
   title,
   subtitle,
   buttonText,
-  buttonUrl,
+  cta,
 }: {
   title?: string;
   subtitle?: string;
   buttonText?: string;
-  buttonUrl?: string;
+  cta: CtaHref | null;
 }) {
-  if (!title && !subtitle && !buttonUrl) return null;
+  if (!title && !subtitle && !cta) return null;
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6">
       {title && (
@@ -607,11 +608,10 @@ function CtaSection({
           {subtitle}
         </p>
       )}
-      {buttonUrl && (
+      {cta && (
         <a
-          href={buttonUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={cta.href}
+          {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
         >
@@ -1309,15 +1309,13 @@ export function BarberClassicView({
                   typeof section.content.subtitle === 'string' ? section.content.subtitle : undefined;
                 const buttonText =
                   typeof section.content.button_text === 'string' ? section.content.button_text : undefined;
-                const buttonUrl =
-                  typeof section.content.button_url === 'string' ? section.content.button_url : undefined;
                 return (
                   <CtaSection
                     key={key}
                     title={heading}
                     subtitle={subtitle}
                     buttonText={buttonText}
-                    buttonUrl={buttonUrl}
+                    cta={resolveCtaHref(section.content, profile)}
                   />
                 );
               }
