@@ -11,6 +11,7 @@ export interface GatheringPlanOption {
   label: string;
   description?: string | null;
   venue_location?: string | null;
+  images?: string[] | null;
 }
 
 function toLocalParts(value?: string | null) {
@@ -292,6 +293,15 @@ export function GatheringPlanControls({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium">{option.label}</span>
+                        {option.images?.length ? (
+                          <span className="mt-2 flex gap-2">
+                            {option.images.slice(0, 3).map((src, index) => (
+                              // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
+                              <img key={`${src}-${index}`} src={src} alt="" className="h-12 w-12 rounded-md object-cover" />
+                            ))}
+                            {option.images.length > 3 && <span className="self-center text-xs" style={{ color: 'var(--brand-muted)' }}>+{option.images.length - 3} foto</span>}
+                          </span>
+                        ) : null}
                         {(option.description || option.venue_location) && (
                           <span className="mt-1 block text-xs" style={{ color: 'var(--brand-muted)' }}>
                             {[option.venue_location, option.description].filter(Boolean).join(' · ')}

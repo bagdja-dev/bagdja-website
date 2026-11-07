@@ -20,6 +20,7 @@ export interface GatheringOptionGroup {
     venueLocation?: string;
     availabilityNote?: string;
     benefits?: string[];
+    images?: string[];
   }>;
 }
 
@@ -390,6 +391,7 @@ function normalizeGatheringMeta(
         ? option.availability_window.note
         : undefined,
       benefits: option.benefits?.filter((benefit): benefit is string => typeof benefit === 'string'),
+      images: option.images ?? [],
     });
     groups.set(group.key, group);
   }

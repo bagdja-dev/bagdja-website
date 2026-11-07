@@ -112,6 +112,7 @@ export interface ApiWebsiteProduct {
     availability_window?: Record<string, unknown>;
     venue_location?: string | null;
     benefits?: unknown[];
+    images?: string[] | null;
     is_active: boolean;
     sort_order: number;
   }>;

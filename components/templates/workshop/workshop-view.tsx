@@ -838,7 +838,16 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                           <ul className="mt-1 list-disc space-y-1 pl-5">
                             {group.options.map((option) => (
                               <li key={option.id}>
-                                {option.label}{option.description ? `: ${option.description}` : ''}
+                                <span className="font-medium">{option.label}</span>{option.description ? `: ${option.description}` : ''}
+                                {option.images?.length ? (
+                                  <span className="mt-2 flex gap-2">
+                                    {option.images.slice(0, 3).map((src, imageIndex) => (
+                                      // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
+                                      <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-14 w-14 rounded object-cover" />
+                                    ))}
+                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} foto</span> : null}
+                                  </span>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
