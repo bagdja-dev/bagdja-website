@@ -20,6 +20,7 @@ export interface GatheringOptionGroup {
     venueLocation?: string;
     availabilityNote?: string;
     benefits?: string[];
+    images?: string[];
   }>;
 }
 
@@ -148,6 +149,8 @@ export interface FaqItem {
 }
 
 export interface SectionEntry {
+  /** `website_sections.id` — hanya untuk penanda section di route preview Studio (S8); fallback template tidak punya id. */
+  id?: string;
   type: string;
   content: Record<string, unknown>;
 }
@@ -196,6 +199,30 @@ export interface GalleryImageItem {
   url: string;
   alt?: string;
   caption?: string;
+}
+
+export interface FeatureItem {
+  icon: string;
+  title: string;
+  desc: string;
+}
+
+export function parseFeatureItems(content: Record<string, unknown>): FeatureItem[] {
+  if (Array.isArray(content.features)) {
+    return content.features
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => ({
+        icon: typeof item.icon === 'string' ? item.icon : '',
+        title: typeof item.title === 'string' ? item.title : '',
+        desc: typeof item.desc === 'string' ? item.desc : '',
+      }));
+  }
+
+  return [1, 2, 3, 4].map((index) => ({
+    icon: typeof content[`feature_${index}_icon`] === 'string' ? content[`feature_${index}_icon`] as string : '',
+    title: typeof content[`feature_${index}_title`] === 'string' ? content[`feature_${index}_title`] as string : '',
+    desc: typeof content[`feature_${index}_desc`] === 'string' ? content[`feature_${index}_desc`] as string : '',
+  }));
 }
 
 export function parseGalleryImages(raw: unknown): GalleryImageItem[] {
@@ -364,6 +391,7 @@ function normalizeGatheringMeta(
         ? option.availability_window.note
         : undefined,
       benefits: option.benefits?.filter((benefit): benefit is string => typeof benefit === 'string'),
+      images: option.images ?? [],
     });
     groups.set(group.key, group);
   }
@@ -729,7 +757,7 @@ export function resolveSections(
   if (page?.sections?.length) {
     return [...page.sections]
       .sort((a, b) => a.order - b.order)
-      .map((s) => ({ type: s.type, content: s.content ?? {} }));
+      .map((s) => ({ id: s.id, type: s.type, content: s.content ?? {} }));
   }
 
   if (!allowTemplateFallback) return [];

@@ -38,12 +38,14 @@ import { CatalogGridSection, CategoryListingSection, VariantTreeSelector } from 
 import { BarberClassicGalleryCarousel } from './barber-classic-gallery-carousel';
 import { BarberClassicHeader, type HeaderNavLink } from './barber-classic-header';
 import { TemplateFooter } from '../shared/template-footer';
+import { withSectionFrame } from '../shared/section-frame';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
 import { OrdersContent } from '../../orders-content';
 import { TagihanContent } from '../../tagihan-content';
 import { GatheringCalendarContent } from '../../gathering-calendar-content';
 import { ProfileContent } from '../../profile-content';
+import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { CustomerChatContent } from '../../customer-chat-content';
 import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '../../order-detail-content';
 import { ChatReferenceButton } from '../../chat-reference-button';
@@ -583,14 +585,14 @@ function CtaSection({
   title,
   subtitle,
   buttonText,
-  buttonUrl,
+  cta,
 }: {
   title?: string;
   subtitle?: string;
   buttonText?: string;
-  buttonUrl?: string;
+  cta: CtaHref | null;
 }) {
-  if (!title && !subtitle && !buttonUrl) return null;
+  if (!title && !subtitle && !cta) return null;
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6">
       {title && (
@@ -606,11 +608,10 @@ function CtaSection({
           {subtitle}
         </p>
       )}
-      {buttonUrl && (
+      {cta && (
         <a
-          href={buttonUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={cta.href}
+          {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
         >
@@ -908,7 +909,16 @@ function ProductDetailSection({
                           <ul className="mt-1 list-disc space-y-1 pl-5">
                             {group.options.map((option) => (
                               <li key={option.id}>
-                                {option.label}{option.description ? `: ${option.description}` : ''}
+                                <span className="font-medium">{option.label}</span>{option.description ? `: ${option.description}` : ''}
+                                {option.images?.length ? (
+                                  <span className="mt-2 flex gap-2">
+                                    {option.images.slice(0, 3).map((src, imageIndex) => (
+                                      // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
+                                      <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-14 w-14 rounded object-cover" />
+                                    ))}
+                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} foto</span> : null}
+                                  </span>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
@@ -1202,7 +1212,7 @@ export function BarberClassicView({
 
         {sections
           .filter((section) => section.type !== 'hero')
-          .map((section, index) => {
+          .map(withSectionFrame((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
               case 'category_grid': {
@@ -1308,15 +1318,13 @@ export function BarberClassicView({
                   typeof section.content.subtitle === 'string' ? section.content.subtitle : undefined;
                 const buttonText =
                   typeof section.content.button_text === 'string' ? section.content.button_text : undefined;
-                const buttonUrl =
-                  typeof section.content.button_url === 'string' ? section.content.button_url : undefined;
                 return (
                   <CtaSection
                     key={key}
                     title={heading}
                     subtitle={subtitle}
                     buttonText={buttonText}
-                    buttonUrl={buttonUrl}
+                    cta={resolveCtaHref(section.content, profile)}
                   />
                 );
               }
@@ -1441,7 +1449,7 @@ export function BarberClassicView({
                 warnUnknownSection('barber-classic', section.type);
                 return null;
             }
-          })}
+          }))}
 
         {(chatHref || waHref) && (
           <div className="fixed bottom-4 left-4 right-4 z-10 sm:hidden">

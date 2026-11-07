@@ -102,6 +102,7 @@ export const BUILT_TEMPLATE_MANIFESTS = {
       'services_grid',
       'category_grid',
       'service_process_section',
+      'cta',
       'contact',
       'faq_list',
       'blog_list',

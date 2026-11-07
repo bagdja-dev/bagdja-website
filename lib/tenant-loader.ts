@@ -10,6 +10,7 @@ import {
   getPageBySlug,
   getProducts,
   getWebsiteBySlug,
+  type PublicFetchOptions,
   type ApiWebsite,
   type ApiWebsiteBlogPost,
   type ApiWebsiteCategory,
@@ -31,20 +32,25 @@ export interface TenantData {
   subscription_inactive: boolean;
 }
 
-export async function loadTenant(slug: string, pageSlug?: string): Promise<TenantData | null> {
-  const website = await getWebsiteBySlug(slug);
+/** `options.fresh` hanya dipakai route preview Studio (tanpa cache); route publik memanggil tanpa options. */
+export async function loadTenant(
+  slug: string,
+  pageSlug?: string,
+  options?: PublicFetchOptions,
+): Promise<TenantData | null> {
+  const website = await getWebsiteBySlug(slug, options);
   if (!website) return null;
 
   const [page, productsResult, categories, locations, faqs, blogPosts] = await Promise.all([
-    pageSlug ? getPageBySlug(slug, pageSlug) : getHomePage(slug),
+    pageSlug ? getPageBySlug(slug, pageSlug, options) : getHomePage(slug, options),
     // `size` besar = praktis "semua produk" untuk kebutuhan lain di halaman
     // (category_grid, related products, featured_product). Grid produk/layanan
     // sendiri fetch ulang halaman berikutnya dari client saat "Muat Lebih Banyak".
-    getProducts(slug, { size: 100 }),
-    getCategories(slug),
-    getLocations(slug),
-    getFaqs(slug),
-    getBlogPosts(slug),
+    getProducts(slug, { size: 100 }, options),
+    getCategories(slug, options),
+    getLocations(slug, undefined, options),
+    getFaqs(slug, undefined, options),
+    getBlogPosts(slug, options),
   ]);
 
   if (page?.sections) {
@@ -57,7 +63,7 @@ export async function loadTenant(slug: string, pageSlug?: string): Promise<Tenan
         ) {
           return;
         }
-        const flow = await getFulfillmentFlow(slug, section.content.flow_id);
+        const flow = await getFulfillmentFlow(slug, section.content.flow_id, options);
         if (flow) {
           section.content = {
             ...section.content,

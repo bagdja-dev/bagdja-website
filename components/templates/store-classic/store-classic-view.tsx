@@ -28,8 +28,11 @@ import {
   type NavPage,
   type SectionEntry,
   normalizeFooterBlocks,
+  parseFeatureItems,
+  type FeatureItem,
 } from '../../../lib/template-data';
 import { warnUnknownSection } from '../../../lib/template-manifests';
+import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
   getGoogleFontsUrl,
@@ -45,6 +48,7 @@ import { StoreClassicProductGallery } from './store-classic-gallery';
 import { TemplateFooter } from '../shared/template-footer';
 import { ChatBubbleIcon, WhatsAppIcon } from './store-classic-icons';
 import { StoreClassicStickyCta } from './store-classic-sticky-cta';
+import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { StoreClassicHeader, type HeaderNavLink } from './store-classic-header';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
@@ -203,12 +207,6 @@ function PageHeroBanner({ label, imageUrl }: { label: string; imageUrl?: string 
       </h1>
     </section>
   );
-}
-
-interface FeatureItem {
-  icon: string;
-  title: string;
-  desc: string;
 }
 
 function FeaturesGridSection({ title, features }: { title?: string; features: FeatureItem[] }) {
@@ -680,8 +678,8 @@ function GallerySection({ title, layout, images }: { title?: string; layout?: st
   );
 }
 
-function CtaSection({ title, subtitle, buttonText, buttonUrl }: { title?: string; subtitle?: string; buttonText?: string; buttonUrl?: string }) {
-  if (!title && !subtitle && !buttonUrl) return null;
+function CtaSection({ title, subtitle, buttonText, cta }: { title?: string; subtitle?: string; buttonText?: string; cta: CtaHref | null }) {
+  if (!title && !subtitle && !cta) return null;
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6">
       {title && (
@@ -694,11 +692,10 @@ function CtaSection({ title, subtitle, buttonText, buttonUrl }: { title?: string
           {subtitle}
         </p>
       )}
-      {buttonUrl && (
+      {cta && (
         <a
-          href={buttonUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={cta.href}
+          {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
         >
@@ -1151,7 +1148,16 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                             className="flex w-[80%] max-w-xs shrink-0 snap-start gap-3 border p-4 sm:w-72"
                             style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
                           >
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
+                          {option.images?.length ? (
+                            <div className="flex w-16 shrink-0 flex-col gap-1">
+                              {option.images.slice(0, 3).map((src, imageIndex) => (
+                                // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
+                                <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-12 w-16 rounded object-cover" />
+                              ))}
+                              {option.images.length > 3 ? <span className="text-center text-[10px]" style={{ color: 'var(--brand-muted)' }}>+{option.images.length - 3} foto</span> : null}
+                            </div>
+                          ) : null}
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
                               {String(index + 1).padStart(2, '0')}
                             </span>
                             <div className="min-w-0">
@@ -1337,29 +1343,27 @@ export function StoreClassicView({
         ) : isChatPage ? null : pageBannerLabel ? (
           <PageHeroBanner label={pageBannerLabel} />
         ) : (
-          <HeroSection
-            title={title}
-            tagline={tagline}
-            subtitle={heroSubtitle}
-            imageUrl={heroImageUrl}
-            waHref={waHref}
-            chatHref={chatHref}
-            showWhatsappCta={showWhatsappCta}
-          />
+          <SectionFrame section={sections.find((s) => s.type === 'hero')}>
+            <HeroSection
+              title={title}
+              tagline={tagline}
+              subtitle={heroSubtitle}
+              imageUrl={heroImageUrl}
+              waHref={waHref}
+              chatHref={chatHref}
+              showWhatsappCta={showWhatsappCta}
+            />
+          </SectionFrame>
         )}
 
         {sections
           .filter((section) => section.type !== 'hero')
-          .map((section, index) => {
+          .map(withSectionFrame((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
               case 'features_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
-                const features: FeatureItem[] = [1, 2, 3].map((n) => ({
-                  icon: typeof section.content[`feature_${n}_icon`] === 'string' ? (section.content[`feature_${n}_icon`] as string) : '',
-                  title: typeof section.content[`feature_${n}_title`] === 'string' ? (section.content[`feature_${n}_title`] as string) : '',
-                  desc: typeof section.content[`feature_${n}_desc`] === 'string' ? (section.content[`feature_${n}_desc`] as string) : '',
-                }));
+                const features = parseFeatureItems(section.content);
                 return <FeaturesGridSection key={key} title={heading} features={features} />;
               }
               case 'featured_product': {
@@ -1474,8 +1478,7 @@ export function StoreClassicView({
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 const subtitle = typeof section.content.subtitle === 'string' ? section.content.subtitle : undefined;
                 const buttonText = typeof section.content.button_text === 'string' ? section.content.button_text : undefined;
-                const buttonUrl = typeof section.content.button_url === 'string' ? section.content.button_url : undefined;
-                return <CtaSection key={key} title={heading} subtitle={subtitle} buttonText={buttonText} buttonUrl={buttonUrl} />;
+                return <CtaSection key={key} title={heading} subtitle={subtitle} buttonText={buttonText} cta={resolveCtaHref(section.content, profile)} />;
               }
               case 'testimonial': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : 'Apa Kata Mereka';
@@ -1568,7 +1571,7 @@ export function StoreClassicView({
                 warnUnknownSection('store-classic', section.type);
                 return null;
             }
-          })}
+          }))}
 
         <TemplateFooter
           blocks={footerBlocks}
