@@ -1,12 +1,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 function formatLocalDate(value?: string | null) {
   if (!value) return 'Belum ditentukan';
   const date = new Date(value);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { timeZone });
+}
+
+function renderInvitationTerms(html: string): ReactNode {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const renderNode = (node: ChildNode, key: string): ReactNode => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (!(node instanceof Element)) return null;
+    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return null;
+
+    const children = Array.from(node.childNodes).map((child, index) => renderNode(child, `${key}-${index}`));
+    switch (node.tagName) {
+      case 'P': return <p key={key} className="mb-2">{children}</p>;
+      case 'BR': return <br key={key} />;
+      case 'STRONG':
+      case 'B': return <strong key={key}>{children}</strong>;
+      case 'EM':
+      case 'I': return <em key={key}>{children}</em>;
+      case 'U': return <u key={key}>{children}</u>;
+      case 'S':
+      case 'DEL': return <s key={key}>{children}</s>;
+      case 'H2': return <h2 key={key} className="mb-2 mt-3 text-base font-semibold">{children}</h2>;
+      case 'H3': return <h3 key={key} className="mb-1 mt-2 font-semibold">{children}</h3>;
+      case 'UL': return <ul key={key} className="mb-2 list-disc pl-5">{children}</ul>;
+      case 'OL': return <ol key={key} className="mb-2 list-decimal pl-5">{children}</ol>;
+      case 'LI': return <li key={key}>{children}</li>;
+      case 'A': return <span key={key} className="underline">{children}</span>;
+      default: return <span key={key}>{children}</span>;
+    }
+  };
+  return Array.from(parsed.body.childNodes).map((node, index) => renderNode(node, `terms-${index}`));
 }
 
 interface InvitePreview {
@@ -27,6 +58,7 @@ interface InvitePreview {
     currency: string;
     min_attendees: number;
     max_attendees: number;
+    cancellation_policy_snapshot?: { participant_terms?: string };
     final_schedule?: string | null;
     rsvp_close_at?: string | null;
     payment_deadline?: string | null;
@@ -64,6 +96,7 @@ interface GatheringInviteOption {
 
 export function GatheringInvitationPreview({ token, websiteName }: { token: string; websiteName: string }) {
   const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const [participantTermsContent, setParticipantTermsContent] = useState<ReactNode>(null);
   const [error, setError] = useState('');
   const [attendeeName, setAttendeeName] = useState('');
   const [email, setEmail] = useState('');
@@ -84,6 +117,11 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
   const [paying, setPaying] = useState(false);
   const [addingReservation, setAddingReservation] = useState(false);
   const [privateAccount, setPrivateAccount] = useState<PrivateAccountState>({ status: 'loading' });
+  const participantTermsHtml = preview?.occurrence.cancellation_policy_snapshot?.participant_terms ?? '';
+
+  useEffect(() => {
+    setParticipantTermsContent(participantTermsHtml ? renderInvitationTerms(participantTermsHtml) : null);
+  }, [participantTermsHtml]);
 
   useEffect(() => {
     let cancelled = false;
@@ -453,6 +491,12 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
         <p className="mt-2 text-sm text-zinc-600">Diprakarsai oleh <strong className="font-semibold text-zinc-800">{preview.group.initiator_name}</strong></p>
         {preview.invitation.invitee_name ? <p className="mt-2 text-sm text-zinc-600">Untuk {preview.invitation.invitee_name}</p> : null}
         {preview.group.invitation_description ? <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-zinc-700">{preview.group.invitation_description}</p> : null}
+        {participantTermsHtml ? (
+          <section className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+            <h2 className="text-sm font-semibold">Syarat dan ketentuan peserta</h2>
+            <div className="mt-2 whitespace-pre-wrap text-sm leading-7 text-zinc-700">{participantTermsContent}</div>
+          </section>
+        ) : null}
         <dl className="mt-6 grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
           <div><dt className="text-xs uppercase text-zinc-500">Harga per peserta</dt><dd className="mt-1 font-semibold">{price}</dd></div>
           <div><dt className="text-xs uppercase text-zinc-500">Batas peserta</dt><dd className="mt-1 font-semibold">Min. {occurrence.min_attendees} · Maks. {occurrence.max_attendees}</dd></div>

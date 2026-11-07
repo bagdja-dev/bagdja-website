@@ -1148,7 +1148,16 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                             className="flex w-[80%] max-w-xs shrink-0 snap-start gap-3 border p-4 sm:w-72"
                             style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
                           >
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
+                          {option.images?.length ? (
+                            <div className="flex w-16 shrink-0 flex-col gap-1">
+                              {option.images.slice(0, 3).map((src, imageIndex) => (
+                                // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
+                                <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-12 w-16 rounded object-cover" />
+                              ))}
+                              {option.images.length > 3 ? <span className="text-center text-[10px]" style={{ color: 'var(--brand-muted)' }}>+{option.images.length - 3} foto</span> : null}
+                            </div>
+                          ) : null}
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
                               {String(index + 1).padStart(2, '0')}
                             </span>
                             <div className="min-w-0">
