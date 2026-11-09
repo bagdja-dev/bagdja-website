@@ -45,10 +45,95 @@ function getSafeAvatarUrl(value: unknown): string | null {
   }
 }
 
+function safeTemplateText(value: unknown, maxLength = 1000): string | undefined {
+  if (
+    typeof value !== 'string' ||
+    value.length > maxLength ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+  ) return undefined;
+  return value;
+}
+
+function sanitizeTemplateOrderDetailPage(page: TemplateRenderProps['page']): TemplateRenderProps['page'] | undefined {
+  if (!page || page.type !== 'order_detail' || !page.transaction || !Array.isArray(page.transaction.items)) {
+    return undefined;
+  }
+  const transaction = page.transaction;
+  const items = transaction.items.slice(0, 100).flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const name = safeTemplateText(item.name, 240);
+    if (!name || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) return [];
+    const image = getSafeAvatarUrl(item.image);
+    return [{
+      key: safeTemplateText(item.key, 100) ?? name,
+      name,
+      ...(safeTemplateText(item.description, 1000) ? { description: safeTemplateText(item.description, 1000) } : {}),
+      quantity: item.quantity,
+      unitPriceLabel: safeTemplateText(item.unitPriceLabel, 80) ?? '',
+      totalLabel: safeTemplateText(item.totalLabel, 80) ?? '',
+      ...(safeTemplateText(item.unit, 30) ? { unit: safeTemplateText(item.unit, 30) } : {}),
+      ...(image ? { image } : {}),
+      ...(isSafeRelativePath(item.detailHref) ? { detailHref: item.detailHref } : {}),
+    }];
+  });
+  const shipping = transaction.shipping
+    ? {
+      ...(safeTemplateText(transaction.shipping.recipient, 120) ? { recipient: safeTemplateText(transaction.shipping.recipient, 120) } : {}),
+      ...(safeTemplateText(transaction.shipping.phone, 40) ? { phone: safeTemplateText(transaction.shipping.phone, 40) } : {}),
+      ...(safeTemplateText(transaction.shipping.address, 500) ? { address: safeTemplateText(transaction.shipping.address, 500) } : {}),
+    }
+    : undefined;
+
+  return {
+    type: 'order_detail',
+    transaction: {
+      title: safeTemplateText(transaction.title, 120) ?? 'Detail Transaksi',
+      ...(safeTemplateText(transaction.reference, 120) ? { reference: safeTemplateText(transaction.reference, 120) } : {}),
+      statusLabel: safeTemplateText(transaction.statusLabel, 120) ?? 'Status tidak tersedia',
+      paymentModeLabel: safeTemplateText(transaction.paymentModeLabel, 80) ?? 'Sudah checkout',
+      createdAt: safeTemplateText(transaction.createdAt, 64) ?? '',
+      subtotalLabel: safeTemplateText(transaction.subtotalLabel, 80) ?? '',
+      shippingLabel: safeTemplateText(transaction.shippingLabel, 80) ?? '',
+      totalLabel: safeTemplateText(transaction.totalLabel, 80) ?? '',
+      ...(safeTemplateText(transaction.courierLabel, 120) ? { courierLabel: safeTemplateText(transaction.courierLabel, 120) } : {}),
+      ...(safeTemplateText(transaction.statusMessage, 500) ? { statusMessage: safeTemplateText(transaction.statusMessage, 500) } : {}),
+      items,
+      ...(shipping && Object.keys(shipping).length > 0 ? { shipping } : {}),
+    },
+    actions: Array.isArray(page.actions)
+      ? [...new Set(page.actions.filter((action) =>
+        (ALLOWED_ORDER_ACTIONS_FOR_TEMPLATE_PROPS as readonly string[]).includes(action),
+      ))]
+      : [],
+  };
+}
+
 export function sanitizeTemplateRuntimeProps(props: TemplateRenderProps): Record<string, unknown> {
-  const { auth, ...publicProps } = props;
+  const { auth, page, profile, sections, ...publicProps } = props;
+  const tenantProfile: TemplateRenderProps['profile'] =
+    profile && typeof profile === 'object' && !Array.isArray(profile) ? profile : {};
+  const safePage = sanitizeTemplateOrderDetailPage(page);
+  const safeProfile = {
+    ...(safeTemplateText(tenantProfile.name, 120) ? { name: safeTemplateText(tenantProfile.name, 120) } : {}),
+    ...(safeTemplateText(tenantProfile.tagline, 240) ? { tagline: safeTemplateText(tenantProfile.tagline, 240) } : {}),
+    ...(getSafeAvatarUrl(tenantProfile.logoUrl) ? { logoUrl: getSafeAvatarUrl(tenantProfile.logoUrl) } : {}),
+    ...(safeTemplateText(tenantProfile.whatsapp, 40) ? { whatsapp: safeTemplateText(tenantProfile.whatsapp, 40) } : {}),
+    ...(safeTemplateText(tenantProfile.phone, 40) ? { phone: safeTemplateText(tenantProfile.phone, 40) } : {}),
+    ...(tenantProfile.socialLinks && typeof tenantProfile.socialLinks === 'object' && !Array.isArray(tenantProfile.socialLinks)
+      ? { socialLinks: tenantProfile.socialLinks }
+      : {}),
+    ...(tenantProfile.footerSettings !== undefined ? { footerSettings: tenantProfile.footerSettings } : {}),
+  };
+  const publicPropsWithPage = {
+    ...publicProps,
+    profile: safeProfile,
+    sections: Array.isArray(sections)
+      ? sections.filter((section) => section?.type !== 'order_detail')
+      : [],
+    ...(safePage ? { page: safePage } : {}),
+  };
   if (auth === null || typeof auth !== 'object' || Array.isArray(auth)) {
-    return publicProps;
+    return publicPropsWithPage;
   }
   const safeAuth: Record<string, unknown> = {
     isLoggedIn: auth.isLoggedIn === true,
@@ -77,7 +162,7 @@ export function sanitizeTemplateRuntimeProps(props: TemplateRenderProps): Record
   }
   const avatar = getSafeAvatarUrl(auth.avatar);
   if (avatar) safeAuth.avatar = avatar;
-  return { ...publicProps, auth: safeAuth };
+  return { ...publicPropsWithPage, auth: safeAuth };
 }
 
 export class TemplateRuntimeError extends Error {
@@ -95,6 +180,12 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const MAX_CLIENT_BUNDLE_BYTES = 512 * 1024;
 const MAX_CLIENT_BUNDLE_BASE64_LENGTH = Math.ceil(MAX_CLIENT_BUNDLE_BYTES / 3) * 4;
+const ALLOWED_ORDER_ACTIONS_FOR_TEMPLATE_PROPS = [
+  'order.retry_payment',
+  'order.cancel',
+  'order.complete',
+  'order.dispute',
+] as const;
 
 export function parseTemplateRuntimeVersionMap(raw: string | undefined): Record<string, string> {
   if (!raw?.trim()) return {};
@@ -162,6 +253,15 @@ export function getTemplateRuntimeTenantVersion(
     return getTemplateRuntimeVersion(slug, pinnedVersion, env);
   }
   return getTemplateRuntimeStudioPreviewVersion(slug, env);
+}
+
+export function isTemplateRuntimeClientBundleApproved(
+  slug: string,
+  version: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED !== 'true') return false;
+  return parseTemplateRuntimeVersionMap(env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP)[slug] === version;
 }
 
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {

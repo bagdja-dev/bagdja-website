@@ -12,6 +12,7 @@ import type {
   NavPage,
   SectionEntry,
 } from './template-data';
+import type { TemplateRuntimeOrderAction } from './template-runtime-bridge';
 import {
   BUILT_TEMPLATE_MANIFESTS,
   UNSUPPORTED_TEMPLATE_DIGEST,
@@ -53,6 +54,39 @@ export interface TemplateRenderProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  /** Explicit, minimized page-level data for approved external template surfaces. */
+  page?: {
+    type: 'order_detail';
+    transaction: {
+      title: string;
+      reference?: string;
+      statusLabel: string;
+      paymentModeLabel: string;
+      createdAt: string;
+      subtotalLabel: string;
+      shippingLabel: string;
+      totalLabel: string;
+      courierLabel?: string;
+      statusMessage?: string;
+      items: Array<{
+        key: string;
+        name: string;
+        description?: string;
+        quantity: number;
+        unitPriceLabel: string;
+        totalLabel: string;
+        unit?: string;
+        image?: string;
+        detailHref?: string;
+      }>;
+      shipping?: {
+        recipient?: string;
+        phone?: string;
+        address?: string;
+      };
+    };
+    actions: TemplateRuntimeOrderAction[];
+  };
   /** Hide the built-in header where a separately rendered designer header is present. */
   hideHeader?: boolean;
   /** Use the Store Classic cart presentation while keeping cart operations in the host. */

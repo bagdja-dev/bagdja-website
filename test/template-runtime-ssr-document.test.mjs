@@ -25,7 +25,7 @@ const {
   isTemplateRuntimeResizeMessage,
 } = helperModule.exports;
 const identity = { slug: 'storefront-demo', version: '1.2.3', digest: 'a'.repeat(64) };
-globalThis.window = { btoa, crypto: webcrypto };
+globalThis.window = { atob, btoa, crypto: webcrypto };
 const bridgeSource = await readFile(join(projectRoot, 'lib/template-runtime-bridge.ts'), 'utf8');
 const bridgeTranspiled = ts.transpileModule(bridgeSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -36,7 +36,24 @@ new Function('exports', 'module', 'require', bridgeTranspiled)(
   bridgeModule,
   require,
 );
-const { getAllowedTemplateNavigationUrl } = bridgeModule.exports;
+const {
+  createTemplateRuntimeOrderActionBridge,
+  getAllowedTemplateNavigationUrl,
+  parseTemplateRuntimeOrderActionMessage,
+} = bridgeModule.exports;
+const runtimeClientSource = await readFile(join(projectRoot, 'lib/template-runtime-client.ts'), 'utf8');
+const runtimeClientTranspiled = ts.transpileModule(runtimeClientSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText;
+const runtimeClientModule = { exports: {} };
+new Function('exports', 'module', 'require', runtimeClientTranspiled)(
+  runtimeClientModule.exports,
+  runtimeClientModule,
+  (specifier) => specifier.endsWith('template-runtime-bridge')
+    ? bridgeModule.exports
+    : require(specifier),
+);
+const { sanitizeTemplateRuntimeProps } = runtimeClientModule.exports;
 globalThis.DOMParser = class {
   parseFromString(markup) {
     const body = markup.match(/<body>([\s\S]*)<\/body>/i)?.[1]
@@ -45,9 +62,51 @@ globalThis.DOMParser = class {
       .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
       .replace(/<(?:meta|base|iframe|frame|object|embed|form)\b[^>]*\/?>/gi, '')
       .replace(/<link\b(?=[^>]*\brel\s*=\s*['"]?import\b)[^>]*\/?>/gi, '');
+    const elements = [];
+    sanitizedBody.replace(/<([a-z][\w:-]*)\b([^>]*)>/gi, (whole, tagName, rawAttributes) => {
+      const attributes = [];
+      rawAttributes.replace(/([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g, (_attribute, name, doubleQuoted, singleQuoted, unquoted) => {
+        attributes.push({ name, value: doubleQuoted ?? singleQuoted ?? unquoted ?? '' });
+        return '';
+      });
+      const element = {
+        tagName,
+        attributes,
+        removed: false,
+        remove() {
+          this.removed = true;
+        },
+        removeAttribute(name) {
+          this.attributes = this.attributes.filter((attribute) => attribute.name !== name);
+        },
+        setAttribute(name, value) {
+          this.removeAttribute(name);
+          this.attributes.push({ name, value });
+        },
+      };
+      elements.push(element);
+      return whole;
+    });
     return {
-      body: { innerHTML: sanitizedBody },
-      querySelectorAll: () => [],
+      body: {
+        get innerHTML() {
+          let index = 0;
+          return sanitizedBody.replace(/<([a-z][\w:-]*)\b([^>]*)>/gi, (whole) => {
+            const element = elements[index++];
+            if (!element || element.removed) return '';
+            const attrs = element.attributes.map(({ name, value }) =>
+              ` ${name}="${String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`,
+            ).join('');
+            return `<${element.tagName}${attrs}>`;
+          });
+        },
+        querySelectorAll: (selector) => selector === '*' ? elements : [],
+      },
+      querySelectorAll: (selector) => {
+        if (selector === '*') return elements;
+        const removedTagNames = new Set(['script', 'meta', 'base', 'iframe', 'frame', 'object', 'embed', 'form']);
+        return elements.filter((element) => removedTagNames.has(element.tagName.toLowerCase()));
+      },
     };
   }
 };
@@ -66,6 +125,7 @@ test('builds a static, CSP-locked frame and strips executable or navigation mark
   });
   const bootstrap = document.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(bootstrap);
+  assert.doesNotThrow(() => new Function(bootstrap));
   const expectedBootstrapHash = createHash('sha256').update(bootstrap).digest('base64');
   const escapedPolicy = document.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
   assert.ok(escapedPolicy);
@@ -75,15 +135,138 @@ test('builds a static, CSP-locked frame and strips executable or navigation mark
   assert.ok(policy.includes("form-action 'none'"));
   assert.ok(policy.includes("frame-src 'none'"));
   assert.ok(policy.includes("worker-src 'none'"));
+  assert.ok(policy.includes("navigate-to 'none'"));
+  assert.ok(!policy.includes('unsafe-eval'));
   assert.ok(bootstrap.includes("type: 'bagdja:template:navigate'"));
   assert.ok(bootstrap.includes("url.hostname === 'wa.me'"));
   assert.ok(bootstrap.includes('event.preventDefault()'));
+  assert.ok(bootstrap.includes("type: 'bagdja:template:order-action'"));
+  assert.ok(bootstrap.includes("message.type !== 'bagdja:template:order-action-result'"));
   assert.ok(document.includes('https://tenant.example.test/_next/static/css/site.css'));
   assert.ok(!document.includes('attacker.example.test'));
   assert.ok(!document.includes('window.pwned'));
   assert.ok(!document.includes('http-equiv="refresh"'));
   assert.ok(!document.includes('<iframe src="https://evil.test"'));
   assert.ok(document.includes('<main>Rendered</main>'));
+});
+
+test('loads only an integrity-verified client bundle in the opaque frame with restricted network policy', async () => {
+  const bundle = Buffer.from('document.body.dataset.hydrated = "yes";');
+  const bundleBase64 = bundle.toString('base64');
+  const bundleSha256 = createHash('sha256').update(bundle).digest('hex');
+  const document = await createTemplateRuntimeSsrDocument({
+    html: '<main onclick="steal()">Dynamic page</main><img src="https://tenant-project.supabase.co/storage/v1/object/public/product.jpg" onerror="steal()"><img src="https://attacker.example.test/pixel">',
+    identity,
+    parentOrigin: 'https://tenant.example.test',
+    tenantPathPrefix: '/store',
+    stylesheetUrls: [],
+    clientBundle: bundleBase64,
+    clientBundleSha256: bundleSha256,
+  });
+  const bootstrap = document.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(bootstrap);
+  assert.doesNotThrow(() => new Function(bootstrap));
+  const policy = document.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]?.replaceAll('&#39;', "'");
+  assert.ok(policy?.includes(`script-src 'sha256-${createHash('sha256').update(bootstrap).digest('base64')}' blob:`));
+  assert.ok(policy?.includes("connect-src 'none'"));
+  assert.ok(policy?.includes("img-src data: blob: https://tenant-project.supabase.co"));
+  assert.ok(!policy?.includes('attacker.example.test'));
+  assert.ok(bootstrap.includes('URL.createObjectURL(new Blob'));
+  assert.ok(document.includes('https://tenant-project.supabase.co/storage/v1/object/public/product.jpg'));
+  assert.ok(!document.includes('attacker.example.test'));
+  assert.ok(!document.includes('onclick='));
+  await assert.rejects(
+    createTemplateRuntimeSsrDocument({
+      html: '<main></main>',
+      identity,
+      parentOrigin: 'https://tenant.example.test',
+      tenantPathPrefix: '/store',
+      stylesheetUrls: [],
+      clientBundle: bundleBase64,
+      clientBundleSha256: 'b'.repeat(64),
+    }),
+    /integrity check failed/,
+  );
+});
+
+test('minimizes page data and excludes email and raw transaction sections from template props', () => {
+  const safe = sanitizeTemplateRuntimeProps({
+    isPreview: false,
+    profile: { name: 'Toko', email: 'owner@example.test' },
+    auth: { isLoggedIn: true, email: 'buyer@example.test', username: 'Buyer' },
+    sections: [
+      { type: 'order_detail', content: { transaction: { id: 'private-transaction-id', phone: 'raw' } } },
+      { type: 'text_block', content: { body: 'Public text' } },
+    ],
+    products: [],
+    locations: [],
+    faqs: [],
+    page: {
+      type: 'order_detail',
+      transaction: {
+        title: 'Detail',
+        reference: 'INV-123',
+        statusLabel: 'Menunggu pembayaran',
+        paymentModeLabel: 'Sudah checkout',
+        createdAt: '2026-11-09',
+        subtotalLabel: 'Rp 100.000',
+        shippingLabel: 'Rp 0',
+        totalLabel: 'Rp 100.000',
+        items: [{
+          key: 'item-1',
+          name: 'Product',
+          quantity: 1,
+          unitPriceLabel: 'Rp 100.000',
+          totalLabel: 'Rp 100.000',
+          image: 'https://outside.example.test/image.png',
+        }],
+        internalTransactionId: 'private-transaction-id',
+      },
+      actions: ['order.cancel', 'untrusted.action'],
+    },
+  });
+  assert.equal(safe.profile.email, undefined);
+  assert.equal(safe.auth.email, undefined);
+  assert.deepEqual(safe.sections.map((section) => section.type), ['text_block']);
+  assert.equal(safe.page.transaction.internalTransactionId, undefined);
+  assert.equal(safe.page.transaction.items[0].image, undefined);
+  assert.deepEqual(safe.page.actions, ['order.cancel']);
+});
+
+test('validates iframe order-action intents against identity, source, and host allowlist', async () => {
+  const requestId = '123e4567-e89b-42d3-a456-426614174000';
+  const message = {
+    protocol: 1,
+    type: 'bagdja:template:order-action',
+    ...identity,
+    requestId,
+    action: 'order.cancel',
+  };
+  assert.equal(parseTemplateRuntimeOrderActionMessage(message)?.action, 'order.cancel');
+  assert.equal(parseTemplateRuntimeOrderActionMessage({ ...message, action: 'transaction.delete' }), null);
+  assert.equal(parseTemplateRuntimeOrderActionMessage({ ...message, digest: 'b'.repeat(64) })?.digest, 'b'.repeat(64));
+  assert.equal(parseTemplateRuntimeOrderActionMessage({ ...message, requestId: 'invalid' }), null);
+
+  const responses = [];
+  const frame = { postMessage: (data, targetOrigin) => responses.push({ data, targetOrigin }) };
+  let actionCount = 0;
+  const handler = createTemplateRuntimeOrderActionBridge({
+    frame,
+    identity,
+    allowedActions: ['order.cancel'],
+    onAction: async () => { actionCount += 1; },
+  });
+  await handler({ source: {}, origin: 'null', data: message });
+  await handler({ source: frame, origin: 'https://tenant.example.test', data: message });
+  await handler({ source: frame, origin: 'null', data: { ...message, digest: 'b'.repeat(64) } });
+  await handler({ source: frame, origin: 'null', data: { ...message, action: 'order.complete' } });
+  await handler({ source: frame, origin: 'null', data: message });
+  await handler({ source: frame, origin: 'null', data: message });
+
+  assert.equal(actionCount, 1);
+  assert.equal(responses.length, 1);
+  assert.equal(responses[0].targetOrigin, '*');
+  assert.equal(responses[0].data.result.ok, true);
 });
 
 test('reports bounded header height through the identity-bound resize bridge', async () => {

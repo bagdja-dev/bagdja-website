@@ -11,6 +11,8 @@ for (const required of [
   'TEMPLATE_RUNTIME_TIMEOUT_MS',
   'TEMPLATE_RUNTIME_ENABLED',
   'TEMPLATE_RUNTIME_VERSION_MAP',
+  'TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED',
+  'TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP',
   '/v1/render',
   'authorization: `Bearer ${config.token}`',
 ]) {
@@ -35,6 +37,18 @@ const approvedEnv = {
 };
 assert.equal(runtimeClient.getTemplateRuntimeVersion('store-classic', null, approvedEnv), null);
 assert.equal(runtimeClient.getTemplateRuntimeVersion('store-classic', '1.0.0', approvedEnv), '1.0.0');
+assert.equal(runtimeClient.isTemplateRuntimeClientBundleApproved('store-classic', '1.0.0', approvedEnv), false);
+const approvedClientBundleEnv = {
+  ...approvedEnv,
+  TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED: 'true',
+  TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP: JSON.stringify({ 'store-classic': '1.0.0' }),
+};
+assert.equal(runtimeClient.isTemplateRuntimeClientBundleApproved('store-classic', '1.0.0', approvedClientBundleEnv), true);
+assert.equal(runtimeClient.isTemplateRuntimeClientBundleApproved('store-classic', '1.0.1', approvedClientBundleEnv), false);
+assert.equal(runtimeClient.isTemplateRuntimeClientBundleApproved('store-classic', '1.0.0', {
+  ...approvedClientBundleEnv,
+  TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED: 'false',
+}), false);
 assert.throws(
   () => runtimeClient.getTemplateRuntimeVersion('store-classic', '1.0.0', { ...approvedEnv, TEMPLATE_RUNTIME_ENABLED: 'false' }),
   (error) => error.code === 'runtime_disabled',
@@ -356,8 +370,8 @@ assert(tenantRuntimeRoute.includes('getTemplateRuntimeTenantVersion'), 'Tenant r
 assert(tenantRuntimeRoute.includes('sanitizeTemplateRuntimeProps(props)'), 'Tenant runtime must not expose auth PII.');
 
 const publicFrame = await readFile(path.join(process.cwd(), 'components/template-runtime-ssr-frame.tsx'), 'utf8');
-assert(publicFrame.includes('sandbox="allow-scripts"'), 'Public SSR frame may run only the hash-pinned host navigation bootstrap.');
-assert(!publicFrame.includes('clientBundle'), 'Public SSR frame must not execute a third-party client bundle.');
+assert(publicFrame.includes('sandbox="allow-scripts"'), 'Public SSR frame must use the opaque script-only sandbox.');
+assert(publicFrame.includes('clientBundle'), 'Public SSR frame must support the verified, version-approved client bundle.');
 assert(!publicFrame.includes('allow-same-origin'), 'Public SSR frame must retain an opaque origin.');
 const frameDocument = await readFile(path.join(process.cwd(), 'lib/template-runtime-ssr-document.ts'), 'utf8');
 for (const directive of [
@@ -365,12 +379,17 @@ for (const directive of [
   "form-action 'none'",
   "frame-src 'none'",
   "worker-src 'none'",
+  "navigate-to 'none'",
 ]) {
   assert(frameDocument.includes(directive), `Public SSR frame CSP must include ${directive}.`);
 }
+assert(frameDocument.includes('clientBundleSha256'), 'Browser bundle must be re-verified in the iframe document builder.');
+assert(frameDocument.includes('resourceOrigins'), 'Frame image origins must be narrowed to the SSR markup resource set.');
 assert(frameDocument.includes('event.preventDefault()'), 'SSR frame links must route through the host bridge.');
 assert(frameDocument.includes('sanitizeTemplateHtml'), 'Untrusted SSR markup must be sanitized before insertion.');
 const runtimeRoute = await readFile(path.join(process.cwd(), 'lib/template-runtime-route.tsx'), 'utf8');
-assert(runtimeRoute.includes('template_client_bundle_not_supported'), 'Client-hydrated templates must fail closed until browser isolation is approved.');
+assert(runtimeRoute.includes('template_client_bundle_not_approved'), 'Client bundles must fail closed until the exact version is approved.');
+assert(runtimeRoute.includes('clientBundle={rendered.clientBundle}'), 'Approved client bundles must also be passed through designer header frames.');
+assert(runtimeRoute.includes('isTemplateRuntimeClientBundleApproved(templateSlug, version)'), 'Client bundles on every tenant surface must require exact-version approval.');
 
 console.log('Template runtime Next.js adapter contract: OK');

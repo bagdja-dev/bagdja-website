@@ -2,8 +2,16 @@ import type { CatalogItem } from './template-data';
 
 export const TEMPLATE_RUNTIME_ACTION = 'bagdja:template:action';
 export const TEMPLATE_RUNTIME_ACTION_RESULT = 'bagdja:template:action-result';
+export const TEMPLATE_RUNTIME_ORDER_ACTION = 'bagdja:template:order-action';
+export const TEMPLATE_RUNTIME_ORDER_ACTION_RESULT = 'bagdja:template:order-action-result';
 export const TEMPLATE_RUNTIME_NAVIGATE = 'bagdja:template:navigate';
 export const TEMPLATE_RUNTIME_BRIDGE_VERSION = 1;
+export const TEMPLATE_RUNTIME_ORDER_ACTIONS = [
+  'order.retry_payment',
+  'order.cancel',
+  'order.complete',
+  'order.dispute',
+] as const;
 
 export interface TemplateRuntimeIdentity {
   slug: string;
@@ -25,6 +33,22 @@ export interface TemplateRuntimeActionMessage extends TemplateRuntimeIdentity {
   action: AddToCartAction;
 }
 
+export type TemplateRuntimeOrderAction = typeof TEMPLATE_RUNTIME_ORDER_ACTIONS[number];
+
+export interface TemplateRuntimeOrderActionMessage extends TemplateRuntimeIdentity {
+  protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
+  type: typeof TEMPLATE_RUNTIME_ORDER_ACTION;
+  requestId: string;
+  action: TemplateRuntimeOrderAction;
+}
+
+export interface TemplateRuntimeOrderActionResultMessage extends TemplateRuntimeIdentity {
+  protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
+  type: typeof TEMPLATE_RUNTIME_ORDER_ACTION_RESULT;
+  requestId: string;
+  result: { ok: true } | { ok: false; message: string };
+}
+
 export interface TemplateRuntimeActionResultMessage extends TemplateRuntimeIdentity {
   protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
   type: typeof TEMPLATE_RUNTIME_ACTION_RESULT;
@@ -41,6 +65,7 @@ export interface TemplateRuntimeNavigationMessage extends TemplateRuntimeIdentit
 }
 
 export type TemplateRuntimeActionHandler = (action: AddToCartAction) => Promise<{ orderId: string }>;
+export type TemplateRuntimeOrderActionHandler = (action: TemplateRuntimeOrderAction) => Promise<void>;
 
 export class TemplateRuntimeActionError extends Error {
   constructor(
@@ -133,6 +158,35 @@ export function parseTemplateRuntimeActionMessage(value: unknown): TemplateRunti
       quantity: value.action.quantity as number,
       ...(typeof value.action.locationId === 'string' ? { locationId: value.action.locationId } : {}),
     },
+  };
+}
+
+export function parseTemplateRuntimeOrderActionMessage(value: unknown): TemplateRuntimeOrderActionMessage | null {
+  if (
+    !isRecord(value) ||
+    value.protocol !== TEMPLATE_RUNTIME_BRIDGE_VERSION ||
+    value.type !== TEMPLATE_RUNTIME_ORDER_ACTION ||
+    typeof value.slug !== 'string' ||
+    !SLUG_PATTERN.test(value.slug) ||
+    typeof value.version !== 'string' ||
+    !VERSION_PATTERN.test(value.version) ||
+    typeof value.digest !== 'string' ||
+    !DIGEST_PATTERN.test(value.digest) ||
+    typeof value.requestId !== 'string' ||
+    !REQUEST_ID_PATTERN.test(value.requestId) ||
+    typeof value.action !== 'string' ||
+    !(TEMPLATE_RUNTIME_ORDER_ACTIONS as readonly string[]).includes(value.action)
+  ) {
+    return null;
+  }
+  return {
+    protocol: TEMPLATE_RUNTIME_BRIDGE_VERSION,
+    type: TEMPLATE_RUNTIME_ORDER_ACTION,
+    slug: value.slug,
+    version: value.version,
+    digest: value.digest,
+    requestId: value.requestId,
+    action: value.action as TemplateRuntimeOrderAction,
   };
 }
 
@@ -267,6 +321,66 @@ export function createTemplateRuntimeActionBridge({
       response.result = error instanceof TemplateRuntimeActionError
         ? { ok: false, code: error.code, message: error.message }
         : { ok: false, code: 'action_failed', message: 'Aksi template gagal diproses.' };
+    }
+    frame.postMessage(response, '*');
+  };
+}
+
+export function createTemplateRuntimeOrderActionBridge({
+  frame,
+  identity,
+  allowedActions,
+  onAction,
+}: {
+  frame: Pick<Window, 'postMessage'>;
+  identity: TemplateRuntimeIdentity;
+  allowedActions: readonly TemplateRuntimeOrderAction[];
+  onAction: TemplateRuntimeOrderActionHandler;
+}): (event: MessageEvent<unknown>) => Promise<void> {
+  const allowed = new Set(allowedActions);
+  const seenRequests = new Set<string>();
+
+  return async (event) => {
+    if (event.source !== frame || event.origin !== 'null') return;
+    const message = parseTemplateRuntimeOrderActionMessage(event.data);
+    if (
+      !message ||
+      message.slug !== identity.slug ||
+      message.version !== identity.version ||
+      message.digest !== identity.digest ||
+      !allowed.has(message.action) ||
+      seenRequests.has(message.requestId)
+    ) return;
+
+    if (seenRequests.size >= 256) {
+      frame.postMessage({
+        protocol: TEMPLATE_RUNTIME_BRIDGE_VERSION,
+        type: TEMPLATE_RUNTIME_ORDER_ACTION_RESULT,
+        ...identity,
+        requestId: message.requestId,
+        result: { ok: false, message: 'Batas aksi template untuk halaman ini tercapai.' },
+      } satisfies TemplateRuntimeOrderActionResultMessage, '*');
+      return;
+    }
+
+    seenRequests.add(message.requestId);
+    const response: TemplateRuntimeOrderActionResultMessage = {
+      protocol: TEMPLATE_RUNTIME_BRIDGE_VERSION,
+      type: TEMPLATE_RUNTIME_ORDER_ACTION_RESULT,
+      ...identity,
+      requestId: message.requestId,
+      result: { ok: false, message: 'Aksi transaksi gagal diproses.' },
+    };
+    try {
+      await onAction(message.action);
+      response.result = { ok: true };
+    } catch (error) {
+      response.result = {
+        ok: false,
+        message: error instanceof TemplateRuntimeActionError
+          ? error.message
+          : 'Aksi transaksi gagal diproses.',
+      };
     }
     frame.postMessage(response, '*');
   };

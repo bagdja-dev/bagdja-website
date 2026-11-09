@@ -3,10 +3,12 @@ import type { TemplateRenderProps } from './template-registry';
 import { resolveTenantLinkBase } from './tenant-link-base';
 import {
   getTemplateRuntimeTenantVersion,
+  isTemplateRuntimeClientBundleApproved,
   renderTemplateThroughRuntime,
   sanitizeTemplateRuntimeProps,
   TemplateRuntimeError,
 } from './template-runtime-client';
+import type { TemplateRuntimeOrderAction } from './template-runtime-bridge';
 import { TemplateRuntimeSsrFrame } from '../components/template-runtime-ssr-frame';
 import { TemplateRuntimeErrorView } from '../components/template-runtime-error';
 
@@ -24,27 +26,39 @@ export async function renderPinnedTenantTemplate({
   pinnedVersion,
   tenantSlug,
   props,
+  orderActionContext,
 }: {
   templateSlug: string;
   pinnedVersion: string | null | undefined;
   tenantSlug: string;
   props: TemplateRenderProps;
+  orderActionContext?: {
+    transactionId: string;
+    actions: readonly TemplateRuntimeOrderAction[];
+  };
 }): Promise<ReactNode | null> {
   try {
     const version = getTemplateRuntimeTenantVersion(templateSlug, pinnedVersion);
     if (version === null) return null;
 
+    const safeProps = sanitizeTemplateRuntimeProps(props);
     const rendered = await renderTemplateThroughRuntime({
       slug: templateSlug,
       version,
-      props: sanitizeTemplateRuntimeProps(props),
+      props: safeProps,
     });
+    let clientBundle: string | null = null;
+    let clientBundleSha256: string | null = null;
     if (rendered.clientBundle !== null) {
-      throw new TemplateRuntimeError(
-        'Template versi ini membutuhkan browser JavaScript yang belum diaktifkan untuk halaman tenant.',
-        'template_client_bundle_not_supported',
-        503,
-      );
+      if (!isTemplateRuntimeClientBundleApproved(templateSlug, version)) {
+        throw new TemplateRuntimeError(
+          'Browser JavaScript belum disetujui untuk versi template ini.',
+          'template_client_bundle_not_approved',
+          503,
+        );
+      }
+      clientBundle = rendered.clientBundle;
+      clientBundleSha256 = rendered.clientBundleSha256;
     }
 
     return (
@@ -52,6 +66,9 @@ export async function renderPinnedTenantTemplate({
         html={rendered.html}
         identity={{ slug: rendered.slug, version: rendered.version, digest: rendered.digest }}
         tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+        clientBundle={clientBundle}
+        clientBundleSha256={clientBundleSha256}
+        orderActionContext={orderActionContext}
       />
     );
   } catch (error) {
@@ -96,11 +113,13 @@ export async function renderPinnedTenantHeader({
       },
     });
     if (rendered.clientBundle !== null) {
-      throw new TemplateRuntimeError(
-        'Template versi ini membutuhkan browser JavaScript yang belum diaktifkan untuk halaman tenant.',
-        'template_client_bundle_not_supported',
-        503,
-      );
+      if (!isTemplateRuntimeClientBundleApproved(templateSlug, version)) {
+        throw new TemplateRuntimeError(
+          'Browser JavaScript belum disetujui untuk versi template ini.',
+          'template_client_bundle_not_approved',
+          503,
+        );
+      }
     }
 
     return {
@@ -109,6 +128,8 @@ export async function renderPinnedTenantHeader({
           html={rendered.html}
           identity={{ slug: rendered.slug, version: rendered.version, digest: rendered.digest }}
           tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+          clientBundle={rendered.clientBundle}
+          clientBundleSha256={rendered.clientBundleSha256}
           resizeToContent
         />
       ),

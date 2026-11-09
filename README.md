@@ -62,10 +62,32 @@ app/
   daftar tagihan, dan kalender acara memakai presentasi demo Store Classic
   khusus saat header runtime aktif; data, aksi cart, alamat, ongkir, pembayaran,
   filter, RSVP, dan navigasi detail tetap dikelola renderer host.
-- Artifact yang memerlukan client bundle ditolak secara fail-closed. JavaScript
-  template pihak ketiga belum dijalankan sampai isolasi navigasi/egress aman.
-  Bundle JavaScript hanya boleh diaktifkan untuk versi yang dipin dan disetujui
-  setelah origin eksekusi khusus tersedia dan isolasinya tervalidasi.
+- Pengecualian proof-of-concept: pin `store-classic@1.0.6` dapat memiliki
+  markup/layout halaman penuh detail transaksi melalui view-model `order_detail`.
+  Aksi yang ditampilkan tetap merupakan intent bernama yang divalidasi host
+  terhadap transaksi dan statusnya sebelum memanggil API Bagdja. Data yang
+  diteruskan ke template dibatasi ke ringkasan tampilan; tidak ada token atau
+  akses API langsung. Semua pin lain tetap memakai perilaku terdahulu. Package
+  `1.0.6` belum dipublish atau dideploy dan tidak otomatis aktif hanya dengan
+  perubahan kode ini.
+- Bundle browser kini dapat dijalankan hanya bila
+  `TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED=true` dan slug/versi cocok persis
+  dengan `TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP`. Default tetap mati.
+  Bundle harus menjadi bagian artefak immutable dan hash diverifikasi lagi di
+  browser. Eksekusi memakai iframe opaque `sandbox="allow-scripts"` tanpa
+  `allow-same-origin`, popup, form, worker, frame turunan, atau koneksi fetch/
+  websocket. CSP mengizinkan hanya hash bootstrap host dan bundle blob yang
+  dibuat bootstrap; gambar hanya diizinkan dari storage origin yang ditemukan
+  di markup SSR. Preview Studio tetap inert.
+- Client bundle tidak dijalankan pada sesi login aktif atau surface cart,
+  checkout, transaksi, tagihan, kalender, dan chat; halaman tersebut tetap SSR
+  di iframe. Interaksi tulis data hanya lewat action bridge bertipe milik
+  Bagdja. Link biasa disaring host; CSP `navigate-to 'none'` dipasang sebagai
+  defense-in-depth, tetapi Chromium belum mendukung directive tersebut.
+  Pemantau iframe menghentikan konten setelah mendeteksi navigasi dokumen
+  lanjutan, namun tidak dapat menjamin bahwa request navigasi tak sempat keluar.
+  Karena itu exact-version review dan deployment allowlist tetap wajib, dan
+  JavaScript tidak boleh diaktifkan untuk halaman yang menampilkan data privat.
 - Preview Studio adalah surface terpisah: iframe tetap inert dan tidak
   menjalankan script atau aksi template.
 - Untuk mencoba artifact `store-classic` di preview katalog Studio saat

@@ -12,11 +12,124 @@ import { getTemplateRenderer } from '../../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../../lib/tenant-link-base';
 import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../../lib/website-theme';
-import { renderPinnedTenantHeader } from '../../../../lib/template-runtime-route';
+import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../../lib/template-runtime-route';
+import type { TemplateRuntimeOrderAction } from '../../../../lib/template-runtime-bridge';
 import type { OrderDetail, TransactionDetail } from '../../../../components/order-detail-content';
 import { draftOrderHref, transactionHref } from '../../../../lib/order-href';
 
 export const revalidate = 60;
+
+function formatAmount(value: number): string {
+  const amount = Number.isFinite(value) ? Math.round(value) : 0;
+  return `Rp ${amount.toLocaleString('id-ID')}`;
+}
+
+function getOrderDetailActions(transaction: TransactionDetail, isGathering: boolean): TemplateRuntimeOrderAction[] {
+  if (isGathering) return [];
+  const actions: TemplateRuntimeOrderAction[] = [];
+  if (transaction.status === 'PENDING_PAYMENT' || transaction.status === 'PENDING') {
+    actions.push('order.retry_payment', 'order.cancel');
+  } else if (transaction.status === 'HELD') {
+    actions.push('order.dispute');
+    const allFulfillmentComplete = !transaction.fulfillment ||
+      Object.values(transaction.fulfillment).every((progress) =>
+        progress.steps.every((step) => step.completed),
+      );
+    if (allFulfillmentComplete) actions.push('order.complete');
+  }
+  return actions;
+}
+
+function createOrderDetailPage(transaction: TransactionDetail, basePath: string) {
+  const items = transaction.items ?? [];
+  const isGathering = items.some((item) => Boolean(item.order?.gathering_invoice));
+  const subtotal = items.reduce((sum, item) => {
+    const amount = Number(item.total_amount);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const shipping = transaction.metadata?.shipping;
+  const courierLabel = shipping
+    ? `${shipping.courier_code.toUpperCase()}${shipping.courier_service_name || shipping.resolved_service ? ` — ${shipping.courier_service_name ?? shipping.resolved_service}` : ''}`
+    : transaction.courier ?? undefined;
+  const statusLabels: Record<string, string> = {
+    PENDING: 'Menunggu pembayaran',
+    PENDING_PAYMENT: 'Menunggu pembayaran',
+    HELD: 'Pembayaran sukses',
+    COMPLETED: 'Selesai',
+    REFUNDED: 'Direfund',
+    CLOSED: 'Ditutup',
+    DISPUTED: 'Dalam sengketa',
+    CANCELLED: 'Dibatalkan',
+  };
+  const amount = (value: number) => formatAmount(value);
+
+  return {
+    isGathering,
+    page: {
+      type: 'order_detail' as const,
+      transaction: {
+        title: isGathering ? 'Detail Pembayaran Gathering' : 'Detail Transaksi',
+        ...(transaction.ref_number ? { reference: transaction.ref_number } : {}),
+        statusLabel: statusLabels[transaction.status] ?? transaction.status,
+        paymentModeLabel: isGathering ? 'Escrow seat' : 'Sudah checkout',
+        createdAt: transaction.created_at,
+        subtotalLabel: amount(subtotal),
+        shippingLabel: shipping ? amount(transaction.shipping_cost ?? 0) : 'Ditentukan penjual',
+        totalLabel: amount(transaction.total_amount),
+        ...(courierLabel ? { courierLabel } : {}),
+        ...(isGathering
+          ? { statusMessage: `${statusLabels[transaction.status] ?? transaction.status}. Dana escrow seat akan diselesaikan oleh pengelola setelah konfirmasi acara.` }
+          : { statusMessage: statusLabels[transaction.status] ?? transaction.status }),
+        items: items.map((item, index) => {
+          const product = item.order?.product;
+          const invoice = item.order?.gathering_invoice;
+          return {
+            key: item.id || `item-${index}`,
+            name: product?.name ?? 'Produk',
+            ...(product?.description ? { description: product.description } : {}),
+            quantity: item.quantity,
+            unitPriceLabel: amount(item.unit_price),
+            totalLabel: amount(item.total_amount),
+            ...(product?.uom?.symbol ? { unit: product.uom.symbol } : {}),
+            ...(product?.images?.[0] ? { image: product.images[0] } : {}),
+            ...(invoice ? {
+              detailHref: `${basePath}/gathering/invoice/${encodeURIComponent(invoice.registration_id)}`,
+            } : {}),
+          };
+        }),
+        ...(
+          transaction.recipient_name ||
+          transaction.phone ||
+          transaction.address ||
+          transaction.district ||
+          transaction.city ||
+          transaction.postal_code
+            ? {
+              shipping: {
+                ...(transaction.recipient_name ? { recipient: transaction.recipient_name } : {}),
+                ...(transaction.phone ? { phone: transaction.phone } : {}),
+                ...( [
+                  transaction.address,
+                  transaction.district,
+                  transaction.city,
+                  transaction.postal_code,
+                ].filter(Boolean).join(', ')
+                  ? { address: [
+                    transaction.address,
+                    transaction.district,
+                    transaction.city,
+                    transaction.postal_code,
+                  ].filter(Boolean).join(', ') }
+                  : {}),
+              },
+            }
+            : {}
+        ),
+      },
+      actions: getOrderDetailActions(transaction, isGathering),
+    },
+  };
+}
 
 /** Mirror `TransactionSyncResponseDto` (bagdja-website-api) — hasil POST /api/transactions/:id/sync. */
 interface TransactionSyncResult {
@@ -116,6 +229,24 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
+  // Only the package version declaring the full order_detail contract owns this page.
+  if (
+    website.template?.slug === 'store-classic' &&
+    website.template_runtime_version === '1.0.6'
+  ) {
+    const orderDetail = createOrderDetailPage(result.data, basePath);
+    const templatePage = await renderPinnedTenantTemplate({
+      templateSlug: website.template.slug,
+      pinnedVersion: website.template_runtime_version,
+      tenantSlug: website.slug,
+      props: { ...props, page: orderDetail.page },
+      orderActionContext: {
+        transactionId: result.data.id,
+        actions: orderDetail.page.actions,
+      },
+    });
+    if (templatePage) return templatePage;
+  }
   const designerHeader = website.template?.slug === 'store-classic'
     ? await renderPinnedTenantHeader({
         templateSlug: website.template.slug,
