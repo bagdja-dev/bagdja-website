@@ -8,8 +8,10 @@
     "build": "next build",
     "start": "next start -p 5005",
     "lint": "next lint",
+    "test:template-runtime-frame": "node --test test/template-runtime-ssr-document.test.mjs",
     "typecheck": "tsc --noEmit",
-    "check:contract": "node scripts/check-template-contract.mjs"
+    "check:contract": "node scripts/check-template-contract.mjs",
+    "check:template-runtime-adapter": "node scripts/check-template-runtime-adapter.mjs"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",

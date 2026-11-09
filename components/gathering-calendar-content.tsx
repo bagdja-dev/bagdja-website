@@ -137,13 +137,46 @@ function useJson<T>(url: string, unauthorizedMessage: string, fallbackMessage: s
   return { data, loading, error };
 }
 
-function StatusLine({ loading, error, loadingText }: { loading: boolean; error: string; loadingText: string }) {
-  if (loading) return <p className="border-y py-8 text-sm" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>{loadingText}</p>;
-  if (error) return <p role="alert" className="border-y py-5 text-sm text-red-700" style={{ borderColor: 'var(--brand-border)' }}>{error}</p>;
+function StatusLine({ loading, error, loadingText, designVariant }: { loading: boolean; error: string; loadingText: string; designVariant?: 'store-classic' }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
+  if (loading) {
+    return (
+      <p
+        className={`border p-8 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'border-y'}`}
+        style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)', backgroundColor: isStoreClassicDesign ? 'var(--brand-surface)' : undefined }}
+      >
+        {loadingText}
+      </p>
+    );
+  }
+  if (error) {
+    return (
+      <p
+        role="alert"
+        className={`border p-5 text-sm text-red-700 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'border-y'}`}
+        style={{ borderColor: 'var(--brand-border)', backgroundColor: isStoreClassicDesign ? 'rgba(239,68,68,0.06)' : undefined }}
+      >
+        {error}
+      </p>
+    );
+  }
   return null;
 }
 
-function PlansTab({ basePath, plans, loading, error }: { basePath: string; plans: PlanRow[]; loading: boolean; error: string }) {
+function PlansTab({
+  basePath,
+  plans,
+  loading,
+  error,
+  designVariant,
+}: {
+  basePath: string;
+  plans: PlanRow[];
+  loading: boolean;
+  error: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const [activeTab, setActiveTab] = useState<string>('all');
   const selectedTab = CALENDAR_TABS.find((tab) => tab.key === activeTab) ?? CALENDAR_TABS[0];
   const filteredPlans = plans.filter(selectedTab.matches);
@@ -155,24 +188,44 @@ function PlansTab({ basePath, plans, loading, error }: { basePath: string; plans
           const selected = activeTab === tab.key;
           const count = plans.filter(tab.matches).length;
           return (
-            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} aria-pressed={selected} className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium" style={{ borderColor: selected ? 'var(--brand-accent)' : 'var(--brand-border)', color: selected ? 'var(--brand-text)' : 'var(--brand-muted)' }}>
-              {tab.label}<span>{count}</span>
-            </button>
-          );
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  aria-pressed={selected}
+                  className={`flex shrink-0 items-center gap-2 border px-3 py-1.5 text-xs font-medium ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
+                  style={{
+                    borderColor: selected ? 'var(--brand-accent)' : 'var(--brand-border)',
+                    backgroundColor: isStoreClassicDesign && selected ? 'var(--brand-accent)' : undefined,
+                    color: isStoreClassicDesign && selected ? 'var(--brand-on-accent)' : selected ? 'var(--brand-text)' : 'var(--brand-muted)',
+                  }}
+                >
+                  {tab.label}
+                  <span
+                    className={isStoreClassicDesign ? 'rounded-full px-1.5' : ''}
+                    style={isStoreClassicDesign ? {
+                      backgroundColor: selected ? 'rgba(255,255,255,0.18)' : 'var(--brand-border)',
+                      color: selected ? 'var(--brand-on-accent)' : 'var(--brand-muted)',
+                    } : undefined}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
         })}
       </nav>
 
-      <StatusLine loading={loading} error={error} loadingText="Memuat rencana acara…" />
+      <StatusLine loading={loading} error={error} loadingText="Memuat rencana acara…" designVariant={designVariant} />
       {!loading && !error && filteredPlans.length === 0 ? (
-        <section className="border-y py-10 text-center">
+        <section className={`border p-10 text-center ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'border-y'}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: isStoreClassicDesign ? 'var(--brand-surface)' : undefined }}>
           <h2 className="text-lg font-semibold">{plans.length === 0 ? 'Belum ada rencana acara' : 'Tidak ada acara pada status ini'}</h2>
           <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>Rencana gathering yang Anda buat akan dikelola dari kalender ini.</p>
-          <Link href={`${basePath}/`} className="mt-5 inline-flex rounded-full px-5 py-2.5 text-sm font-semibold" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Jelajahi acara</Link>
+          <Link href={`${basePath}/`} className={`mt-5 inline-flex px-5 py-2.5 text-sm font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Jelajahi acara</Link>
         </section>
       ) : null}
-      <div className="flex flex-col divide-y" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className={`flex flex-col ${isStoreClassicDesign ? 'gap-3' : 'divide-y'}`} style={{ borderColor: 'var(--brand-border)' }}>
         {filteredPlans.map((plan) => (
-          <article key={plan.id} className="grid gap-4 py-5 sm:grid-cols-[1fr_auto] sm:items-center">
+          <article key={plan.id} className={`grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center ${isStoreClassicDesign ? 'rounded-2xl border p-5 shadow-sm' : 'py-5'}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold">{plan.title}</h2>
@@ -183,7 +236,7 @@ function PlansTab({ basePath, plans, loading, error }: { basePath: string; plans
               <p className="mt-2 text-xs" style={{ color: 'var(--brand-muted)' }}>Jadwal: {formatDate(plan.occurrence.final_schedule)} · Peserta: min. {plan.occurrence.min_attendees}, maks. {plan.occurrence.max_attendees}</p>
               {plan.occurrence.payment_deadline ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Batas pembayaran: {formatDate(plan.occurrence.payment_deadline)}</p> : null}
             </div>
-            <Link href={`${basePath}/cart/order/${encodeURIComponent(plan.order_id ?? plan.id)}`} className="inline-flex w-fit items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lanjutkan rencana</Link>
+            <Link href={`${basePath}/cart/order/${encodeURIComponent(plan.order_id ?? plan.id)}`} className={`inline-flex w-fit items-center justify-center border px-4 py-2 text-xs font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lanjutkan rencana</Link>
           </article>
         ))}
       </div>
@@ -191,16 +244,17 @@ function PlansTab({ basePath, plans, loading, error }: { basePath: string; plans
   );
 }
 
-function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRow }) {
+function InvitationCard({ basePath, row, designVariant }: { basePath: string; row: InvitationRow; designVariant?: 'store-classic' }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const label = row.action === 'NONE' ? noneLabel(row) : ACTION_LABEL[row.action];
   const primary = NEEDS_ATTENTION.includes(row.action);
   return (
-    <article className="grid gap-4 py-5 sm:grid-cols-[1fr_auto] sm:items-center">
+    <article className={`grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center ${isStoreClassicDesign ? 'rounded-2xl border p-5 shadow-sm' : 'py-5'}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold">{row.gathering_title}</h3>
           {row.kind === 'INVITATION' ? (
-            <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Undangan baru</span>
+            <span className="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Undangan baru</span>
           ) : null}
         </div>
         <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
@@ -216,7 +270,7 @@ function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRo
         {row.action_path ? (
           <Link
             href={`${basePath}${row.action_path}`}
-            className="inline-flex w-fit items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold"
+            className={`inline-flex w-fit items-center justify-center border px-4 py-2 text-xs font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
             style={primary
               ? { backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }
               : { borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
@@ -229,20 +283,21 @@ function InvitationCard({ basePath, row }: { basePath: string; row: InvitationRo
   );
 }
 
-function InvitationSection({ title, hint, rows, basePath }: { title: string; hint: string; rows: InvitationRow[]; basePath: string }) {
+function InvitationSection({ title, hint, rows, basePath, designVariant }: { title: string; hint: string; rows: InvitationRow[]; basePath: string; designVariant?: 'store-classic' }) {
   if (!rows.length) return null;
   return (
     <section className="mb-8">
       <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>{title} <span className="font-normal">({rows.length})</span></h2>
       <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{hint}</p>
-      <div className="flex flex-col divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-        {rows.map((row) => <InvitationCard key={`${row.kind}-${row.id}`} basePath={basePath} row={row} />)}
+      <div className={`flex flex-col ${designVariant === 'store-classic' ? 'gap-3' : 'divide-y'}`} style={{ borderColor: 'var(--brand-border)' }}>
+        {rows.map((row) => <InvitationCard key={`${row.kind}-${row.id}`} basePath={basePath} row={row} designVariant={designVariant} />)}
       </div>
     </section>
   );
 }
 
-function InvitationsTab({ basePath, rows, loading, error }: { basePath: string; rows: InvitationRow[]; loading: boolean; error: string }) {
+function InvitationsTab({ basePath, rows, loading, error, designVariant }: { basePath: string; rows: InvitationRow[]; loading: boolean; error: string; designVariant?: 'store-classic' }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfToday = today.getTime();
@@ -255,20 +310,20 @@ function InvitationsTab({ basePath, rows, loading, error }: { basePath: string; 
 
   return (
     <>
-      <StatusLine loading={loading} error={error} loadingText="Memuat undangan…" />
+      <StatusLine loading={loading} error={error} loadingText="Memuat undangan…" designVariant={designVariant} />
       {!loading && !error && rows.length === 0 ? (
-        <section className="border-y py-10 text-center">
+        <section className={`border p-10 text-center ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'border-y'}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: isStoreClassicDesign ? 'var(--brand-surface)' : undefined }}>
           <h2 className="text-lg font-semibold">Belum ada undangan</h2>
           <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>Undangan acara yang dikirim ke email akun Anda akan muncul di sini, lengkap dengan tagihan dan tiket masuk.</p>
         </section>
       ) : null}
-      <InvitationSection title="Akan datang" hint="Diurutkan dari acara terdekat." rows={upcoming} basePath={basePath} />
-      <InvitationSection title="Belum dijadwalkan" hint="Masih dalam tahap RSVP atau voting; tanggal final belum ditentukan." rows={unscheduled} basePath={basePath} />
+      <InvitationSection title="Akan datang" hint="Diurutkan dari acara terdekat." rows={upcoming} basePath={basePath} designVariant={designVariant} />
+      <InvitationSection title="Belum dijadwalkan" hint="Masih dalam tahap RSVP atau voting; tanggal final belum ditentukan." rows={unscheduled} basePath={basePath} designVariant={designVariant} />
       {past.length ? (
-        <details className="mb-8">
+        <details className={`mb-8 ${isStoreClassicDesign ? 'rounded-2xl border p-5' : ''}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
           <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>Sudah lewat ({past.length})</summary>
           <div className="flex flex-col divide-y" style={{ borderColor: 'var(--brand-border)' }}>
-            {past.map((row) => <InvitationCard key={`${row.kind}-${row.id}`} basePath={basePath} row={row} />)}
+            {past.map((row) => <InvitationCard key={`${row.kind}-${row.id}`} basePath={basePath} row={row} designVariant={designVariant} />)}
           </div>
         </details>
       ) : null}
@@ -276,7 +331,8 @@ function InvitationsTab({ basePath, rows, loading, error }: { basePath: string; 
   );
 }
 
-export function GatheringCalendarContent({ basePath, websiteId }: { basePath: string; websiteId: string }) {
+export function GatheringCalendarContent({ basePath, websiteId, designVariant }: { basePath: string; websiteId: string; designVariant?: 'store-classic' }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const [mainTab, setMainTab] = useState<MainTab>('plans');
   const plans = useJson<PlanRow>(
     `/api/gathering/plans?website_id=${encodeURIComponent(websiteId)}`,
@@ -301,18 +357,36 @@ export function GatheringCalendarContent({ basePath, websiteId }: { basePath: st
   ];
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>Acara Anda</p>
-        <h1 className="mt-1 text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Kalender Acara</h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          {mainTab === 'plans'
-            ? 'Kelola rencana, peserta, voting, dan pembayaran seat acara yang Anda buat.'
-            : 'Acara yang mengundang Anda. Buka undangan untuk menjawab RSVP, membayar seat, dan melihat tiket masuk.'}
-        </p>
+    <main className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-5xl py-10'}`}>
+      <header className={`mb-6 ${isStoreClassicDesign ? 'flex flex-wrap items-end justify-between gap-4' : ''}`}>
+        <div>
+          {isStoreClassicDesign ? <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>Acara Anda</p> : null}
+          <h1 className={`mt-1 font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl'}`} style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>Kalender Acara</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
+            {mainTab === 'plans'
+              ? 'Kelola rencana, peserta, voting, dan pembayaran seat acara yang Anda buat.'
+              : 'Acara yang mengundang Anda. Buka undangan untuk menjawab RSVP, membayar seat, dan melihat tiket masuk.'}
+          </p>
+        </div>
+        {isStoreClassicDesign ? (
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <span className="font-bold">{plans.data.length}</span>
+              <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>rencana</span>
+            </div>
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <span className="font-bold">{invitations.data.length}</span>
+              <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>undangan</span>
+            </div>
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <span className="font-bold">{attentionCount}</span>
+              <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>perlu tindakan</span>
+            </div>
+          </div>
+        ) : null}
       </header>
 
-      <div className="mb-6 flex border-b" role="tablist" aria-label="Kalender acara" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className={`mb-6 flex gap-2 overflow-x-auto pb-1 ${isStoreClassicDesign ? '' : 'border-b'}`} role="tablist" aria-label="Kalender acara" style={{ borderColor: 'var(--brand-border)' }}>
         {mainTabs.map((tab) => {
           const selected = mainTab === tab.key;
           return (
@@ -322,12 +396,16 @@ export function GatheringCalendarContent({ basePath, websiteId }: { basePath: st
               role="tab"
               aria-selected={selected}
               onClick={() => setMainTab(tab.key)}
-              className="-mb-px flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold"
-              style={{ borderColor: selected ? 'var(--brand-accent)' : 'transparent', color: selected ? 'var(--brand-text)' : 'var(--brand-muted)' }}
+              className={`flex shrink-0 items-center gap-2 border px-4 py-2 text-sm font-semibold ${isStoreClassicDesign ? 'rounded-lg' : '-mb-px border-b-2 border-x-0 border-t-0 px-4 py-3'}`}
+              style={{
+                borderColor: selected ? 'var(--brand-accent)' : isStoreClassicDesign ? 'var(--brand-border)' : 'transparent',
+                backgroundColor: isStoreClassicDesign && selected ? 'var(--brand-accent)' : isStoreClassicDesign ? 'var(--brand-surface)' : undefined,
+                color: isStoreClassicDesign && selected ? 'var(--brand-on-accent)' : selected ? 'var(--brand-text)' : 'var(--brand-muted)',
+              }}
             >
               {tab.label}
               {tab.badge ? (
-                <span className="min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }} aria-label={`${tab.badge} perlu tindakan`}>
+                <span className="min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold" style={{ backgroundColor: isStoreClassicDesign && selected ? 'rgba(255,255,255,0.18)' : 'var(--brand-accent)', color: 'var(--brand-on-accent)' }} aria-label={`${tab.badge} perlu tindakan`}>
                   {tab.badge}
                 </span>
               ) : null}
@@ -337,8 +415,8 @@ export function GatheringCalendarContent({ basePath, websiteId }: { basePath: st
       </div>
 
       {mainTab === 'plans'
-        ? <PlansTab basePath={basePath} plans={plans.data} loading={plans.loading} error={plans.error} />
-        : <InvitationsTab basePath={basePath} rows={invitations.data} loading={invitations.loading} error={invitations.error} />}
+        ? <PlansTab basePath={basePath} plans={plans.data} loading={plans.loading} error={plans.error} designVariant={designVariant} />
+        : <InvitationsTab basePath={basePath} rows={invitations.data} loading={invitations.loading} error={invitations.error} designVariant={designVariant} />}
     </main>
   );
 }

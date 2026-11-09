@@ -17,6 +17,8 @@ export interface ApiWebsite {
   slug: string;
   domain: string | null;
   template_id: string | null;
+  /** Exact approved external package version; null keeps the built-in renderer active. */
+  template_runtime_version: string | null;
   template: ApiWebsiteTemplate | null;
   tagline: string | null;
   logo_url: string | null;

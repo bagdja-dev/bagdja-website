@@ -33,6 +33,7 @@ export interface CatalogItem {
   category?: string;
   name: string;
   slug: string;
+  price?: number;
   description?: string;
   detail?: string;
   gatheringMeta?: {
@@ -463,6 +464,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     category: product.category ?? undefined,
     name: product.name,
     slug: product.slug,
+    price: Number(product.price),
     description: product.description ?? undefined,
     detail: product.detail ?? undefined,
     gatheringMeta: normalizeGatheringMeta(product.metadata, product.gathering_options),

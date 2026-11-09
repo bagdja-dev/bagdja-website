@@ -88,6 +88,7 @@ interface CancelledPreorderRow {
 interface OrdersContentProps {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
+  designVariant?: 'store-classic';
 }
 
 type TabKey = 'all' | 'awaiting' | 'process' | 'done' | 'cancelled' | 'preorder-cancelled';
@@ -174,7 +175,12 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { websiteId: string }) {
+export function OrdersContent({
+  basePath,
+  websiteId,
+  designVariant,
+}: OrdersContentProps & { websiteId: string }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const [rows, setRows] = useState<WebsiteTransactionRow[]>([]);
   const [cancelledPreorders, setCancelledPreorders] = useState<CancelledPreorderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,17 +257,30 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
   }, [rows, cancelledPreorders]);
 
   return (
-    <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <header className="mb-6">
+    <section className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-4xl sm:py-10'}`}>
+      <header className={`mb-6 ${isStoreClassicDesign ? 'flex flex-wrap items-end justify-between gap-4' : ''}`}>
+        <div>
+          {isStoreClassicDesign && (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+              Akun Anda
+            </p>
+          )}
         <h1
-          className="text-2xl font-bold sm:text-3xl"
+          className={`font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}
           style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
         >
-          Daftar Transaksi
+          {isStoreClassicDesign ? 'Pesanan Saya' : 'Daftar Transaksi'}
         </h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
           Lihat semua pesanan, status pembayaran, dan riwayat pembelian Anda.
         </p>
+        </div>
+        {isStoreClassicDesign && (
+          <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+            <span className="font-bold">{tabCounts.all}</span>
+            <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>transaksi tercatat</span>
+          </div>
+        )}
       </header>
 
       <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
@@ -272,7 +291,9 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 items-center gap-2 border px-4 py-2 text-sm font-medium transition-colors ${
+                isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'
+              } ${
                 active ? '' : 'hover:opacity-90'
               }`}
               style={{
@@ -300,7 +321,7 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
 
       {loading && (
         <div
-          className="rounded-xl border p-10 text-center text-sm"
+          className={`border p-10 text-center text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
         >
           Memuat transaksi…
@@ -309,14 +330,14 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
 
       {!loading && error && (
         <div
-          className="rounded-xl border p-5 text-sm"
+          className={`border p-5 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(239,68,68,0.06)' }}
         >
           <p style={{ color: 'rgb(185, 28, 28)' }}>{error}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-3 inline-flex rounded-full px-5 py-2 text-sm font-semibold"
+            className={`mt-3 inline-flex px-5 py-2 text-sm font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
             style={{
               backgroundColor: 'var(--brand-accent)',
               color: 'var(--brand-on-accent)',
@@ -328,13 +349,13 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
       )}
 
       {!loading && !error && tab === 'preorder-cancelled' && cancelledPreorders.length === 0 && (
-        <EmptyState tab={tab} basePath={basePath} hasAny={rows.length > 0} />
+        <EmptyState tab={tab} basePath={basePath} hasAny={rows.length > 0} designVariant={designVariant} />
       )}
 
       {!loading && !error && tab === 'preorder-cancelled' && cancelledPreorders.length > 0 && (
         <div className="flex flex-col gap-3">
           {cancelledPreorders.map((row) => (
-            <article key={row.id} className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+            <article key={row.id} className={`border p-5 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold">{row.product?.name ?? 'Produk'}</p>
@@ -343,7 +364,7 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
                 <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(107,114,128,0.14)', color: 'rgb(75,85,99)' }}>Dibatalkan</span>
               </div>
               <p className="mt-3 font-semibold">Harga quotation: {formatMoney(row.quoted_total_amount ?? row.total_amount)}</p>
-              <a href={`${basePath}/cart/order/${row.id}`} className="mt-3 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)' }}>Detail Pesanan</a>
+              <a href={`${basePath}/cart/order/${row.id}`} className={`mt-3 inline-flex border px-4 py-1.5 text-xs font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)' }}>Detail Pesanan</a>
             </article>
           ))}
         </div>
@@ -352,7 +373,7 @@ export function OrdersContent({ basePath, websiteId }: OrdersContentProps & { we
       {!loading && !error && tab !== 'preorder-cancelled' && filtered.length > 0 && (
         <div className="flex flex-col gap-3">
           {filtered.map((row) => (
-            <TransactionCard key={row.id} row={row} basePath={basePath} websiteId={websiteId} />
+            <TransactionCard key={row.id} row={row} basePath={basePath} websiteId={websiteId} designVariant={designVariant} />
           ))}
         </div>
       )}
@@ -364,11 +385,14 @@ function EmptyState({
   tab,
   basePath,
   hasAny,
+  designVariant,
 }: {
   tab: TabKey;
   basePath: string;
   hasAny: boolean;
+  designVariant?: 'store-classic';
 }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const label = hasAny ? TABS.find((t) => t.key === tab)?.label ?? '' : '';
   const title = hasAny
     ? label
@@ -381,7 +405,7 @@ function EmptyState({
 
   return (
     <div
-      className="flex flex-col items-center gap-4 rounded-xl border p-10 text-center"
+      className={`flex flex-col items-center gap-4 border p-10 text-center ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
       style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
     >
       <div
@@ -406,7 +430,7 @@ function EmptyState({
       </div>
       <a
         href={basePath || '/'}
-        className="inline-flex rounded-full px-6 py-2.5 text-sm font-semibold"
+        className={`inline-flex px-6 py-2.5 text-sm font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
         style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
       >
         Mulai Belanja
@@ -423,7 +447,18 @@ function tabStatusOf(row: WebsiteTransactionRow): string {
   return hasOutstandingTagihan(row.status, row.termin_summary) ? 'HELD' : row.status;
 }
 
-function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransactionRow; basePath: string; websiteId: string }) {
+function TransactionCard({
+  row,
+  basePath,
+  websiteId,
+  designVariant,
+}: {
+  row: WebsiteTransactionRow;
+  basePath: string;
+  websiteId: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const outstanding = hasOutstandingTagihan(row.status, row.termin_summary);
   const tone = outstanding ? 'pending' : STATUS_TONE[row.status] ?? 'muted';
   const toneStyle = pillBg(tone);
@@ -439,10 +474,10 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
 
   return (
     <article
-      className="rounded-xl border text-sm"
+      className={`border text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
       style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
     >
-      <div className="flex items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+      <div className={`flex items-center justify-between gap-3 border-b px-5 py-3 ${isStoreClassicDesign ? 'flex-wrap' : ''}`} style={{ borderColor: 'var(--brand-border)' }}>
         <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
           <span className="font-mono font-semibold">{row.ref_number ?? `#${shortId(row.id)}`}</span>
           <span>•</span>
@@ -462,7 +497,7 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
           className="flex min-w-0 items-center gap-4 sm:max-w-md"
         >
           <div
-            className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border"
+            className={`flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden border ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-lg'}`}
             style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}
           >
             {productImage ? (
@@ -512,7 +547,7 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <a
               href={detailHref}
-              className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
+              className={`inline-flex border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
               style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
             >
               Detail Transaksi
@@ -531,7 +566,7 @@ function TransactionCard({ row, basePath, websiteId }: { row: WebsiteTransaction
                   href: buildChatReferenceHref('transaction', basePath, { entityId: row.id }),
                 }}
                 wrapperClassName="inline-flex flex-col items-start"
-                className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85"
+                className={`inline-flex border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                 style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
               >
                 Chat Order

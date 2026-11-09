@@ -53,6 +53,20 @@ export interface TemplateRenderProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  /** Hide the built-in header where a separately rendered designer header is present. */
+  hideHeader?: boolean;
+  /** Use the Store Classic cart presentation while keeping cart operations in the host. */
+  cartDesign?: 'store-classic';
+  /** Use the Store Classic checkout presentation while keeping checkout operations in the host. */
+  checkoutDesign?: 'store-classic';
+  /** Use the Store Classic transaction-list presentation while keeping transaction operations in the host. */
+  ordersDesign?: 'store-classic';
+  /** Use the Store Classic invoice-list presentation while keeping payment operations in the host. */
+  tagihanDesign?: 'store-classic';
+  /** Use the Store Classic calendar presentation while keeping calendar data and actions in the host. */
+  calendarDesign?: 'store-classic';
+  /** Use the Store Classic order-detail presentation while keeping order actions in the host. */
+  orderDetailDesign?: 'store-classic';
   /** W1 auth renderer: state login buyer (dibaca server-side dari cookie). */
   auth?: {
     isLoggedIn: boolean;
@@ -63,7 +77,10 @@ export interface TemplateRenderProps {
     logoutHref?: string;
     cartHref?: string;
     ordersHref?: string;
+    tagihanHref?: string;
+    calendarHref?: string;
     profileHref?: string;
+    chatHref?: string;
   };
 }
 

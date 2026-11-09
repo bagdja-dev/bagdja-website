@@ -285,6 +285,7 @@ export function OrderDetailContent({
   basePath = '',
   websiteId,
   loginHref,
+  designVariant,
 }: {
   transaction?: TransactionDetail | null;
   order?: OrderDetail | null;
@@ -292,14 +293,28 @@ export function OrderDetailContent({
   basePath?: string;
   websiteId?: string;
   loginHref?: string;
+  designVariant?: 'store-classic';
 }) {
-  if (transaction) return <TransactionView transaction={transaction} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
-  if (order && gatheringPlan) return <GatheringPlanOrderView order={order} plan={gatheringPlan} basePath={basePath} websiteId={websiteId ?? ''} />;
-  if (order) return <LegacyOrderView order={order} basePath={basePath} websiteId={websiteId} loginHref={loginHref} />;
+  if (transaction) return <TransactionView transaction={transaction} basePath={basePath} websiteId={websiteId} loginHref={loginHref} designVariant={designVariant} />;
+  if (order && gatheringPlan) return <GatheringPlanOrderView order={order} plan={gatheringPlan} basePath={basePath} websiteId={websiteId ?? ''} designVariant={designVariant} />;
+  if (order) return <LegacyOrderView order={order} basePath={basePath} websiteId={websiteId} loginHref={loginHref} designVariant={designVariant} />;
   return null;
 }
 
-function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: OrderDetail; plan: GatheringPlanDetail; basePath: string; websiteId: string }) {
+function GatheringPlanOrderView({
+  order,
+  plan,
+  basePath,
+  websiteId,
+  designVariant,
+}: {
+  order: OrderDetail;
+  plan: GatheringPlanDetail;
+  basePath: string;
+  websiteId: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const occurrence = plan.occurrence;
   const seatPrice = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -308,13 +323,13 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
   }).format(Number(occurrence.price_per_seat));
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <section className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-3xl py-10'}`}>
+      <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 ${isStoreClassicDesign ? 'rounded-2xl border p-5 shadow-sm' : ''}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>Praorder Gathering</p>
-          <h1 className="mt-1 text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{plan.title}</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-accent-muted)' }}>{isStoreClassicDesign ? 'Ringkasan Pesanan' : 'Praorder Gathering'}</p>
+          <h1 className={`mt-1 font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl'}`} style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{plan.title}</h1>
         </div>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
+        <span className={`border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
           {occurrence.status === 'PREORDER' ? 'Praorder' : occurrence.status}
         </span>
       </div>
@@ -356,7 +371,20 @@ function GatheringPlanOrderView({ order, plan, basePath, websiteId }: { order: O
 }
 
 /** Tampilan transaksi (alur baru W2.8) — read-only, mirip layout checkout. */
-function TransactionView({ transaction, basePath, websiteId, loginHref }: { transaction: TransactionDetail; basePath: string; websiteId?: string; loginHref?: string }) {
+function TransactionView({
+  transaction,
+  basePath,
+  websiteId,
+  loginHref,
+  designVariant,
+}: {
+  transaction: TransactionDetail;
+  basePath: string;
+  websiteId?: string;
+  loginHref?: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const items = transaction.items ?? [];
   const gatheringItems = items.filter((item) => item.order?.gathering_invoice);
   const isGatheringTransaction = gatheringItems.length > 0;
@@ -393,14 +421,39 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
     : STATUS_LABEL[transaction.status] ?? transaction.status;
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{isGatheringTransaction ? 'Detail Pembayaran Gathering' : 'Detail Transaksi'}</h1>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>{isGatheringTransaction ? 'Escrow seat' : 'Sudah checkout'}</span>
+    <section className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-5xl py-10'}`}>
+      <div
+        className={`mb-5 ${isStoreClassicDesign ? 'rounded-2xl border p-5 shadow-sm sm:p-6' : ''}`}
+        style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}
+      >
+        {isStoreClassicDesign ? (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+            Ringkasan Pesanan
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className={`font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl'}`} style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{isGatheringTransaction ? 'Detail Pembayaran Gathering' : 'Detail Transaksi'}</h1>
+            {isStoreClassicDesign && transaction.ref_number ? (
+              <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
+                Nomor transaksi <span className="font-mono font-semibold" style={{ color: 'var(--brand-text)' }}>{transaction.ref_number}</span>
+              </p>
+            ) : null}
+          </div>
+          <span
+            className={`border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
+            style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
+          >
+            {isGatheringTransaction ? 'Escrow seat' : 'Sudah checkout'}
+          </span>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 ${isStoreClassicDesign ? 'rounded-xl border p-4' : ''}`}
+        style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}
+      >
         <span
-          className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wide"
+          className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wide ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
           style={
             partiallyCompleted
               ? { backgroundColor: 'rgba(245, 158, 11, 0.14)', color: 'rgb(180, 83, 9)' }
@@ -426,7 +479,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
 
       {unpaidTerminsCount > 0 && (
         <div
-          className="mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm"
+          className={`mt-4 flex items-center gap-2 border px-4 py-3 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(245, 158, 11, 0.08)' }}
         >
           <span className="font-semibold" style={{ color: 'rgb(180, 83, 9)' }}>
@@ -454,7 +507,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
                 return (
                   <div
                     key={item.id}
-                    className="flex gap-4 rounded-xl border p-4"
+                    className={`flex gap-4 border p-4 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
                     style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
                   >
                     {image ? (
@@ -608,7 +661,7 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
 
         {/* Kolom kanan: ringkasan + aksi (posisi sama dengan tombol Bayar di checkout) */}
         <aside
-          className="h-fit rounded-xl border p-5 lg:sticky lg:top-24"
+          className={`h-fit border p-5 lg:sticky lg:top-24 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
         >
           <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -691,7 +744,20 @@ function TransactionView({ transaction, basePath, websiteId, loginHref }: { tran
 }
 
 /** Tampilan order legacy (sebelum W2.8 — escrow di level order). */
-function LegacyOrderView({ order, basePath, websiteId, loginHref }: { order: OrderDetail; basePath: string; websiteId?: string; loginHref?: string }) {
+function LegacyOrderView({
+  order,
+  basePath,
+  websiteId,
+  loginHref,
+  designVariant,
+}: {
+  order: OrderDetail;
+  basePath: string;
+  websiteId?: string;
+  loginHref?: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   // fulfillment-praorder-plan.md Q5 — harga 0 = belum ada penawaran (seller
   // belum isi harga final), tampilkan "-" dulu, jangan "Rp 0" mentah
   // (terlihat seperti gratis/rusak).
@@ -700,14 +766,17 @@ function LegacyOrderView({ order, basePath, websiteId, loginHref }: { order: Ord
   const image = order.product?.images?.[0];
 
   return (
-    <section className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Pesanan</h1>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Belum checkout</span>
+    <section className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-2xl py-10'}`}>
+      <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 ${isStoreClassicDesign ? 'rounded-2xl border p-5 shadow-sm' : ''}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
+        <div>
+          {isStoreClassicDesign ? <p className="text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>Ringkasan Pesanan</p> : null}
+          <h1 className={`mt-1 font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl'}`} style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>Detail Pesanan</h1>
+        </div>
+        <span className={`border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Belum checkout</span>
       </div>
       <div
-        className="flex gap-4 rounded-xl border p-5 text-sm"
-        style={{ borderColor: 'var(--brand-border)' }}
+        className={`flex gap-4 border p-5 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
+        style={{ borderColor: 'var(--brand-border)', backgroundColor: isStoreClassicDesign ? 'var(--brand-surface)' : undefined }}
       >
         {image ? (
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg">

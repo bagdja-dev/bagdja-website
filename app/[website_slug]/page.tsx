@@ -6,6 +6,7 @@ import { CartProvider } from '../../lib/cart';
 import { loadTenantPageView } from '../../lib/tenant-page-view';
 import WebsiteInactiveNotice from '../../components/website-inactive-notice';
 import { getTemplateRenderer } from '../../lib/template-registry';
+import { renderPinnedTenantTemplate } from '../../lib/template-runtime-route';
 
 export const revalidate = 60;
 
@@ -27,6 +28,16 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const view = await loadTenantPageView(params.website_slug);
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
+
+  if (view.templateSlug) {
+    const runtimeTemplate = await renderPinnedTenantTemplate({
+      templateSlug: view.templateSlug,
+      pinnedVersion: view.tenant.website.template_runtime_version,
+      tenantSlug: params.website_slug,
+      props: view.props,
+    });
+    if (runtimeTemplate) return runtimeTemplate;
+  }
 
   const Renderer = view.templateSlug ? getTemplateRenderer(view.templateSlug) : null;
   if (!Renderer) notFound();
