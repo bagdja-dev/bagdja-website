@@ -42,8 +42,9 @@ app/
 
 ## External template runtime
 
-- Halaman tenant publik memakai runtime privat hanya jika pin versi website
-  cocok persis dengan allowlist deployment. Tanpa pin, renderer built-in tetap
+- Halaman tenant publik memakai runtime privat hanya untuk versi exact yang
+  dipin pada website dan berstatus `published` di registry runtime. Allowlist
+  deployment tambahan bersifat opsional. Tanpa pin, renderer built-in tetap
   dipakai; setelah pin dipilih, error runtime tidak fallback diam-diam.
 - SSR eksternal ditampilkan di iframe opaque dengan markup aktif dibersihkan,
   CSP ketat, dan navigasi link tenant divalidasi host. Email dan token tidak
@@ -70,24 +71,25 @@ app/
   akses API langsung. Semua pin lain tetap memakai perilaku terdahulu. Package
   `1.0.6` belum dipublish atau dideploy dan tidak otomatis aktif hanya dengan
   perubahan kode ini.
-- Bundle browser kini dapat dijalankan hanya bila
-  `TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED=true` dan slug/versi cocok persis
-  dengan `TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP`. Default tetap mati.
+- Bundle browser pada artifact yang sudah dipublikasikan dapat berjalan tanpa
+  allowlist JavaScript per paket. `TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED=false`
+  tetap tersedia sebagai sakelar darurat global.
   Bundle harus menjadi bagian artefak immutable dan hash diverifikasi lagi di
   browser. Eksekusi memakai iframe opaque `sandbox="allow-scripts"` tanpa
   `allow-same-origin`, popup, form, worker, frame turunan, atau koneksi fetch/
   websocket. CSP mengizinkan hanya hash bootstrap host dan bundle blob yang
   dibuat bootstrap; gambar hanya diizinkan dari storage origin yang ditemukan
   di markup SSR. Preview Studio tetap inert.
-- Client bundle tidak dijalankan pada sesi login aktif atau surface cart,
-  checkout, transaksi, tagihan, kalender, dan chat; halaman tersebut tetap SSR
-  di iframe. Interaksi tulis data hanya lewat action bridge bertipe milik
-  Bagdja. Link biasa disaring host; CSP `navigate-to 'none'` dipasang sebagai
+- Bundle dijalankan hanya dalam iframe pada halaman yang memakai renderer
+  eksternal; detail transaksi dapat memakai renderer tersebut, sehingga review
+  harus mempertimbangkan data yang terlihat di halaman. Interaksi tulis data
+  hanya lewat action bridge bertipe milik Bagdja. Link biasa disaring host; CSP
+  `navigate-to 'none'` dipasang sebagai
   defense-in-depth, tetapi Chromium belum mendukung directive tersebut.
   Pemantau iframe menghentikan konten setelah mendeteksi navigasi dokumen
   lanjutan, namun tidak dapat menjamin bahwa request navigasi tak sempat keluar.
-  Karena itu exact-version review dan deployment allowlist tetap wajib, dan
-  JavaScript tidak boleh diaktifkan untuk halaman yang menampilkan data privat.
+  Karena itu review bundle sebelum publikasi tetap penting; versi website tetap
+  dipin exact ke artifact published di registry runtime.
 - Preview Studio adalah surface terpisah: iframe tetap inert dan tidak
   menjalankan script atau aksi template.
 - Untuk mencoba artifact `store-classic` di preview katalog Studio saat
@@ -101,8 +103,8 @@ app/
   tersimpan setelah pengguna menekan tombol simpan.
 - Public tenant renderer di local development juga dapat menampilkan artifact
   SSR yang sama untuk template tanpa pin, selama flag development aktif dan
-  slug/versinya ada di allowlist. Production tetap mewajibkan pin versi website
-  yang disetujui.
+  slug/versinya tercantum di `TEMPLATE_RUNTIME_VERSION_MAP`. Production tetap
+  mewajibkan pin versi website yang published.
 
 ## Phase 1 Checklist
 

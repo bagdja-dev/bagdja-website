@@ -9,6 +9,7 @@
  * di `components/customer-chat-content.tsx` (client), dirender oleh masing-
  * masing `*-view.tsx` template lewat `case 'chat'`.
  */
+import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -52,7 +53,8 @@ export default async function ChatPage({ params }: ChatPageProps) {
     resolveTenantLinkBase(params.website_slug),
   );
   const { website, products, locations, faqs, blogPosts } = tenant;
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  const hostSlug = hostRendererSlug(website);
+  const Renderer = hostSlug ? getTemplateRenderer(hostSlug) : null;
   if (!Renderer) notFound();
 
   const sections: SectionEntry[] = [{ type: 'chat', content: {} }];
@@ -81,10 +83,11 @@ export default async function ChatPage({ params }: ChatPageProps) {
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
-  const designerHeader = website.template?.slug === 'store-classic'
+  const runtime = tenantRuntime(website);
+  const designerHeader = runtime && templateOwnsPage(website, 'header')
     ? await renderPinnedTenantHeader({
-        templateSlug: website.template.slug,
-        pinnedVersion: website.template_runtime_version,
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
         tenantSlug: website.slug,
         props,
       })

@@ -29,10 +29,11 @@ export default async function TenantPage({ params }: TenantPageProps) {
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
 
-  if (view.templateSlug) {
+  const runtime = view.tenant.website.template_runtime ?? null;
+  if (runtime) {
     const runtimeTemplate = await renderPinnedTenantTemplate({
-      templateSlug: view.templateSlug,
-      pinnedVersion: view.tenant.website.template_runtime_version,
+      templateSlug: runtime.slug,
+      pinnedVersion: runtime.version,
       tenantSlug: params.website_slug,
       props: view.props,
     });

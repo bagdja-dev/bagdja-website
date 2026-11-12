@@ -132,6 +132,76 @@ function createNavigationBootstrap({
       action,
     }, parentOrigin);
   }, true);
+  const pendingIntents = new Map();
+  const showIntentMessage = (text) => {
+    let toast = document.querySelector('[data-bagdja-intent-toast]');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.setAttribute('data-bagdja-intent-toast', '');
+      toast.setAttribute('role', 'alert');
+      Object.assign(toast.style, {
+        position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)', zIndex: '2147483647',
+        maxWidth: 'min(92vw, 420px)', padding: '10px 14px', borderRadius: '10px', background: '#18181b',
+        color: '#fff', font: '13px/1.4 system-ui, sans-serif', boxShadow: '0 8px 24px rgba(0,0,0,.25)',
+      });
+      document.body.appendChild(toast);
+    }
+    toast.textContent = text;
+    toast.hidden = false;
+    clearTimeout(toast.__bagdjaTimer);
+    toast.__bagdjaTimer = setTimeout(() => { toast.hidden = true; }, 5000);
+  };
+  window.addEventListener('message', (event) => {
+    const message = event.data;
+    if (event.source !== parent || event.origin !== parentOrigin ||
+        !message || message.protocol !== 1 ||
+        message.type !== 'bagdja:template:intent-result' ||
+        message.slug !== identity.slug || message.version !== identity.version ||
+        message.digest !== identity.digest || typeof message.requestId !== 'string') return;
+    const pending = pendingIntents.get(message.requestId);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    pendingIntents.delete(message.requestId);
+    pending.element.removeAttribute('aria-busy');
+    if ('disabled' in pending.element) pending.element.disabled = false;
+    if (message.result?.ok !== true) {
+      showIntentMessage(typeof message.result?.message === 'string' ? message.result.message : 'Aksi belum dapat diproses.');
+    }
+  });
+  document.addEventListener('click', (event) => {
+    const element = event.target instanceof Element ? event.target.closest('[data-bagdja-intent]') : null;
+    if (!element || element.disabled || element.getAttribute('aria-busy') === 'true') return;
+    const action = element.getAttribute('data-bagdja-intent');
+    if (!['cart.set_quantity', 'cart.remove', 'cart.checkout', 'invoice.pay', 'gathering.respond'].includes(action)) return;
+    event.preventDefault();
+    const intent = { action };
+    const key = element.getAttribute('data-bagdja-key');
+    if (key) intent.key = key;
+    if (action === 'cart.set_quantity') intent.quantity = Number(element.getAttribute('data-bagdja-quantity'));
+    if (action === 'gathering.respond' && element.getAttribute('data-bagdja-response')) {
+      intent.response = element.getAttribute('data-bagdja-response');
+    }
+    if (action === 'cart.checkout') {
+      intent.keys = Array.from(document.querySelectorAll('input[data-bagdja-selectable][data-bagdja-key]'))
+        .filter((input) => input.checked && !input.disabled)
+        .map((input) => input.getAttribute('data-bagdja-key'));
+      if (intent.keys.length === 0) {
+        showIntentMessage('Pilih minimal satu item untuk checkout.');
+        return;
+      }
+    }
+    element.setAttribute('aria-busy', 'true');
+    if ('disabled' in element) element.disabled = true;
+    const requestId = newRequestId();
+    const timeout = setTimeout(() => {
+      pendingIntents.delete(requestId);
+      element.removeAttribute('aria-busy');
+      if ('disabled' in element) element.disabled = false;
+      showIntentMessage('Aksi belum mendapatkan respons. Coba lagi.');
+    }, 30000);
+    pendingIntents.set(requestId, { element, timeout });
+    parent.postMessage({ protocol: 1, type: 'bagdja:template:intent', ...identity, requestId, intent }, parentOrigin);
+  }, true);
   ${clientBundleBase64 === null ? '' : `document.addEventListener('DOMContentLoaded', () => {
     try {
       const binary = atob(${scriptJson(clientBundleBase64)});

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
+import { getTemplateBySlug } from '../../../../lib/api-client';
 import {
-  getTemplateRuntimeStudioPreviewVersion,
+  getTemplateRuntimeVersion,
   renderTemplateThroughRuntime,
   TemplateRuntimeError,
 } from '../../../../lib/template-runtime-client';
@@ -23,13 +24,12 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
+/**
+ * Render draft editor halaman Studio untuk template PACKAGE yang ter-pin.
+ * Template bawaan tidak pernah dirender lewat runtime (slug bawaan ditolak), dan
+ * runtime sendiri hanya melayani versi berstatus `published` di registry.
+ */
 export async function POST(request: Request) {
-  if (
-    process.env.NODE_ENV === 'production' ||
-    process.env.TEMPLATE_RUNTIME_STUDIO_PREVIEW_ENABLED !== 'true'
-  ) {
-    return jsonResponse({ error: { code: 'studio_preview_disabled', message: 'Pratinjau runtime Studio tidak aktif.' } }, 404);
-  }
 
   const origin = request.headers.get('origin');
   const host = request.headers.get('host');
@@ -89,16 +89,20 @@ export async function POST(request: Request) {
     return jsonResponse({ error: { code: 'invalid_preview_props', message: 'Props pratinjau tidak valid.' } }, 400);
   }
 
+  const template = await getTemplateBySlug(body.slug).catch(() => null);
+  if (!template || template.source !== 'package') {
+    return jsonResponse({ error: { code: 'runtime_version_not_approved', message: 'Hanya template package yang dirender lewat runtime.' } }, 403);
+  }
   let approvedVersion: string | null;
   try {
-    approvedVersion = getTemplateRuntimeStudioPreviewVersion(body.slug);
+    approvedVersion = getTemplateRuntimeVersion(body.slug, body.version);
   } catch (error) {
     if (error instanceof TemplateRuntimeError) {
       return jsonResponse({ error: { code: error.code, message: error.message } }, error.status);
     }
     throw error;
   }
-  if (!approvedVersion || approvedVersion !== body.version) {
+  if (!approvedVersion) {
     return jsonResponse({ error: { code: 'runtime_version_not_approved', message: 'Versi template tidak diizinkan untuk pratinjau.' } }, 403);
   }
 
@@ -111,14 +115,7 @@ export async function POST(request: Request) {
       version: approvedVersion,
       props: safeProps,
     });
-    if (rendered.clientBundle !== null) {
-      return jsonResponse({
-        error: {
-          code: 'template_client_bundle_not_supported',
-          message: 'Template ini membutuhkan browser JavaScript yang belum diaktifkan untuk pratinjau Studio.',
-        },
-      }, 503);
-    }
+    // Pratinjau inert: client bundle tidak dikirim/dijalankan di editor.
     return jsonResponse({
       slug: rendered.slug,
       version: rendered.version,

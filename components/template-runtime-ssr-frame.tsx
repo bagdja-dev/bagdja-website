@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  createTemplateRuntimeIntentBridge,
   createTemplateRuntimeOrderActionBridge,
   TemplateRuntimeActionError,
   type TemplateRuntimeIdentity,
@@ -26,6 +27,25 @@ interface TemplateRuntimeSsrFrameProps {
     transactionId: string;
     actions: readonly TemplateRuntimeOrderAction[];
   };
+  /** Intent halaman sistem (keranjang, bayar, RSVP) — diteruskan ke /api/template-intents. */
+  intentContext?: {
+    tenantSlug: string;
+    pageType: string;
+    actions: readonly string[];
+  };
+}
+
+/** Tujuan redirect hasil intent: path tenant di origin sendiri, atau halaman pembayaran http(s). */
+function safeIntentRedirect(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.username || url.password) return null;
+    if (url.origin === window.location.origin) return `${url.pathname}${url.search}${url.hash}`;
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 export function TemplateRuntimeSsrFrame({
@@ -36,6 +56,7 @@ export function TemplateRuntimeSsrFrame({
   clientBundleSha256 = null,
   resizeToContent = false,
   orderActionContext,
+  intentContext,
 }: TemplateRuntimeSsrFrameProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -179,6 +200,49 @@ export function TemplateRuntimeSsrFrame({
     window.addEventListener('message', handleOrderAction);
     return () => window.removeEventListener('message', handleOrderAction);
   }, [orderActionContext, router, stableIdentity]);
+
+  useEffect(() => {
+    const frame = frameRef.current?.contentWindow;
+    if (!frame || !intentContext || intentContext.actions.length === 0) return;
+    const handleIntent = createTemplateRuntimeIntentBridge({
+      frame,
+      identity: stableIdentity,
+      allowedActions: intentContext.actions,
+      onIntent: async (intent) => {
+        if (intent.action === 'cart.remove' && !window.confirm('Hapus item ini dari keranjang?')) {
+          throw new TemplateRuntimeActionError('action_cancelled', 'Aksi dibatalkan.');
+        }
+        const response = await fetch('/api/template-intents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantSlug: intentContext.tenantSlug, pageType: intentContext.pageType, intent }),
+        });
+        let body: { ok?: boolean; redirect?: unknown; message?: unknown } | null = null;
+        try {
+          body = await response.json();
+        } catch {
+          body = null;
+        }
+        if (response.status === 401) {
+          const returnTo = `${window.location.pathname}${window.location.search}`;
+          window.location.assign(`/auth/login?next=${encodeURIComponent(returnTo)}`);
+          throw new TemplateRuntimeActionError('authentication_required', 'Login diperlukan untuk melanjutkan.');
+        }
+        if (!response.ok || body?.ok !== true) {
+          throw new TemplateRuntimeActionError(
+            'intent_failed',
+            typeof body?.message === 'string' ? body.message : 'Aksi belum dapat diproses.',
+          );
+        }
+        const redirect = safeIntentRedirect(body.redirect);
+        // Muat ulang penuh (bukan router.refresh) agar iframe template dibuat ulang dengan data terbaru.
+        if (redirect) window.location.assign(redirect);
+        else window.location.reload();
+      },
+    });
+    window.addEventListener('message', handleIntent);
+    return () => window.removeEventListener('message', handleIntent);
+  }, [intentContext, stableIdentity]);
 
   if (error) return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
 

@@ -6,6 +6,7 @@
  * `components/checkout-content.tsx` (client). Route diprotect middleware
  * (wajib login buyer).
  */
+import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -51,7 +52,8 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
 
   const { website, products, locations, faqs, blogPosts } = tenant;
 
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  const hostSlug = hostRendererSlug(website);
+  const Renderer = hostSlug ? getTemplateRenderer(hostSlug) : null;
   if (!Renderer) notFound();
 
   // order_ids dari halaman cart (checkbox multi-item), comma-separated.
@@ -92,10 +94,11 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
-  const designerHeader = website.template?.slug === 'store-classic'
+  const runtime = tenantRuntime(website);
+  const designerHeader = runtime && templateOwnsPage(website, 'header')
     ? await renderPinnedTenantHeader({
-        templateSlug: website.template.slug,
-        pinnedVersion: website.template_runtime_version,
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
         tenantSlug: website.slug,
         props,
       })

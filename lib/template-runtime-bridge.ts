@@ -445,3 +445,158 @@ export function createCartAddActionHandler({
     return { orderId: result.id };
   };
 }
+
+// ── Intent halaman sistem (plan/website-builder/template-owned-system-pages-plan.md §4.3) ──
+
+export const TEMPLATE_RUNTIME_INTENT = 'bagdja:template:intent';
+export const TEMPLATE_RUNTIME_INTENT_RESULT = 'bagdja:template:intent-result';
+export const TEMPLATE_RUNTIME_INTENTS = [
+  'cart.set_quantity',
+  'cart.remove',
+  'cart.checkout',
+  'invoice.pay',
+  'gathering.respond',
+] as const;
+
+export type TemplateRuntimeIntentAction = typeof TEMPLATE_RUNTIME_INTENTS[number];
+
+export interface TemplateRuntimeIntent {
+  action: TemplateRuntimeIntentAction;
+  /** `key` opaque dari props.page — bukan ID internal. */
+  key?: string;
+  /** cart.checkout: item terpilih. */
+  keys?: string[];
+  /** cart.set_quantity: jumlah tujuan. */
+  quantity?: number;
+  /** gathering.respond. */
+  response?: 'ACCEPTED' | 'DECLINED';
+}
+
+export interface TemplateRuntimeIntentMessage extends TemplateRuntimeIdentity {
+  protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
+  type: typeof TEMPLATE_RUNTIME_INTENT;
+  requestId: string;
+  intent: TemplateRuntimeIntent;
+}
+
+export interface TemplateRuntimeIntentResultMessage extends TemplateRuntimeIdentity {
+  protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
+  type: typeof TEMPLATE_RUNTIME_INTENT_RESULT;
+  requestId: string;
+  result: { ok: true } | { ok: false; message: string };
+}
+
+export type TemplateRuntimeIntentHandler = (intent: TemplateRuntimeIntent) => Promise<void>;
+
+const OPAQUE_KEY_PATTERN = /^[A-Za-z0-9_-]{6,128}$/;
+
+export function parseTemplateRuntimeIntent(value: unknown): TemplateRuntimeIntent | null {
+  if (!isRecord(value) || typeof value.action !== 'string') return null;
+  const action = value.action as TemplateRuntimeIntentAction;
+  if (!(TEMPLATE_RUNTIME_INTENTS as readonly string[]).includes(action)) return null;
+  const key = typeof value.key === 'string' && OPAQUE_KEY_PATTERN.test(value.key) ? value.key : undefined;
+  switch (action) {
+    case 'cart.set_quantity': {
+      const quantity = value.quantity;
+      if (!key || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 999) return null;
+      return { action, key, quantity };
+    }
+    case 'cart.checkout': {
+      if (!Array.isArray(value.keys) || value.keys.length === 0 || value.keys.length > 100) return null;
+      if (!value.keys.every((item) => typeof item === 'string' && OPAQUE_KEY_PATTERN.test(item))) return null;
+      return { action, keys: [...new Set(value.keys as string[])] };
+    }
+    case 'gathering.respond': {
+      if (!key) return null;
+      const response = value.response === 'ACCEPTED' || value.response === 'DECLINED' ? value.response : undefined;
+      return response ? { action, key, response } : { action, key };
+    }
+    default:
+      return key ? { action, key } : null;
+  }
+}
+
+export function parseTemplateRuntimeIntentMessage(value: unknown): TemplateRuntimeIntentMessage | null {
+  if (
+    !isRecord(value) ||
+    value.protocol !== TEMPLATE_RUNTIME_BRIDGE_VERSION ||
+    value.type !== TEMPLATE_RUNTIME_INTENT ||
+    typeof value.slug !== 'string' ||
+    !SLUG_PATTERN.test(value.slug) ||
+    typeof value.version !== 'string' ||
+    !VERSION_PATTERN.test(value.version) ||
+    typeof value.digest !== 'string' ||
+    !DIGEST_PATTERN.test(value.digest) ||
+    typeof value.requestId !== 'string' ||
+    !REQUEST_ID_PATTERN.test(value.requestId)
+  ) {
+    return null;
+  }
+  const intent = parseTemplateRuntimeIntent(value.intent);
+  if (!intent) return null;
+  return {
+    protocol: TEMPLATE_RUNTIME_BRIDGE_VERSION,
+    type: TEMPLATE_RUNTIME_INTENT,
+    slug: value.slug,
+    version: value.version,
+    digest: value.digest,
+    requestId: value.requestId,
+    intent,
+  };
+}
+
+/**
+ * Bridge host untuk intent dari iframe opaque: cek sumber/origin, identitas
+ * slug+version+digest, aksi yang diizinkan halaman, dan replay requestId.
+ */
+export function createTemplateRuntimeIntentBridge({
+  frame,
+  identity,
+  allowedActions,
+  onIntent,
+}: {
+  frame: Pick<Window, 'postMessage'>;
+  identity: TemplateRuntimeIdentity;
+  allowedActions: readonly string[];
+  onIntent: TemplateRuntimeIntentHandler;
+}): (event: MessageEvent<unknown>) => Promise<void> {
+  const allowed = new Set(allowedActions);
+  const seenRequests = new Set<string>();
+
+  return async (event) => {
+    if (event.source !== frame || event.origin !== 'null') return;
+    const message = parseTemplateRuntimeIntentMessage(event.data);
+    if (
+      !message ||
+      message.slug !== identity.slug ||
+      message.version !== identity.version ||
+      message.digest !== identity.digest ||
+      !allowed.has(message.intent.action) ||
+      seenRequests.has(message.requestId)
+    ) return;
+
+    const response: TemplateRuntimeIntentResultMessage = {
+      protocol: TEMPLATE_RUNTIME_BRIDGE_VERSION,
+      type: TEMPLATE_RUNTIME_INTENT_RESULT,
+      ...identity,
+      requestId: message.requestId,
+      result: { ok: false, message: 'Aksi belum dapat diproses.' },
+    };
+    if (seenRequests.size >= 256) {
+      response.result = { ok: false, message: 'Batas aksi template untuk halaman ini tercapai.' };
+      frame.postMessage(response, '*');
+      return;
+    }
+    seenRequests.add(message.requestId);
+    try {
+      await onIntent(message.intent);
+      response.result = { ok: true };
+    } catch (error) {
+      response.result = {
+        ok: false,
+        message: error instanceof TemplateRuntimeActionError ? error.message : 'Aksi belum dapat diproses.',
+      };
+    }
+    frame.postMessage(response, '*');
+  };
+}

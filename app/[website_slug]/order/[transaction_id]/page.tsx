@@ -1,7 +1,10 @@
+import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
 import { backendFetch } from '../../../../lib/backend-api';
+import { getSession } from '../../../../lib/session';
+import { createPageKeyFactory, PAGE_TIMEZONE, toIsoDateTime, toMoney, type PageKeyFactory } from '../../../../lib/template-pages';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
 import WebsiteInactiveNotice from '../../../../components/website-inactive-notice';
@@ -40,7 +43,7 @@ function getOrderDetailActions(transaction: TransactionDetail, isGathering: bool
   return actions;
 }
 
-function createOrderDetailPage(transaction: TransactionDetail, basePath: string) {
+function createOrderDetailPage(transaction: TransactionDetail, basePath: string, key: PageKeyFactory) {
   const items = transaction.items ?? [];
   const isGathering = items.some((item) => Boolean(item.order?.gathering_invoice));
   const subtotal = items.reduce((sum, item) => {
@@ -67,12 +70,23 @@ function createOrderDetailPage(transaction: TransactionDetail, basePath: string)
     isGathering,
     page: {
       type: 'order_detail' as const,
+      contractVersion: 2 as const,
+      currency: 'IDR' as const,
+      timezone: PAGE_TIMEZONE,
       transaction: {
+        // v2: angka mentah + key opaque (template-owned-system-pages-plan.md §4.2).
+        key: key('transaction', transaction.id),
+        status: transaction.status,
+        paymentMode: transaction.payment_mode === 'ESCROW' ? 'ESCROW' as const : 'DIRECT' as const,
+        subtotalAmount: toMoney(subtotal),
+        shippingAmount: toMoney(shipping ? transaction.shipping_cost ?? 0 : 0),
+        totalAmount: toMoney(transaction.total_amount),
+        // v1: label siap tampil (template lama tetap berjalan).
         title: isGathering ? 'Detail Pembayaran Gathering' : 'Detail Transaksi',
         ...(transaction.ref_number ? { reference: transaction.ref_number } : {}),
         statusLabel: statusLabels[transaction.status] ?? transaction.status,
         paymentModeLabel: isGathering ? 'Escrow seat' : 'Sudah checkout',
-        createdAt: transaction.created_at,
+        createdAt: toIsoDateTime(transaction.created_at) ?? new Date(0).toISOString(),
         subtotalLabel: amount(subtotal),
         shippingLabel: shipping ? amount(transaction.shipping_cost ?? 0) : 'Ditentukan penjual',
         totalLabel: amount(transaction.total_amount),
@@ -84,14 +98,16 @@ function createOrderDetailPage(transaction: TransactionDetail, basePath: string)
           const product = item.order?.product;
           const invoice = item.order?.gathering_invoice;
           return {
-            key: item.id || `item-${index}`,
+            key: key('transaction_item', item.id || `${transaction.id}:${index}`),
             name: product?.name ?? 'Produk',
+            unitPrice: toMoney(item.unit_price),
+            totalAmount: toMoney(item.total_amount),
             ...(product?.description ? { description: product.description } : {}),
             quantity: item.quantity,
             unitPriceLabel: amount(item.unit_price),
             totalLabel: amount(item.total_amount),
             ...(product?.uom?.symbol ? { unit: product.uom.symbol } : {}),
-            ...(product?.images?.[0] ? { image: product.images[0] } : {}),
+            ...(product?.images?.[0] ? { image: product.images[0], imageUrl: product.images[0] } : {}),
             ...(invoice ? {
               detailHref: `${basePath}/gathering/invoice/${encodeURIComponent(invoice.registration_id)}`,
             } : {}),
@@ -201,7 +217,8 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     redirect(transactionHref(basePath, result.data.parent_transaction_id));
   }
 
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  const hostSlug = hostRendererSlug(website);
+  const Renderer = hostSlug ? getTemplateRenderer(hostSlug) : null;
   if (!Renderer) notFound();
   const sections: SectionEntry[] = [{ type: 'order_detail', content: { transaction: result.data, order: null } }];
   const props: TemplateRenderProps = {
@@ -229,15 +246,14 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
-  // Only the package version declaring the full order_detail contract owns this page.
-  if (
-    website.template?.slug === 'store-classic' &&
-    website.template_runtime_version === '1.0.6'
-  ) {
-    const orderDetail = createOrderDetailPage(result.data, basePath);
+  // Template package yang menyatakan `order_detail` di manifest versi terpasang memiliki halaman ini.
+  const orderRuntime = tenantRuntime(website);
+  if (orderRuntime && templateOwnsPage(website, 'order_detail')) {
+    const session = await getSession();
+    const orderDetail = createOrderDetailPage(result.data, basePath, createPageKeyFactory(session.user?.userId ?? 'anonymous'));
     const templatePage = await renderPinnedTenantTemplate({
-      templateSlug: website.template.slug,
-      pinnedVersion: website.template_runtime_version,
+      templateSlug: orderRuntime.slug,
+      pinnedVersion: orderRuntime.version,
       tenantSlug: website.slug,
       props: { ...props, page: orderDetail.page },
       orderActionContext: {
@@ -247,10 +263,11 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     });
     if (templatePage) return templatePage;
   }
-  const designerHeader = website.template?.slug === 'store-classic'
+  const runtime = tenantRuntime(website);
+  const designerHeader = runtime && templateOwnsPage(website, 'header')
     ? await renderPinnedTenantHeader({
-        templateSlug: website.template.slug,
-        pinnedVersion: website.template_runtime_version,
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
         tenantSlug: website.slug,
         props,
       })

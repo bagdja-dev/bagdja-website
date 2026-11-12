@@ -1,3 +1,4 @@
+import { validateTemplatePage } from './template-page-contract';
 import { createHash } from 'node:crypto';
 import type { TemplateRenderProps } from './template-registry';
 
@@ -54,65 +55,25 @@ function safeTemplateText(value: unknown, maxLength = 1000): string | undefined 
   return value;
 }
 
-function sanitizeTemplateOrderDetailPage(page: TemplateRenderProps['page']): TemplateRenderProps['page'] | undefined {
-  if (!page || page.type !== 'order_detail' || !page.transaction || !Array.isArray(page.transaction.items)) {
+/**
+ * `props.page` hanya diteruskan bila lolos kontrak (gagal tertutup): tanpa email/token,
+ * key opaque, tanggal ber-offset, uang integer, link relatif tenant, aksi yang berlaku.
+ */
+function sanitizeTemplatePage(page: TemplateRenderProps['page']): TemplateRenderProps['page'] | undefined {
+  if (page === undefined || page === null) return undefined;
+  const issues = validateTemplatePage(page);
+  if (issues.length > 0) {
+    console.error(`[template-runtime] props.page ${String(page.type)} ditolak: ${issues.slice(0, 5).join('; ')}`);
     return undefined;
   }
-  const transaction = page.transaction;
-  const items = transaction.items.slice(0, 100).flatMap((item) => {
-    if (!item || typeof item !== 'object') return [];
-    const name = safeTemplateText(item.name, 240);
-    if (!name || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) return [];
-    const image = getSafeAvatarUrl(item.image);
-    return [{
-      key: safeTemplateText(item.key, 100) ?? name,
-      name,
-      ...(safeTemplateText(item.description, 1000) ? { description: safeTemplateText(item.description, 1000) } : {}),
-      quantity: item.quantity,
-      unitPriceLabel: safeTemplateText(item.unitPriceLabel, 80) ?? '',
-      totalLabel: safeTemplateText(item.totalLabel, 80) ?? '',
-      ...(safeTemplateText(item.unit, 30) ? { unit: safeTemplateText(item.unit, 30) } : {}),
-      ...(image ? { image } : {}),
-      ...(isSafeRelativePath(item.detailHref) ? { detailHref: item.detailHref } : {}),
-    }];
-  });
-  const shipping = transaction.shipping
-    ? {
-      ...(safeTemplateText(transaction.shipping.recipient, 120) ? { recipient: safeTemplateText(transaction.shipping.recipient, 120) } : {}),
-      ...(safeTemplateText(transaction.shipping.phone, 40) ? { phone: safeTemplateText(transaction.shipping.phone, 40) } : {}),
-      ...(safeTemplateText(transaction.shipping.address, 500) ? { address: safeTemplateText(transaction.shipping.address, 500) } : {}),
-    }
-    : undefined;
-
-  return {
-    type: 'order_detail',
-    transaction: {
-      title: safeTemplateText(transaction.title, 120) ?? 'Detail Transaksi',
-      ...(safeTemplateText(transaction.reference, 120) ? { reference: safeTemplateText(transaction.reference, 120) } : {}),
-      statusLabel: safeTemplateText(transaction.statusLabel, 120) ?? 'Status tidak tersedia',
-      paymentModeLabel: safeTemplateText(transaction.paymentModeLabel, 80) ?? 'Sudah checkout',
-      createdAt: safeTemplateText(transaction.createdAt, 64) ?? '',
-      subtotalLabel: safeTemplateText(transaction.subtotalLabel, 80) ?? '',
-      shippingLabel: safeTemplateText(transaction.shippingLabel, 80) ?? '',
-      totalLabel: safeTemplateText(transaction.totalLabel, 80) ?? '',
-      ...(safeTemplateText(transaction.courierLabel, 120) ? { courierLabel: safeTemplateText(transaction.courierLabel, 120) } : {}),
-      ...(safeTemplateText(transaction.statusMessage, 500) ? { statusMessage: safeTemplateText(transaction.statusMessage, 500) } : {}),
-      items,
-      ...(shipping && Object.keys(shipping).length > 0 ? { shipping } : {}),
-    },
-    actions: Array.isArray(page.actions)
-      ? [...new Set(page.actions.filter((action) =>
-        (ALLOWED_ORDER_ACTIONS_FOR_TEMPLATE_PROPS as readonly string[]).includes(action),
-      ))]
-      : [],
-  };
+  return JSON.parse(JSON.stringify(page)) as TemplateRenderProps['page'];
 }
 
 export function sanitizeTemplateRuntimeProps(props: TemplateRenderProps): Record<string, unknown> {
   const { auth, page, profile, sections, ...publicProps } = props;
   const tenantProfile: TemplateRenderProps['profile'] =
     profile && typeof profile === 'object' && !Array.isArray(profile) ? profile : {};
-  const safePage = sanitizeTemplateOrderDetailPage(page);
+  const safePage = sanitizeTemplatePage(page);
   const safeProfile = {
     ...(safeTemplateText(tenantProfile.name, 120) ? { name: safeTemplateText(tenantProfile.name, 120) } : {}),
     ...(safeTemplateText(tenantProfile.tagline, 240) ? { tagline: safeTemplateText(tenantProfile.tagline, 240) } : {}),
@@ -218,8 +179,8 @@ export function getTemplateRuntimeVersion(
   if (env.TEMPLATE_RUNTIME_ENABLED !== 'true') {
     throw new TemplateRuntimeError('Template runtime is disabled for a pinned website.', 'runtime_disabled', 503);
   }
-  const approvedVersion = parseTemplateRuntimeVersionMap(env.TEMPLATE_RUNTIME_VERSION_MAP)[slug];
-  if (approvedVersion !== tenantVersion) {
+  const deploymentPin = parseTemplateRuntimeVersionMap(env.TEMPLATE_RUNTIME_VERSION_MAP)[slug];
+  if (deploymentPin !== undefined && deploymentPin !== tenantVersion) {
     throw new TemplateRuntimeError(
       'Pinned template version is not approved by this renderer deployment.',
       'runtime_version_not_approved',
@@ -244,24 +205,27 @@ export function getTemplateRuntimeStudioPreviewVersion(
   return getTemplateRuntimeVersion(slug, approvedVersion, env);
 }
 
+/**
+ * Versi runtime untuk route tenant. Hanya dari pin website (`template_runtime` API);
+ * tidak ada lagi fallback "dev preview" lewat TEMPLATE_RUNTIME_VERSION_MAP, karena
+ * fallback itu membuat template bawaan bernama sama (mis. store-classic) dirender
+ * sebagai package eksternal.
+ */
 export function getTemplateRuntimeTenantVersion(
   slug: string,
   pinnedVersion: string | null | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
-  if (pinnedVersion !== null && pinnedVersion !== undefined) {
-    return getTemplateRuntimeVersion(slug, pinnedVersion, env);
-  }
-  return getTemplateRuntimeStudioPreviewVersion(slug, env);
+  if (pinnedVersion === null || pinnedVersion === undefined) return null;
+  return getTemplateRuntimeVersion(slug, pinnedVersion, env);
 }
 
 export function isTemplateRuntimeClientBundleApproved(
-  slug: string,
+  _slug: string,
   version: string,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  if (env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED !== 'true') return false;
-  return parseTemplateRuntimeVersionMap(env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_VERSION_MAP)[slug] === version;
+  return env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED !== 'false' && VERSION_PATTERN.test(version);
 }
 
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {

@@ -8,7 +8,7 @@ import {
   sanitizeTemplateRuntimeProps,
   TemplateRuntimeError,
 } from './template-runtime-client';
-import type { TemplateRuntimeOrderAction } from './template-runtime-bridge';
+import { TEMPLATE_RUNTIME_INTENTS, type TemplateRuntimeOrderAction } from './template-runtime-bridge';
 import { TemplateRuntimeSsrFrame } from '../components/template-runtime-ssr-frame';
 import { TemplateRuntimeErrorView } from '../components/template-runtime-error';
 
@@ -41,7 +41,16 @@ export async function renderPinnedTenantTemplate({
     const version = getTemplateRuntimeTenantVersion(templateSlug, pinnedVersion);
     if (version === null) return null;
 
-    const safeProps = sanitizeTemplateRuntimeProps(props);
+    // Bridge aksi aktif hanya untuk intent yang dinyatakan props.page (keputusan P2).
+    const pageActions = Array.isArray(props.page?.actions)
+      ? (props.page.actions as unknown[]).filter((action): action is string =>
+        typeof action === 'string' && (TEMPLATE_RUNTIME_INTENTS as readonly string[]).includes(action))
+      : [];
+    const intentContext = props.page && pageActions.length > 0
+      ? { tenantSlug, pageType: props.page.type, actions: pageActions }
+      : undefined;
+    const bridgeAvailable = Boolean(intentContext) || (orderActionContext?.actions.length ?? 0) > 0;
+    const safeProps = sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...props, bridgeVersion: 1 } : props);
     const rendered = await renderTemplateThroughRuntime({
       slug: templateSlug,
       version,
@@ -52,8 +61,8 @@ export async function renderPinnedTenantTemplate({
     if (rendered.clientBundle !== null) {
       if (!isTemplateRuntimeClientBundleApproved(templateSlug, version)) {
         throw new TemplateRuntimeError(
-          'Browser JavaScript belum disetujui untuk versi template ini.',
-          'template_client_bundle_not_approved',
+          'Browser JavaScript dinonaktifkan pada deployment ini.',
+          'template_client_bundle_disabled',
           503,
         );
       }
@@ -69,6 +78,7 @@ export async function renderPinnedTenantTemplate({
         clientBundle={clientBundle}
         clientBundleSha256={clientBundleSha256}
         orderActionContext={orderActionContext}
+        intentContext={intentContext}
       />
     );
   } catch (error) {
@@ -115,8 +125,8 @@ export async function renderPinnedTenantHeader({
     if (rendered.clientBundle !== null) {
       if (!isTemplateRuntimeClientBundleApproved(templateSlug, version)) {
         throw new TemplateRuntimeError(
-          'Browser JavaScript belum disetujui untuk versi template ini.',
-          'template_client_bundle_not_approved',
+          'Browser JavaScript dinonaktifkan pada deployment ini.',
+          'template_client_bundle_disabled',
           503,
         );
       }

@@ -40,7 +40,14 @@ const {
   createTemplateRuntimeOrderActionBridge,
   getAllowedTemplateNavigationUrl,
   parseTemplateRuntimeOrderActionMessage,
+  parseTemplateRuntimeIntentMessage,
+  createTemplateRuntimeIntentBridge,
 } = bridgeModule.exports;
+const contractSource = await readFile(join(projectRoot, 'lib/template-page-contract.ts'), 'utf8');
+const contractModule = { exports: {} };
+new Function('exports', 'module', 'require', ts.transpileModule(contractSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText)(contractModule.exports, contractModule, require);
 const runtimeClientSource = await readFile(join(projectRoot, 'lib/template-runtime-client.ts'), 'utf8');
 const runtimeClientTranspiled = ts.transpileModule(runtimeClientSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -51,7 +58,9 @@ new Function('exports', 'module', 'require', runtimeClientTranspiled)(
   runtimeClientModule,
   (specifier) => specifier.endsWith('template-runtime-bridge')
     ? bridgeModule.exports
-    : require(specifier),
+    : specifier.endsWith('template-page-contract')
+      ? contractModule.exports
+      : require(specifier),
 );
 const { sanitizeTemplateRuntimeProps } = runtimeClientModule.exports;
 globalThis.DOMParser = class {
@@ -189,8 +198,8 @@ test('loads only an integrity-verified client bundle in the opaque frame with re
   );
 });
 
-test('minimizes page data and excludes email and raw transaction sections from template props', () => {
-  const safe = sanitizeTemplateRuntimeProps({
+test('excludes email and raw transaction sections, and drops pages that break the contract', () => {
+  const base = {
     isPreview: false,
     profile: { name: 'Toko', email: 'owner@example.test' },
     auth: { isLoggedIn: true, email: 'buyer@example.test', username: 'Buyer' },
@@ -201,36 +210,53 @@ test('minimizes page data and excludes email and raw transaction sections from t
     products: [],
     locations: [],
     faqs: [],
+  };
+  const invalid = sanitizeTemplateRuntimeProps({
+    ...base,
     page: {
       type: 'order_detail',
-      transaction: {
-        title: 'Detail',
-        reference: 'INV-123',
-        statusLabel: 'Menunggu pembayaran',
-        paymentModeLabel: 'Sudah checkout',
-        createdAt: '2026-11-09',
-        subtotalLabel: 'Rp 100.000',
-        shippingLabel: 'Rp 0',
-        totalLabel: 'Rp 100.000',
-        items: [{
-          key: 'item-1',
-          name: 'Product',
-          quantity: 1,
-          unitPriceLabel: 'Rp 100.000',
-          totalLabel: 'Rp 100.000',
-          image: 'https://outside.example.test/image.png',
-        }],
-        internalTransactionId: 'private-transaction-id',
-      },
+      transaction: { title: 'Detail', createdAt: '2026-11-09', items: [] },
       actions: ['order.cancel', 'untrusted.action'],
     },
   });
-  assert.equal(safe.profile.email, undefined);
-  assert.equal(safe.auth.email, undefined);
-  assert.deepEqual(safe.sections.map((section) => section.type), ['text_block']);
-  assert.equal(safe.page.transaction.internalTransactionId, undefined);
-  assert.equal(safe.page.transaction.items[0].image, undefined);
-  assert.deepEqual(safe.page.actions, ['order.cancel']);
+  assert.equal(invalid.profile.email, undefined);
+  assert.equal(invalid.auth.email, undefined);
+  assert.deepEqual(invalid.sections.map((section) => section.type), ['text_block']);
+  assert.equal(invalid.page, undefined, 'a page that breaks the contract must not reach the template');
+
+  const page = {
+    type: 'order_detail',
+    contractVersion: 2,
+    currency: 'IDR',
+    timezone: 'Asia/Jakarta',
+    transaction: {
+      key: 'kOpaqueTransactionKey01',
+      status: 'PENDING_PAYMENT',
+      statusLabel: 'Menunggu pembayaran',
+      createdAt: '2026-11-09T02:00:00.000Z',
+      paymentMode: 'ESCROW',
+      paymentModeLabel: 'Sudah checkout',
+      subtotalAmount: 100000,
+      shippingAmount: 0,
+      totalAmount: 100000,
+      title: 'Detail',
+      subtotalLabel: 'Rp 100.000',
+      shippingLabel: 'Rp 0',
+      totalLabel: 'Rp 100.000',
+      items: [{ key: 'kOpaqueItemKey0001', name: 'Product', quantity: 1, unitPrice: 100000, totalAmount: 100000, unitPriceLabel: 'Rp 100.000', totalLabel: 'Rp 100.000' }],
+      shipping: null,
+    },
+    actions: ['order.cancel'],
+  };
+  const valid = sanitizeTemplateRuntimeProps({ ...base, page });
+  assert.deepEqual(valid.page, page);
+  assert.notEqual(valid.page, page, 'the page is copied, not shared');
+
+  const withEmail = sanitizeTemplateRuntimeProps({
+    ...base,
+    page: { ...page, transaction: { ...page.transaction, buyerEmail: 'buyer@example.test' } },
+  });
+  assert.equal(withEmail.page, undefined);
 });
 
 test('validates iframe order-action intents against identity, source, and host allowlist', async () => {
@@ -367,4 +393,42 @@ test('rejects invalid tenant origins and path prefixes', async () => {
     createTemplateRuntimeSsrDocument({ ...base, tenantPathPrefix: '//attacker.example.test' }),
     /path prefix is invalid/,
   );
+});
+
+test('validates system-page intents from the template iframe', async () => {
+  const requestId = '123e4567-e89b-42d3-a456-426614174001';
+  const base = { protocol: 1, type: 'bagdja:template:intent', ...identity, requestId };
+  const key = 'kOpaqueCartKey0001';
+  assert.deepEqual(
+    parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.set_quantity', key, quantity: 3 } })?.intent,
+    { action: 'cart.set_quantity', key, quantity: 3 },
+  );
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.set_quantity', key, quantity: 0 } }), null);
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.set_quantity', key, quantity: 1000 } }), null);
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.remove', key: '../1' } }), null);
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.checkout', keys: [] } }), null);
+  assert.deepEqual(
+    parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'cart.checkout', keys: [key, key] } })?.intent,
+    { action: 'cart.checkout', keys: [key] },
+  );
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, intent: { action: 'wallet.withdraw', key } }), null);
+  assert.equal(parseTemplateRuntimeIntentMessage({ ...base, digest: 'short', intent: { action: 'cart.remove', key } }), null);
+
+  const posted = [];
+  const frame = { postMessage: (data) => posted.push(data) };
+  const handled = [];
+  const bridge = createTemplateRuntimeIntentBridge({
+    frame,
+    identity,
+    allowedActions: ['cart.remove'],
+    onIntent: async (intent) => { handled.push(intent.action); },
+  });
+  await bridge({ source: frame, origin: 'null', data: { ...base, intent: { action: 'cart.remove', key } } });
+  await bridge({ source: frame, origin: 'null', data: { ...base, intent: { action: 'cart.remove', key } } });
+  await bridge({ source: frame, origin: 'null', data: { ...base, requestId: '123e4567-e89b-42d3-a456-426614174002', intent: { action: 'invoice.pay', key } } });
+  await bridge({ source: {}, origin: 'null', data: { ...base, requestId: '123e4567-e89b-42d3-a456-426614174003', intent: { action: 'cart.remove', key } } });
+  assert.deepEqual(handled, ['cart.remove'], 'replays, disallowed actions, and foreign sources are ignored');
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].type, 'bagdja:template:intent-result');
+  assert.deepEqual(posted[0].result, { ok: true });
 });

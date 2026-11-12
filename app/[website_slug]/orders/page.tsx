@@ -7,8 +7,9 @@
  * tombol detail/bayar) di `components/orders-content.tsx` (client).
  * Route diprotect middleware (wajib login buyer, via PROTECTED_PATH_PATTERN).
  */
+import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { getAuthViewState } from '../../../lib/auth-view';
 import { loadTenant } from '../../../lib/tenant-loader';
@@ -26,7 +27,8 @@ import { getTemplateRenderer } from '../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
 import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
-import { renderPinnedTenantHeader } from '../../../lib/template-runtime-route';
+import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../lib/template-runtime-route';
+import { loadOrdersTemplatePage } from '../../../lib/template-page-loaders';
 
 export const revalidate = 60;
 
@@ -51,7 +53,8 @@ export default async function OrdersPage({ params }: OrdersPageProps) {
 
   const { website, products, locations, faqs, blogPosts } = tenant;
 
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  const hostSlug = hostRendererSlug(website);
+  const Renderer = hostSlug ? getTemplateRenderer(hostSlug) : null;
   if (!Renderer) notFound();
 
   const sections: SectionEntry[] = [
@@ -83,10 +86,27 @@ export default async function OrdersPage({ params }: OrdersPageProps) {
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
-  const designerHeader = website.template?.slug === 'store-classic'
+  const runtime = tenantRuntime(website);
+  if (runtime && templateOwnsPage(website, 'orders')) {
+    const basePath = resolveTenantLinkBase(params.website_slug);
+    const loaded = await loadOrdersTemplatePage(website.id, basePath);
+    if (loaded && 'unauthenticated' in loaded) {
+      redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/orders`)}`);
+    }
+    if (loaded) {
+      const templatePage = await renderPinnedTenantTemplate({
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
+        tenantSlug: website.slug,
+        props: { ...props, sections: [], page: loaded.page },
+      });
+      if (templatePage) return templatePage;
+    }
+  }
+  const designerHeader = runtime && templateOwnsPage(website, 'header')
     ? await renderPinnedTenantHeader({
-        templateSlug: website.template.slug,
-        pinnedVersion: website.template_runtime_version,
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
         tenantSlug: website.slug,
         props,
       })

@@ -77,9 +77,9 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
   if (!view.templateSlug) notFound();
 
   let runtimeVersion: string | null = null;
-  const pinnedVersion = view.tenant.website.template_runtime_version;
+  const runtime = view.tenant.website.template_runtime ?? null;
   try {
-    runtimeVersion = getTemplateRuntimeTenantVersion(view.templateSlug, pinnedVersion);
+    runtimeVersion = runtime ? getTemplateRuntimeTenantVersion(runtime.slug, runtime.version) : null;
   } catch (error) {
     if (error instanceof TemplateRuntimeError) {
       return <TemplateRuntimeErrorView code={error.code} message={error.message} />;
@@ -97,13 +97,8 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
         version: runtimeVersion,
         props: runtimeProps,
       });
-      if (rendered.clientBundle !== null) {
-        throw new TemplateRuntimeError(
-          'Template versi ini membutuhkan browser JavaScript yang belum diaktifkan untuk pratinjau.',
-          'template_client_bundle_not_supported',
-          503,
-        );
-      }
+      // Pratinjau Studio inert: hanya HTML hasil render server. JavaScript browser template
+      // (progressive enhancement) sengaja tidak dijalankan di editor.
       const isHome = !pageSlug;
       return (
         <TemplateRuntimePreview

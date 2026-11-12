@@ -9,6 +9,8 @@ export interface ApiWebsiteTemplate {
   description: string | null;
   preview_image: string | null;
   structure: Record<string, unknown>;
+  /** `builtin` = renderer React internal; `package` = template designer via runtime. */
+  source?: 'builtin' | 'package';
 }
 
 export interface ApiWebsite {
@@ -17,8 +19,18 @@ export interface ApiWebsite {
   slug: string;
   domain: string | null;
   template_id: string | null;
-  /** Exact approved external package version; null keeps the built-in renderer active. */
+  /** Salinan versi package terpasang; null untuk template bawaan. Gunakan `template_runtime`. */
   template_runtime_version: string | null;
+  /**
+   * Keputusan runtime dari API: hanya terisi untuk template package yang ter-pin.
+   * null = renderer bawaan (lib/tenant-template.ts).
+   */
+  template_runtime?: {
+    slug: string;
+    version: string;
+    status: 'published' | 'deprecated' | 'revoked';
+    pageOverrides: string[];
+  } | null;
   template: ApiWebsiteTemplate | null;
   tagline: string | null;
   logo_url: string | null;
