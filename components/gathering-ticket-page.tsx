@@ -41,7 +41,7 @@ const STATUS_COPY: Record<PublicGatheringTicket['ticket_status'], { label: strin
   },
 };
 
-export function GatheringTicketPage({ token, websiteName }: { token: string; websiteName: string }) {
+export function GatheringTicketPage({ token, websiteName, hideHeader = false }: { token: string; websiteName: string; hideHeader?: boolean }) {
   const [ticket, setTicket] = useState<PublicGatheringTicket | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -82,7 +82,7 @@ export function GatheringTicketPage({ token, websiteName }: { token: string; web
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200 bg-white"><div className="mx-auto max-w-md px-5 py-4 text-sm font-semibold">{websiteName}</div></header>
+      {hideHeader ? null : <header className="border-b border-zinc-200 bg-white"><div className="mx-auto max-w-md px-5 py-4 text-sm font-semibold">{websiteName}</div></header>}
       <article className="mx-auto max-w-md px-5 py-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Tiket masuk</p>
         <h1 className="mt-2 text-2xl font-semibold">{ticket.gathering_title}</h1>

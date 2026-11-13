@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from './confirm-dialog';
+import { VenueLocation } from './venue-location';
+import { richTextToPlainText } from '@/lib/rich-text';
 
 export interface GatheringPlanOption {
   product_option_id: string;
@@ -11,6 +13,8 @@ export interface GatheringPlanOption {
   label: string;
   description?: string | null;
   venue_location?: string | null;
+  venue_address?: string | null;
+  venue_map_url?: string | null;
   images?: string[] | null;
 }
 
@@ -304,9 +308,10 @@ export function GatheringPlanControls({
                         ) : null}
                         {(option.description || option.venue_location) && (
                           <span className="mt-1 block text-xs" style={{ color: 'var(--brand-muted)' }}>
-                            {[option.venue_location, option.description].filter(Boolean).join(' · ')}
+                            {[option.venue_location, richTextToPlainText(option.description)].filter(Boolean).join(' · ')}
                           </span>
                         )}
+                        <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
                       </span>
                     </label>
                   </li>

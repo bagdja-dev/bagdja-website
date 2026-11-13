@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createTemplateRuntimeIntentBridge,
   createTemplateRuntimeOrderActionBridge,
   TemplateRuntimeActionError,
+  TEMPLATE_RUNTIME_INTENT_CONFIRMATIONS,
   type TemplateRuntimeIdentity,
   type TemplateRuntimeOrderAction,
 } from '../lib/template-runtime-bridge';
@@ -13,8 +14,59 @@ import {
   isTemplateRuntimeResizeMessage,
   createTemplateRuntimeSsrDocument,
   isTemplateRuntimeNavigationMessage,
+  isTemplateRuntimeNotificationAnchorMessage,
 } from '../lib/template-runtime-ssr-document';
-import { getAllowedTemplateNavigationUrl } from '../lib/template-runtime-bridge';
+import {
+  getAllowedTemplateNavigationUrl,
+  getAllowedTemplateShareUrl,
+  isGoogleMapsNavigationUrl,
+  parseTemplateRuntimeRefreshMessage,
+  parseTemplateRuntimeShareMessage,
+  TEMPLATE_RUNTIME_REFRESH_RESULT,
+  TEMPLATE_RUNTIME_SHARE_RESULT,
+  type TemplateRuntimeShareOutcome,
+} from '../lib/template-runtime-bridge';
+
+/** Salin teks di halaman host (Clipboard API, fallback execCommand). */
+async function copyText(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // lanjut ke fallback
+  }
+  try {
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
+/** Bagikan via Web Share bila ada (HP), selain itu salin tautan. */
+async function shareOrCopy(mode: 'share' | 'copy', url: string, title?: string): Promise<TemplateRuntimeShareOutcome> {
+  if (mode === 'share' && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ url, ...(title ? { title } : {}) });
+      return 'shared';
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled';
+    }
+  }
+  return (await copyText(url)) ? 'copied' : 'failed';
+}
+import { NotificationBell } from './notification-bell';
+import type { ThemeColors } from '../lib/website-theme';
 
 interface TemplateRuntimeSsrFrameProps {
   html: string;
@@ -23,6 +75,13 @@ interface TemplateRuntimeSsrFrameProps {
   clientBundle?: string | null;
   clientBundleSha256?: string | null;
   resizeToContent?: boolean;
+  /**
+   * `bottom` = navigasi bawah template (menempel di bawah layar, tinggi 0 bila template
+   * menyembunyikannya, mis. di desktop).
+   */
+  placement?: 'top' | 'bottom';
+  /** Reserve flow space when the page does not already account for the fixed dock. */
+  reserveBottomSpace?: boolean;
   orderActionContext?: {
     transactionId: string;
     actions: readonly TemplateRuntimeOrderAction[];
@@ -32,6 +91,12 @@ interface TemplateRuntimeSsrFrameProps {
     tenantSlug: string;
     pageType: string;
     actions: readonly string[];
+  };
+  notificationContext?: {
+    websiteId: string;
+    basePath: string;
+    isLoggedIn: boolean;
+    theme: ThemeColors;
   };
 }
 
@@ -55,15 +120,25 @@ export function TemplateRuntimeSsrFrame({
   clientBundle = null,
   clientBundleSha256 = null,
   resizeToContent = false,
+  placement = 'top',
+  reserveBottomSpace = true,
   orderActionContext,
   intentContext,
+  notificationContext,
 }: TemplateRuntimeSsrFrameProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const frameLoadedRef = useRef(false);
   const [frameDocument, setFrameDocument] = useState('');
-  const [frameHeight, setFrameHeight] = useState(76);
+  const [frameHeight, setFrameHeight] = useState(0);
+  const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Refresh lembut setelah intent: dokumen lama tetap tampil (dengan overlay) sampai dokumen baru siap.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshPending, startRefresh] = useTransition();
+  // Permintaan "Muat ulang" dari template: dibalas saat refresh selesai tanpa dokumen baru.
+  const pendingRefreshRef = useRef<string | null>(null);
+  const lastManualRefreshRef = useRef(0);
   const stableIdentity = useMemo(
     () => ({ slug: identity.slug, version: identity.version, digest: identity.digest }),
     [identity.digest, identity.slug, identity.version],
@@ -71,8 +146,7 @@ export function TemplateRuntimeSsrFrame({
 
   useEffect(() => {
     let active = true;
-    frameLoadedRef.current = false;
-    setFrameDocument('');
+    // Dokumen lama dibiarkan tampil sampai dokumen baru siap (tanpa layar kosong saat refresh).
     setError(null);
     void createTemplateRuntimeSsrDocument({
       html,
@@ -82,6 +156,7 @@ export function TemplateRuntimeSsrFrame({
       clientBundle,
       clientBundleSha256,
       resizeToContent,
+      minHeight: placement === 'bottom' ? 0 : 56,
       stylesheetUrls: Array.from(window.document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'))
         .map((link) => {
           try {
@@ -93,7 +168,10 @@ export function TemplateRuntimeSsrFrame({
         })
         .filter((url): url is string => url !== null),
     }).then((frameDocument) => {
-      if (active) setFrameDocument(frameDocument);
+      if (!active) return;
+      // Load berikutnya = dokumen baru yang disengaja, bukan navigasi keluar oleh template.
+      frameLoadedRef.current = false;
+      setFrameDocument(frameDocument);
     }).catch((cause: unknown) => {
       if (active) {
         setError(cause instanceof Error ? cause.message : 'Template tidak dapat disiapkan.');
@@ -102,15 +180,68 @@ export function TemplateRuntimeSsrFrame({
     return () => {
       active = false;
     };
-  }, [clientBundle, clientBundleSha256, html, resizeToContent, stableIdentity, tenantPathPrefix]);
+  }, [clientBundle, clientBundleSha256, html, placement, resizeToContent, stableIdentity, tenantPathPrefix]);
+
+  // Navigasi bawah template: bilah lain yang menempel di bawah layar (mis. tombol Beli)
+  // naik setinggi navigasi lewat `bottom: var(--template-bottom-nav-height, 0px)`.
+  useEffect(() => {
+    if (placement !== 'bottom') return;
+    const root = document.documentElement;
+    root.style.setProperty('--template-bottom-nav-height', `${frameHeight}px`);
+    return () => {
+      root.style.removeProperty('--template-bottom-nav-height');
+    };
+  }, [frameHeight, placement]);
 
   useEffect(() => {
-    const frame = frameRef.current?.contentWindow;
-    if (!frame) return;
+    const frameElement = frameRef.current;
+    const frame = frameElement?.contentWindow;
+    if (!frameElement || !frame) return;
     const handleMessage = (event: MessageEvent<unknown>) => {
       if (event.source !== frame || event.origin !== 'null') return;
+      if (stableIdentity.slug === 'kumpul' && isTemplateRuntimeNotificationAnchorMessage(event.data, stableIdentity)) {
+        const anchor = event.data;
+        if (
+          anchor.x <= frameElement.clientWidth &&
+          anchor.y >= 0 &&
+          anchor.y <= 160
+        ) {
+          setNotificationAnchor({
+            left: frameElement.offsetLeft + anchor.x,
+            top: frameElement.offsetTop + anchor.y,
+          });
+        }
+        return;
+      }
       if (resizeToContent && isTemplateRuntimeResizeMessage(event.data, stableIdentity)) {
         setFrameHeight(event.data.height);
+        return;
+      }
+      const refresh = parseTemplateRuntimeRefreshMessage(event.data, stableIdentity);
+      if (refresh) {
+        const now = Date.now();
+        // Batasi tap beruntun: satu refresh tiap 2 detik.
+        if (now - lastManualRefreshRef.current < 2000) {
+          frame.postMessage({ protocol: 1, type: TEMPLATE_RUNTIME_REFRESH_RESULT, ...stableIdentity, requestId: refresh.requestId, ok: false }, '*');
+          return;
+        }
+        lastManualRefreshRef.current = now;
+        pendingRefreshRef.current = refresh.requestId;
+        setRefreshing(true);
+        startRefresh(() => router.refresh());
+        return;
+      }
+      const share = parseTemplateRuntimeShareMessage(event.data, stableIdentity);
+      if (share) {
+        const target = getAllowedTemplateShareUrl(share.href, window.location.origin, tenantPathPrefix);
+        void (target ? shareOrCopy(share.mode, target.href, share.title) : Promise.resolve<TemplateRuntimeShareOutcome>('failed'))
+          .then((outcome) => frame.postMessage({
+            protocol: 1,
+            type: TEMPLATE_RUNTIME_SHARE_RESULT,
+            ...stableIdentity,
+            requestId: share.requestId,
+            outcome,
+          }, '*'));
         return;
       }
       if (!isTemplateRuntimeNavigationMessage(event.data, stableIdentity)) return;
@@ -119,11 +250,14 @@ export function TemplateRuntimeSsrFrame({
         window.location.origin,
         tenantPathPrefix,
       );
-      if (destination) window.location.assign(destination.href);
+      if (!destination) return;
+      // Peta lokasi gathering → tab baru; tautan tenant & WhatsApp → tab ini.
+      if (isGoogleMapsNavigationUrl(destination)) window.open(destination.href, '_blank', 'noopener,noreferrer');
+      else window.location.assign(destination.href);
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [resizeToContent, stableIdentity, tenantPathPrefix]);
+  }, [resizeToContent, router, stableIdentity, tenantPathPrefix]);
 
   useEffect(() => {
     const frame = frameRef.current?.contentWindow;
@@ -209,14 +343,32 @@ export function TemplateRuntimeSsrFrame({
       identity: stableIdentity,
       allowedActions: intentContext.actions,
       onIntent: async (intent) => {
-        if (intent.action === 'cart.remove' && !window.confirm('Hapus item ini dari keranjang?')) {
+        const confirmation = TEMPLATE_RUNTIME_INTENT_CONFIRMATIONS[intent.action];
+        // Template boleh menampilkan popup konfirmasinya sendiri (intent.confirmed, divalidasi bootstrap).
+        const hasTemplateConfirmation = intent.confirmed === true || (stableIdentity.slug === 'kumpul'
+          && intent.action === 'gathering.invitations.submit');
+        if (confirmation && !hasTemplateConfirmation && !window.confirm(confirmation)) {
           throw new TemplateRuntimeActionError('action_cancelled', 'Aksi dibatalkan.');
         }
-        const response = await fetch('/api/template-intents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantSlug: intentContext.tenantSlug, pageType: intentContext.pageType, intent }),
-        });
+        const { bannerFile, confirmed: _confirmed, ...jsonIntent } = intent;
+        // pagePath: halaman undangan memetakan token dari path (diverifikasi server terhadap key intent).
+        const payload = {
+          tenantSlug: intentContext.tenantSlug,
+          pageType: intentContext.pageType,
+          pagePath: window.location.pathname,
+          intent: jsonIntent,
+        };
+        let requestInit: RequestInit;
+        if (bannerFile) {
+          // Banner undangan: file ikut sebagai multipart, intent tetap JSON di field `payload`.
+          const form = new FormData();
+          form.append('payload', JSON.stringify(payload));
+          form.append('banner', bannerFile, bannerFile instanceof File ? bannerFile.name : 'banner');
+          requestInit = { method: 'POST', body: form };
+        } else {
+          requestInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+        }
+        const response = await fetch('/api/template-intents', requestInit);
         let body: { ok?: boolean; redirect?: unknown; message?: unknown } | null = null;
         try {
           body = await response.json();
@@ -231,18 +383,42 @@ export function TemplateRuntimeSsrFrame({
         if (!response.ok || body?.ok !== true) {
           throw new TemplateRuntimeActionError(
             'intent_failed',
-            typeof body?.message === 'string' ? body.message : 'Aksi belum dapat diproses.',
+            typeof body?.message === 'string'
+              ? body.message
+              : response.ok
+                ? 'Server mengirim respons aksi yang tidak valid.'
+                : `Aksi gagal diproses (HTTP ${response.status}).`,
           );
         }
         const redirect = safeIntentRedirect(body.redirect);
-        // Muat ulang penuh (bukan router.refresh) agar iframe template dibuat ulang dengan data terbaru.
-        if (redirect) window.location.assign(redirect);
-        else window.location.reload();
+        if (redirect) {
+          window.location.assign(redirect);
+          return;
+        }
+        // Refresh lembut: data server dimuat ulang tanpa reload halaman; iframe diganti saat dokumen baru siap.
+        setRefreshing(true);
+        startRefresh(() => router.refresh());
       },
     });
     window.addEventListener('message', handleIntent);
     return () => window.removeEventListener('message', handleIntent);
-  }, [intentContext, stableIdentity]);
+  }, [intentContext, router, stableIdentity]);
+
+  // Refresh selesai tanpa dokumen baru (data tidak berubah) → hapus overlay.
+  useEffect(() => {
+    if (!refreshing || refreshPending) return;
+    const timer = window.setTimeout(() => {
+      setRefreshing(false);
+      const requestId = pendingRefreshRef.current;
+      pendingRefreshRef.current = null;
+      if (requestId) {
+        frameRef.current?.contentWindow?.postMessage({
+          protocol: 1, type: TEMPLATE_RUNTIME_REFRESH_RESULT, ...stableIdentity, requestId, ok: true,
+        }, '*');
+      }
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [refreshPending, refreshing, stableIdentity]);
 
   if (error) return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
 
@@ -250,7 +426,11 @@ export function TemplateRuntimeSsrFrame({
     <iframe
       ref={frameRef}
       title={`Website template ${stableIdentity.slug} ${stableIdentity.version}`}
-      className={`block w-full border-0 ${resizeToContent ? 'absolute left-0 top-0 z-20 overflow-hidden' : 'min-h-screen'}`}
+      className={`block w-full border-0 ${
+        placement === 'bottom'
+          ? 'overflow-hidden'
+          : resizeToContent ? 'absolute left-0 top-0 z-20 overflow-hidden' : 'min-h-screen'
+      }`}
       style={resizeToContent ? { height: frameHeight } : undefined}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
@@ -262,19 +442,61 @@ export function TemplateRuntimeSsrFrame({
           return;
         }
         frameLoadedRef.current = true;
+        pendingRefreshRef.current = null;
+        setRefreshing(false);
       }}
     />
   );
+  const refreshOverlay = refreshing ? (
+    <div
+      role="status"
+      aria-label="Memperbarui halaman"
+      className="absolute inset-0 z-30 flex items-start justify-center bg-white/45 pt-24 backdrop-blur-[1px] transition-opacity"
+    >
+      <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-zinc-300 border-t-zinc-700" />
+    </div>
+  ) : null;
+  const notification = notificationContext?.isLoggedIn ? (
+    <div
+      className="absolute z-50 max-[620px]:!left-auto max-[620px]:!right-3 max-[620px]:!top-3 max-[620px]:!translate-y-0"
+      style={notificationAnchor
+        ? { left: notificationAnchor.left, top: notificationAnchor.top, transform: 'translateY(-50%)' }
+        : { right: 'max(16px, calc(50vw - 612px))', top: 18 }}
+    >
+      <NotificationBell
+        websiteId={notificationContext.websiteId}
+        basePath={notificationContext.basePath}
+        isLoggedIn
+        unreadOnly
+        theme={notificationContext.theme}
+      />
+    </div>
+  ) : null;
+
+  if (placement === 'bottom') {
+    return (
+      <>
+        {reserveBottomSpace ? <div aria-hidden="true" style={{ height: frameHeight }} /> : null}
+        <div className="fixed inset-x-0 bottom-0 z-40">{frame}</div>
+      </>
+    );
+  }
 
   if (resizeToContent) {
     return (
-      <div className="relative z-20 h-[76px] w-full">
+      <div className="relative z-20 w-full" style={{ height: frameHeight }}>
         {frame}
+        {refreshOverlay}
+        {notification}
       </div>
     );
   }
 
   return (
-    frame
+    <div className="relative w-full">
+      {frame}
+      {refreshOverlay}
+      {notification}
+    </div>
   );
 }

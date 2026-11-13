@@ -25,7 +25,7 @@ interface PublicGatheringInvoice {
   payment_open: boolean;
 }
 
-export function GatheringInvoicePage({ registrationId, websiteName }: { registrationId: string; websiteName: string }) {
+export function GatheringInvoicePage({ registrationId, websiteName, hideHeader = false }: { registrationId: string; websiteName: string; hideHeader?: boolean }) {
   const [invoice, setInvoice] = useState<PublicGatheringInvoice | null>(null);
   const [loadError, setLoadError] = useState('');
   const [paymentError, setPaymentError] = useState('');
@@ -91,7 +91,7 @@ export function GatheringInvoicePage({ registrationId, websiteName }: { registra
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200 bg-white"><div className="mx-auto max-w-2xl px-5 py-4 text-sm font-semibold">{websiteName}</div></header>
+      {hideHeader ? null : <header className="border-b border-zinc-200 bg-white"><div className="mx-auto max-w-2xl px-5 py-4 text-sm font-semibold">{websiteName}</div></header>}
       <article className="mx-auto max-w-2xl px-5 py-10">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Tagihan gathering</p>
         <h1 className="mt-2 text-2xl font-semibold">{invoice.gathering_title}</h1>

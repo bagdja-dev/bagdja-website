@@ -6,9 +6,17 @@ import { getSession } from './session';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5003';
 
-export async function publicBackendFetch<T = unknown>(path: string): Promise<{ data: T | null; status: number; error?: string }> {
+/** Website API tanpa sesi (endpoint publik). `options` opsional untuk POST JSON (mis. RSVP undangan terbuka). */
+export async function publicBackendFetch<T = unknown>(
+  path: string,
+  options: { method?: string; body?: string } = {},
+): Promise<{ data: T | null; status: number; error?: string }> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: 'no-store',
+      ...(options.method ? { method: options.method } : {}),
+      ...(options.body !== undefined ? { body: options.body, headers: { 'Content-Type': 'application/json' } } : {}),
+    });
     if (!res.ok) {
       const body = await res.text();
       return { data: null, status: res.status, error: body || res.statusText };

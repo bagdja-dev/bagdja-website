@@ -6,7 +6,7 @@
  * header dan presentasi sample dipakai sementara operasi order tetap di host.
  * Route diprotect middleware (wajib login buyer).
  */
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
@@ -25,7 +25,7 @@ import {
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../lib/website-theme';
 import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../lib/template-runtime-route';
 import { loadCartTemplatePage } from '../../../lib/template-page-loaders';
 
@@ -72,7 +72,7 @@ export default async function CartPage({ params }: CartPageProps) {
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -96,6 +96,7 @@ export default async function CartPage({ params }: CartPageProps) {
       const templatePage = await renderPinnedTenantTemplate({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
         tenantSlug: website.slug,
         props: { ...props, sections: [], page: loaded.page },
       });
@@ -106,6 +107,8 @@ export default async function CartPage({ params }: CartPageProps) {
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,
       })

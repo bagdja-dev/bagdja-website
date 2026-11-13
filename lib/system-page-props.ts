@@ -2,7 +2,8 @@ import type { AuthViewState } from './auth-view';
 import { toBlogPostItem, toCatalogItem, toFaqItem, toLocationItem, toNavPage, type SectionEntry } from './template-data';
 import type { TemplateRenderProps } from './template-registry';
 import type { TenantData } from './tenant-loader';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from './website-theme';
+import { sanitizeWebsiteTheme } from './website-theme';
+import { tenantTemplateTheme } from './tenant-template';
 
 /** Props template standar untuk halaman sistem (dipakai renderer bawaan maupun template package). */
 export function buildSystemPageProps(
@@ -22,7 +23,7 @@ export function buildSystemPageProps(
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections: options.sections,
     products: products.map(toCatalogItem),

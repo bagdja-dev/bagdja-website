@@ -1,4 +1,4 @@
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
@@ -10,7 +10,7 @@ import { toBlogPostItem, toCatalogItem, toFaqItem, toLocationItem, toNavPage, ty
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../lib/website-theme';
 import { GatheringCalendarContent } from '../../../components/gathering-calendar-content';
 import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../lib/template-runtime-route';
 import { loadCalendarTemplatePage } from '../../../lib/template-page-loaders';
@@ -51,7 +51,7 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -75,6 +75,7 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
       const templatePage = await renderPinnedTenantTemplate({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
         tenantSlug: website.slug,
         props: { ...props, sections: [], page: loaded.page },
       });
@@ -85,6 +86,8 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,
       })

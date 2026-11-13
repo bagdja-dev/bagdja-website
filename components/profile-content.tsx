@@ -32,6 +32,7 @@ interface ProfileContentProps {
     username?: string;
     email?: string;
     avatar?: string;
+    profileLogoutHref?: string;
   };
 }
 
@@ -122,16 +123,27 @@ export function ProfileContent({ auth }: ProfileContentProps) {
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <header className="mb-6">
-        <h1
-          className="text-2xl font-bold sm:text-3xl"
-          style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
-        >
-          Profil Saya
-        </h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          Info akun, saldo, dan riwayat transaksi Anda.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1
+            className="text-2xl font-bold sm:text-3xl"
+            style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+          >
+            Profil Saya
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
+            Info akun, saldo, dan riwayat transaksi Anda.
+          </p>
+        </div>
+        {auth?.profileLogoutHref && (
+          <a
+            href={auth.profileLogoutHref}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-80"
+            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+          >
+            Keluar
+          </a>
+        )}
       </header>
 
       <div className="flex flex-col gap-4">

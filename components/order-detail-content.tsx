@@ -28,6 +28,8 @@ import {
   tagihanProgressText,
   type TagihanSummary,
 } from '../lib/termin-summary';
+import { VenueLocation } from './venue-location';
+import { richTextToPlainText } from '@/lib/rich-text';
 
 export interface TransactionProduct {
   name?: string;
@@ -231,6 +233,8 @@ export interface GatheringPlanDetail {
       label: string;
       description?: string | null;
       venue_location?: string | null;
+      venue_address?: string | null;
+      venue_map_url?: string | null;
       is_final_selection?: boolean;
     }>;
     opened_option_ids_snapshot: string[];
@@ -359,7 +363,8 @@ function GatheringPlanOrderView({
               <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
                 {option.option_group_key}{option.venue_location ? ` · ${option.venue_location}` : ''}
               </p>
-              {option.description ? <p className="mt-2 text-sm">{option.description}</p> : null}
+              <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
+              {option.description ? <p className="mt-2 whitespace-pre-line text-sm">{richTextToPlainText(option.description)}</p> : null}
             </li>
           ))}
         </ul>

@@ -1,4 +1,4 @@
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
@@ -14,7 +14,7 @@ import { toBlogPostItem, toCatalogItem, toFaqItem, toLocationItem, toNavPage, ty
 import { getTemplateRenderer } from '../../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../../lib/website-theme';
 import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../../lib/template-runtime-route';
 import type { TemplateRuntimeOrderAction } from '../../../../lib/template-runtime-bridge';
 import type { OrderDetail, TransactionDetail } from '../../../../components/order-detail-content';
@@ -233,7 +233,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -254,6 +254,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     const templatePage = await renderPinnedTenantTemplate({
       templateSlug: orderRuntime.slug,
       pinnedVersion: orderRuntime.version,
+      candidateDigest: orderRuntime.candidateDigest,
       tenantSlug: website.slug,
       props: { ...props, page: orderDetail.page },
       orderActionContext: {
@@ -268,6 +269,8 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,
       })

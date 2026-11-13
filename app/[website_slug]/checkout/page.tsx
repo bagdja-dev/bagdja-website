@@ -6,7 +6,7 @@
  * `components/checkout-content.tsx` (client). Route diprotect middleware
  * (wajib login buyer).
  */
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -25,7 +25,7 @@ import {
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../lib/website-theme';
 import { renderPinnedTenantHeader } from '../../../lib/template-runtime-route';
 
 export const revalidate = 60;
@@ -81,7 +81,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -99,6 +99,8 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,
       })

@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '../../../../lib/backend-api';
 
+/** backendFetch menaruh body galat mentah (JSON NestJS) di `error`; ambil `message`-nya saja. */
+function readableError(error: string | undefined, fallback: string): string {
+  if (!error) return fallback;
+  try {
+    const parsed = JSON.parse(error) as { message?: unknown };
+    const message = Array.isArray(parsed.message) ? parsed.message.join(', ') : parsed.message;
+    return typeof message === 'string' && message.trim() ? message : fallback;
+  } catch {
+    return error.length <= 300 ? error : fallback;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const websiteId = request.nextUrl.searchParams.get('website_id');
   if (!websiteId) {
@@ -13,7 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
   }
   if (!result.data || result.status >= 400) {
-    return NextResponse.json({ message: result.error ?? 'Failed to load threads' }, { status: result.status || 500 });
+    return NextResponse.json({ message: readableError(result.error, 'Gagal memuat percakapan.') }, { status: result.status || 500 });
   }
 
   return NextResponse.json({ data: result.data }, { status: 200 });
@@ -41,7 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
   }
   if (!result.data || result.status >= 400) {
-    return NextResponse.json({ message: result.error ?? 'Failed to create thread' }, { status: result.status || 500 });
+    return NextResponse.json({ message: readableError(result.error, 'Gagal membuat percakapan.') }, { status: result.status || 500 });
   }
 
   return NextResponse.json({ data: result.data }, { status: 201 });

@@ -9,7 +9,7 @@
  * di `components/customer-chat-content.tsx` (client), dirender oleh masing-
  * masing `*-view.tsx` template lewat `case 'chat'`.
  */
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../../../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../lib/tenant-template';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -28,7 +28,7 @@ import {
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import type { TemplateRenderProps } from '../../../lib/template-registry';
 import { resolveTenantLinkBase } from '../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../lib/website-theme';
 import { renderPinnedTenantHeader } from '../../../lib/template-runtime-route';
 
 export const revalidate = 60;
@@ -70,7 +70,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -88,6 +88,9 @@ export default async function ChatPage({ params }: ChatPageProps) {
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
+        reserveBottomSpace: false,
         tenantSlug: website.slug,
         props,
       })

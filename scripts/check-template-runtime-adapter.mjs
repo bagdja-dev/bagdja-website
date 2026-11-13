@@ -148,6 +148,50 @@ await assert.rejects(
   ),
   (error) => error.code === 'template_client_bundle_not_supported',
 );
+// Uji kandidat (template-candidate-trial-plan §5): artefak kandidat via /v1/render-candidate.
+const candidateDigest = 'c'.repeat(64);
+let candidateCall = null;
+const candidateRender = await runtimeClient.renderTemplateThroughRuntime(
+  { ...legacyRuntimeRequest, candidateDigest },
+  legacyRuntimeEnv,
+  async (url, init) => {
+    candidateCall = { url: String(url), body: JSON.parse(init.body) };
+    return new Response(JSON.stringify({
+      slug: legacyRuntimeRequest.slug,
+      version: legacyRuntimeRequest.version,
+      digest: candidateDigest,
+      candidate: true,
+      html: '<main>Kandidat</main>',
+      clientBundle: null,
+      clientBundleSha256: null,
+    }), { status: 200 });
+  },
+);
+assert.equal(candidateRender.html, '<main>Kandidat</main>');
+assert(candidateCall.url.endsWith('/v1/render-candidate'), 'Candidate renders must use the candidate endpoint.');
+assert.equal(candidateCall.body.digest, candidateDigest);
+await assert.rejects(
+  () => runtimeClient.renderTemplateThroughRuntime(
+    { ...legacyRuntimeRequest, candidateDigest },
+    legacyRuntimeEnv,
+    async () => new Response(JSON.stringify({
+      slug: legacyRuntimeRequest.slug, version: legacyRuntimeRequest.version, digest: 'd'.repeat(64),
+      html: '<main>x</main>', clientBundle: null, clientBundleSha256: null,
+    }), { status: 200 }),
+  ),
+  (error) => error.code === 'invalid_runtime_response',
+  'A candidate render must come from the requested candidate digest.',
+);
+await assert.rejects(
+  () => runtimeClient.renderTemplateThroughRuntime({ ...legacyRuntimeRequest, candidateDigest: '../x' }, legacyRuntimeEnv),
+  (error) => error.code === 'invalid_render_request',
+);
+const trialLoader = await readFile(path.join(process.cwd(), 'lib/template-trial.ts'), 'utf8');
+assert(trialLoader.includes('if (!website.template_trial_active) return website;'), 'Trial lookups only run when the public site reports an active trial.');
+assert(trialLoader.includes("runtime.status !== 'candidate'"), 'Only candidate runtimes may replace the public template runtime.');
+const tenantLoaderSource = await readFile(path.join(process.cwd(), 'lib/tenant-loader.ts'), 'utf8');
+assert(tenantLoaderSource.includes('applyViewerTemplateTrial(publicWebsite)'), 'Every tenant route must resolve the viewer trial in loadTenant.');
+
 const sanitizedProps = runtimeClient.sanitizeTemplateRuntimeProps({
   isPreview: false,
   auth: {
@@ -359,6 +403,7 @@ const previewComponent = await readFile(
 assert(previewComponent.includes('sandbox=""'), 'Runtime HTML must render in an opaque sandboxed iframe.');
 assert(previewComponent.includes("script-src 'none'"), 'Runtime preview must deny template scripts.');
 assert(previewComponent.includes("connect-src 'none'"), 'Runtime preview must deny network connections.');
+assert(previewComponent.includes('img-src data: blob: https:'), 'Runtime preview must allow HTTPS custom storage image domains.');
 assert(!previewComponent.includes('dangerouslySetInnerHTML'), 'Runtime HTML must not enter the renderer origin DOM.');
 assert(previewComponent.includes('parsePreviewInboundMessage'), 'Runtime editor preview must validate Studio draft messages.');
 assert(previewComponent.includes('draftEndpoint'), 'Runtime editor preview must render drafts through the private server adapter.');
@@ -387,7 +432,10 @@ assert(
 );
 const intentRoute = await readFile(path.join(process.cwd(), 'app/api/template-intents/route.ts'), 'utf8');
 assert(intentRoute.includes('sameOrigin(request)'), 'Template intents must only accept same-origin requests from the host frame.');
-assert(intentRoute.includes('parseTemplateRuntimeIntent(record.intent)'), 'Template intents must be validated by the bridge parser.');
+assert(
+  intentRoute.includes('parseTemplateRuntimeIntent(rawIntent && bannerFile ? { ...rawIntent, bannerFile } : rawIntent)'),
+  'Template intents must validate JSON payloads together with an optional uploaded banner.',
+);
 assert(intentRoute.includes('templateOwnsPage(tenant.website, pageType)'), 'Template intents require the package manifest to declare the page.');
 assert(intentRoute.includes('createPageKeyFactory(user.userId)'), 'Template intent keys must be resolved against the buyer session.');
 

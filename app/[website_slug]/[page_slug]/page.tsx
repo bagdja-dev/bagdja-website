@@ -35,6 +35,7 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
     const runtimeTemplate = await renderPinnedTenantTemplate({
       templateSlug: runtime.slug,
       pinnedVersion: runtime.version,
+      candidateDigest: runtime.candidateDigest,
       tenantSlug: params.website_slug,
       props: view.props,
     });

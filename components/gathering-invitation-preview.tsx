@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { VenueLocation } from './venue-location';
+import { richTextToPlainText } from '@/lib/rich-text';
 
 function formatLocalDate(value?: string | null) {
   if (!value) return 'Belum ditentukan';
@@ -92,9 +94,11 @@ interface GatheringInviteOption {
   label: string;
   description?: string | null;
   venue_location?: string | null;
+  venue_address?: string | null;
+  venue_map_url?: string | null;
 }
 
-export function GatheringInvitationPreview({ token, websiteName }: { token: string; websiteName: string }) {
+export function GatheringInvitationPreview({ token, websiteName, hideHeader = false }: { token: string; websiteName: string; hideHeader?: boolean }) {
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [participantTermsContent, setParticipantTermsContent] = useState<ReactNode>(null);
   const [error, setError] = useState('');
@@ -482,7 +486,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
 
   return (
     <main className="min-h-screen bg-white text-zinc-900">
-      <header className="border-b border-zinc-200"><div className="mx-auto max-w-2xl px-5 py-4 text-sm font-semibold">{websiteName}</div></header>
+      {hideHeader ? null : <header className="border-b border-zinc-200"><div className="mx-auto max-w-2xl px-5 py-4 text-sm font-semibold">{websiteName}</div></header>}
       <article className="mx-auto max-w-2xl px-5 py-10">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Undangan gathering</p>
         {preview.group.invitation_banner_url ? <img src={preview.group.invitation_banner_url} alt={`Banner ${preview.group.title}`} className="mt-4 aspect-[16/8] w-full object-cover" /> : null}
@@ -490,7 +494,7 @@ export function GatheringInvitationPreview({ token, websiteName }: { token: stri
         <p className="mt-1 text-xs text-zinc-500">Nomor rencana: {preview.group.plan_number}</p>
         <p className="mt-2 text-sm text-zinc-600">Diprakarsai oleh <strong className="font-semibold text-zinc-800">{preview.group.initiator_name}</strong></p>
         {preview.invitation.invitee_name ? <p className="mt-2 text-sm text-zinc-600">Untuk {preview.invitation.invitee_name}</p> : null}
-        {preview.group.invitation_description ? <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-zinc-700">{preview.group.invitation_description}</p> : null}
+        {richTextToPlainText(preview.group.invitation_description) ? <p className="mt-5 whitespace-pre-line text-sm leading-7 text-zinc-700">{richTextToPlainText(preview.group.invitation_description)}</p> : null}
         {participantTermsHtml ? (
           <section className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
             <h2 className="text-sm font-semibold">Syarat dan ketentuan peserta</h2>
@@ -583,7 +587,8 @@ function GatheringVoteOptionCard({
         <span className="min-w-0">
           <span className="block font-semibold">{option.label}</span>
           <span className="mt-1 block text-xs text-zinc-500">{option.option_group_key}{option.venue_location ? ` · ${option.venue_location}` : ''}</span>
-          {option.description ? <span className="mt-2 block text-xs font-normal text-zinc-600">{option.description}</span> : null}
+          <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
+          {option.description ? <span className="mt-2 block whitespace-pre-line text-xs font-normal text-zinc-600">{richTextToPlainText(option.description)}</span> : null}
         </span>
         <span className="shrink-0 text-right">
           <span className="block text-lg font-bold tabular-nums">{percentage}%</span>

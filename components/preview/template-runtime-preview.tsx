@@ -50,7 +50,7 @@ function createPreviewDocument(
     "default-src 'none'",
     "script-src 'none'",
     "connect-src 'none'",
-    `img-src data: blob: https://*.supabase.co https://*.supabase.in https://*.r2.dev https://*.r2.cloudflarestorage.com${demoImageSource}`,
+    `img-src data: blob: https:${demoImageSource}`,
     `style-src 'unsafe-inline'${stylesheetSources}`,
     'font-src data:',
     'media-src data: blob:',

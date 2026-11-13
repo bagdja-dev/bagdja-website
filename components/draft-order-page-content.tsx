@@ -15,11 +15,11 @@ import {
 import { getTemplateRenderer } from '../lib/template-registry';
 import type { TemplateRenderProps } from '../lib/template-registry';
 import { resolveTenantLinkBase } from '../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../lib/website-theme';
 import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../lib/template-runtime-route';
 import { buildSystemPageProps } from '../lib/system-page-props';
 import { loadGatheringPlanTemplatePage } from '../lib/template-page-loaders';
-import { hostRendererSlug, templateOwnsPage, tenantRuntime } from '../lib/tenant-template';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../lib/tenant-template';
 import type { GatheringPlanDetail, OrderDetail } from './order-detail-content';
 import WebsiteInactiveNotice from './website-inactive-notice';
 import { transactionHref } from '../lib/order-href';
@@ -44,7 +44,16 @@ export default async function DraftOrderPageContent({
   if (result.status === 401) {
     redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/cart/order/${orderId}`)}`);
   }
-  if (!result.data || result.status >= 400) notFound();
+  if (!result.data || result.status >= 400) {
+    // Tautan lama dari kartu referensi chat Studio membawa ID kelompok gathering, bukan ID order.
+    // Bila ID ini rencana milik user, arahkan ke order rencananya; selain itu tetap 404.
+    const plan = await backendFetch<{ order_id?: string | null }>(
+      `/api/gathering/plans/${encodeURIComponent(orderId)}?website_id=${encodeURIComponent(website.id)}`,
+    );
+    const planOrderId = plan.status < 400 ? plan.data?.order_id : null;
+    if (planOrderId && planOrderId !== orderId) redirect(`${basePath}/cart/order/${encodeURIComponent(planOrderId)}`);
+    notFound();
+  }
   if (result.data.transaction_id) {
     redirect(transactionHref(basePath, result.data.transaction_id));
   }
@@ -65,7 +74,7 @@ export default async function DraftOrderPageContent({
   // Rencana gathering milik template package bila manifest menyatakan `gathering_plan`.
   const runtime = tenantRuntime(website);
   if (gatheringPlan && runtime && templateOwnsPage(website, 'gathering_plan')) {
-    const loaded = await loadGatheringPlanTemplatePage(gatheringPlan, website.id, 'initiator');
+    const loaded = await loadGatheringPlanTemplatePage(gatheringPlan, website.id, 'initiator', basePath);
     if (loaded && 'unauthenticated' in loaded) {
       redirect(`/auth/login?next=${encodeURIComponent(`${basePath}/cart/order/${orderId}`)}`);
     }
@@ -73,6 +82,7 @@ export default async function DraftOrderPageContent({
       const templatePage = await renderPinnedTenantTemplate({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
         tenantSlug: website.slug,
         props: { ...buildSystemPageProps(tenant, { basePath, auth, sections: [] }), page: loaded.page },
       });
@@ -96,7 +106,7 @@ export default async function DraftOrderPageContent({
       socialLinks: website.social_links,
       footerSettings: website.footer_settings,
     },
-    templateTheme: extractTemplateTheme(website.template?.structure),
+    templateTheme: tenantTemplateTheme(website),
     websiteTheme: sanitizeWebsiteTheme(website.theme),
     sections,
     products: products.map(toCatalogItem),
@@ -113,6 +123,8 @@ export default async function DraftOrderPageContent({
     ? await renderPinnedTenantHeader({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,
       })

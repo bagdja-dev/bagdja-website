@@ -1,4 +1,5 @@
 import type { ApiWebsite } from './api-client';
+import { extractTemplateTheme, sanitizeWebsiteTheme, type WebsiteTheme } from './website-theme';
 
 /**
  * Keputusan template per website (plan/website-builder/template-owned-system-pages-plan.md §5).
@@ -14,13 +15,19 @@ export const HOST_FALLBACK_TEMPLATE_SLUG = 'store-classic';
 
 export type TemplateSystemPage =
   | 'header'
+  /** Navigasi bawah (HP) di halaman yang isinya dikelola Bagdja. */
+  | 'bottom_nav'
   | 'cart'
   | 'orders'
   | 'order_detail'
   | 'tagihan'
   | 'invoice_detail'
   | 'calendar'
-  | 'gathering_plan';
+  | 'gathering_plan'
+  /** Detail produk gathering (contractVersion 1); produk lain tetap tampilan Bagdja. */
+  | 'product_detail'
+  /** Halaman undangan gathering (RSVP, OTP, voting opsi, bayar kursi). */
+  | 'gathering_invitation';
 
 type WebsiteTemplateFields = Pick<ApiWebsite, 'template' | 'template_runtime'>;
 
@@ -37,4 +44,14 @@ export function templateOwnsPage(website: WebsiteTemplateFields, page: TemplateS
 export function hostRendererSlug(website: WebsiteTemplateFields): string | null {
   if (website.template_runtime) return HOST_FALLBACK_TEMPLATE_SLUG;
   return website.template?.slug ?? null;
+}
+
+/**
+ * Palet bawaan template untuk website ini: dari manifest **versi yang dipakai** (pin atau uji
+ * kandidat, `template_runtime.theme`), baru fallback ke `structure.theme` katalog. Dengan begitu
+ * "Reset ke warna template" dan halaman milik Bagdja memakai warna versi yang sama dengan template.
+ */
+export function tenantTemplateTheme(website: WebsiteTemplateFields): WebsiteTheme {
+  const runtimeTheme = sanitizeWebsiteTheme(website.template_runtime?.theme);
+  return Object.keys(runtimeTheme).length ? runtimeTheme : extractTemplateTheme(website.template?.structure);
 }

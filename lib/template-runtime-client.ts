@@ -6,6 +6,8 @@ export interface TemplateRuntimeRenderRequest {
   slug: string;
   version: string;
   props: Record<string, unknown>;
+  /** Uji kandidat belum terbit: render artefak kandidat (bukan registry rilis). */
+  candidateDigest?: string;
 }
 
 export interface TemplateRuntimeRenderResult {
@@ -268,19 +270,25 @@ export async function renderTemplateThroughRuntime(
   if (request.props === null || typeof request.props !== 'object' || Array.isArray(request.props)) {
     throw new TemplateRuntimeError('Template props must be a JSON object.', 'invalid_render_request', 400);
   }
+  if (request.candidateDigest !== undefined && !/^[a-f0-9]{64}$/.test(request.candidateDigest)) {
+    throw new TemplateRuntimeError('Template candidate digest is invalid.', 'invalid_render_request', 400);
+  }
   const config = getTemplateRuntimeClientConfig(env);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
   try {
-    const response = await fetchImpl(`${config.url}/v1/render`, {
+    const candidate = request.candidateDigest !== undefined;
+    const response = await fetchImpl(`${config.url}${candidate ? '/v1/render-candidate' : '/v1/render'}`, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${config.token}`,
         'content-type': 'application/json',
         accept: 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(candidate
+        ? { digest: request.candidateDigest, slug: request.slug, version: request.version, props: request.props }
+        : { slug: request.slug, version: request.version, props: request.props }),
       cache: 'no-store',
       signal: controller.signal,
     });
@@ -304,6 +312,7 @@ export async function renderTemplateThroughRuntime(
       result.slug !== request.slug ||
       result.version !== request.version ||
       typeof result.digest !== 'string' || !/^[a-f0-9]{64}$/.test(result.digest) ||
+      (candidate && result.digest !== request.candidateDigest) ||
       typeof result.html !== 'string'
     ) {
       throw new TemplateRuntimeError('Template runtime returned an invalid response.', 'invalid_runtime_response', 502);

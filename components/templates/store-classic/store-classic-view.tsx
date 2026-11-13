@@ -1172,7 +1172,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                             <div className="min-w-0">
                               <p className="text-sm font-medium" style={{ color: 'var(--brand-text)' }}>{option.label}</p>
                               {option.description ? (
-                                <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
+                                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
                               ) : null}
                               {(option.venueLocation || option.availabilityNote) && (
                                 <dl className="mt-3 grid gap-2">

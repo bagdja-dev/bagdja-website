@@ -19,7 +19,8 @@ import {
 } from './template-data';
 import type { TemplateRenderProps } from './template-registry';
 import { resolveTenantLinkBase } from './tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from './website-theme';
+import { sanitizeWebsiteTheme } from './website-theme';
+import { tenantTemplateTheme } from './tenant-template';
 
 export type TenantPageViewResult =
   | { status: 'not_found' }
@@ -67,7 +68,7 @@ export async function loadTenantPageView(
         socialLinks: website.social_links,
         footerSettings: website.footer_settings,
       },
-      templateTheme: extractTemplateTheme(website.template?.structure),
+      templateTheme: tenantTemplateTheme(website),
       websiteTheme: sanitizeWebsiteTheme(website.theme),
       sections: resolveSections(page, website.template, !pageSlug),
       products: products.map(toCatalogItem),

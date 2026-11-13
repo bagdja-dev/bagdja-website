@@ -19,6 +19,7 @@ import {
   type ApiWebsitePage,
   type ApiWebsiteProduct,
 } from './api-client';
+import { applyViewerTemplateTrial } from './template-trial';
 
 export interface TenantData {
   website: ApiWebsite;
@@ -38,8 +39,10 @@ export async function loadTenant(
   pageSlug?: string,
   options?: PublicFetchOptions,
 ): Promise<TenantData | null> {
-  const website = await getWebsiteBySlug(slug, options);
-  if (!website) return null;
+  const publicWebsite = await getWebsiteBySlug(slug, options);
+  if (!publicWebsite) return null;
+  // Uji template kandidat hanya untuk designer/reviewer yang berhak (lib/template-trial.ts).
+  const website = await applyViewerTemplateTrial(publicWebsite);
 
   const [page, productsResult, categories, locations, faqs, blogPosts] = await Promise.all([
     pageSlug ? getPageBySlug(slug, pageSlug, options) : getHomePage(slug, options),

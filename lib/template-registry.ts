@@ -85,6 +85,7 @@ export interface TemplateRenderProps {
     avatar?: string;
     loginHref?: string;
     logoutHref?: string;
+    profileLogoutHref?: string;
     cartHref?: string;
     ordersHref?: string;
     tagihanHref?: string;

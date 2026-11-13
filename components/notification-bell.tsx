@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { io } from 'socket.io-client';
 
 import { playNotificationSound, unlockNotificationAudio } from '../lib/notification-sound';
+import type { ThemeColors } from '../lib/website-theme';
 
 interface WebsiteNotification {
   id: string;
@@ -52,10 +53,14 @@ export function NotificationBell({
   websiteId,
   basePath = '',
   isLoggedIn,
+  unreadOnly = false,
+  theme,
 }: {
   websiteId: string;
   basePath?: string;
   isLoggedIn: boolean;
+  unreadOnly?: boolean;
+  theme?: Pick<ThemeColors, 'background' | 'surface' | 'text' | 'textMuted' | 'accent' | 'border' | 'onAccent'>;
 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<WebsiteNotification[]>([]);
@@ -235,6 +240,7 @@ export function NotificationBell({
   }, [basePath, websiteId]);
 
   if (!isLoggedIn || !websiteId) return null;
+  const visibleItems = unreadOnly ? items.filter((item) => !item.read_at) : items;
 
   return (
     <div className="relative" ref={panelRef}>
@@ -243,7 +249,10 @@ export function NotificationBell({
         aria-label="Notifikasi"
         onClick={() => setOpen((current) => !current)}
         className="relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors hover:opacity-80"
-        style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+        style={{
+          borderColor: theme?.border ?? 'var(--brand-border, #e4e4e7)',
+          color: theme?.text ?? 'var(--brand-text, #18181b)',
+        }}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 1-5.714 0M6.75 17.25h10.5a2.25 2.25 0 0 0 1.892-3.526L17.2 11.2A4.2 4.2 0 0 1 16.5 8.25V7.5A4.5 4.5 0 0 0 12 3a4.5 4.5 0 0 0-4.5 4.5v.75a4.2 4.2 0 0 1-.7 2.95l-1.942 2.524A2.25 2.25 0 0 0 6.75 17.25Z" />
@@ -251,7 +260,10 @@ export function NotificationBell({
         {unreadCount > 0 && (
           <span
             className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
-            style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
+            style={{
+              backgroundColor: theme?.accent ?? 'var(--brand-accent, #00608e)',
+              color: theme?.onAccent ?? 'var(--brand-on-accent, #ffffff)',
+            }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
@@ -260,10 +272,17 @@ export function NotificationBell({
 
       {open && (
         <div
-          className="absolute right-0 top-12 z-30 w-80 overflow-hidden rounded-xl border bg-[var(--brand-bg,#fff)] shadow-xl"
-          style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
+          className="absolute right-0 top-12 z-30 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border shadow-xl"
+          style={{
+            borderColor: theme?.border ?? 'var(--brand-border, #e4e4e7)',
+            backgroundColor: theme?.surface ?? theme?.background ?? 'var(--brand-bg, #fff)',
+            color: theme?.text ?? 'var(--brand-text, #18181b)',
+          }}
         >
-          <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: 'var(--brand-border)' }}>
+          <div
+            className="flex items-center justify-between border-b px-3 py-2"
+            style={{ borderColor: theme?.border ?? 'var(--brand-border, #e4e4e7)' }}
+          >
             <p className="text-sm font-semibold">Notifikasi</p>
             {unreadCount > 0 && (
               <button type="button" onClick={() => void markAllRead()} className="text-[11px] font-medium opacity-70">
@@ -272,16 +291,18 @@ export function NotificationBell({
             )}
           </div>
           <div className="max-h-80 overflow-y-auto">
-            {items.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm opacity-60">Tidak ada notifikasi.</p>
+            {visibleItems.length === 0 ? (
+              <p className="px-3 py-6 text-center text-sm opacity-60">
+                {unreadOnly ? 'Tidak ada notifikasi baru.' : 'Tidak ada notifikasi.'}
+              </p>
             ) : (
-              items.map((item) => (
+              visibleItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => void openNotification(item)}
                   className={`block w-full border-b px-3 py-2.5 text-left last:border-b-0 ${item.read_at ? 'opacity-70' : ''}`}
-                  style={{ borderColor: 'var(--brand-border)' }}
+                  style={{ borderColor: theme?.border ?? 'var(--brand-border, #e4e4e7)' }}
                 >
                   <p className="text-sm font-semibold">{item.title}</p>
                   <p className="mt-0.5 line-clamp-2 text-xs opacity-70">{item.message}</p>
@@ -302,9 +323,9 @@ export function NotificationBell({
                   onClick={() => void openNotification(toast)}
                   className="pointer-events-auto rounded-xl border p-3 text-left shadow-xl"
                   style={{
-                    borderColor: 'var(--brand-border)',
-                    backgroundColor: 'var(--brand-bg, #fff)',
-                    color: 'var(--brand-text)',
+                    borderColor: theme?.border ?? 'var(--brand-border, #e4e4e7)',
+                    backgroundColor: theme?.surface ?? theme?.background ?? 'var(--brand-bg, #fff)',
+                    color: theme?.text ?? 'var(--brand-text, #18181b)',
                   }}
                 >
                   <p className="text-sm font-semibold">{toast.title}</p>
