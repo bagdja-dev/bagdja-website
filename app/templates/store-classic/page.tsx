@@ -3,6 +3,9 @@
  * Dipakai oleh admin (iframe live preview) & untuk browsing template secara manual.
  * Data katalog diambil dari master_defaults template sungguhan (lihat
  * `buildTemplateDefaultsPreview`) — tenant sungguhan dirender via [website_slug].
+ *
+ * Selalu memakai renderer bawaan: slug `store-classic` milik template bawaan dan
+ * tidak boleh diganti artefak package eksternal (template package memakai slug sendiri).
  */
 
 import { StoreClassicView } from '../../../components/templates/store-classic/store-classic-view';

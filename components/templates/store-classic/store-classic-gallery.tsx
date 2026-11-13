@@ -261,14 +261,20 @@ export function StoreClassicProductGallery({
             type="button"
             onClick={() => setIsLightboxOpen(false)}
             aria-label="Tutup preview"
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            // z-10: wadah konten di bawah (relative, selebar layar di HP) dirender setelah tombol ini dan
+            // sebelumnya menutupinya, sehingga tap X tertelan oleh stopPropagation wadah.
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
           >
             <CloseIcon />
           </button>
 
           <div
             className="relative flex h-full max-h-full w-full max-w-4xl items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              // Area kosong di sekitar media = latar → tutup; klik pada media/tombol tidak.
+              if (e.target === e.currentTarget) setIsLightboxOpen(false);
+              e.stopPropagation();
+            }}
             onTouchStart={isInteractive3d ? undefined : handleTouchStart}
             onTouchEnd={isInteractive3d ? undefined : handleTouchEnd}
           >

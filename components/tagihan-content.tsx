@@ -111,6 +111,7 @@ interface GatheringInvoiceGroup {
 interface TagihanContentProps {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
+  designVariant?: 'store-classic';
 }
 
 type TabKey = 'all' | 'scheduled' | 'issued' | 'paid' | 'refunded' | 'cancelled';
@@ -124,7 +125,12 @@ const TABS: Array<{ key: TabKey; label: string; match?: (s: string) => boolean }
   { key: 'cancelled', label: 'Dibatalkan', match: (s) => s === 'CANCELLED' },
 ];
 
-export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { websiteId: string }) {
+export function TagihanContent({
+  basePath,
+  websiteId,
+  designVariant,
+}: TagihanContentProps & { websiteId: string }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const [rows, setRows] = useState<TagihanRow[]>([]);
   const [gatheringInvoices, setGatheringInvoices] = useState<GatheringInvoiceRow[]>([]);
   const [gatheringInvoiceError, setGatheringInvoiceError] = useState('');
@@ -249,6 +255,10 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
     }
     return cnt;
   }, [groupedGatheringInvoices, rows]);
+  const totalOutstanding = useMemo(
+    () => rows.filter((row) => row.status === 'ISSUED').length + groupedGatheringInvoices.filter((group) => group.has_outstanding_invoice).length,
+    [groupedGatheringInvoices, rows],
+  );
 
   async function payTermin(terminId: string) {
     setPayingId(terminId);
@@ -270,17 +280,36 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
   }
 
   return (
-    <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <header className="mb-6">
-        <h1
-          className="text-2xl font-bold sm:text-3xl"
-          style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
-        >
-          Tagihan
-        </h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          Semua Termin/Tagihan Anda lintas pesanan — bayar langsung dari sini.
-        </p>
+    <section className={`mx-auto px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl sm:py-12' : 'max-w-4xl sm:py-10'}`}>
+      <header className={`mb-6 ${isStoreClassicDesign ? 'flex flex-wrap items-end justify-between gap-4' : ''}`}>
+        <div>
+          {isStoreClassicDesign && (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+              Akun Anda
+            </p>
+          )}
+          <h1
+            className={`font-bold ${isStoreClassicDesign ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}
+            style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+          >
+            Tagihan Saya
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>
+            Semua Termin/Tagihan Anda lintas pesanan — bayar langsung dari sini.
+          </p>
+        </div>
+        {isStoreClassicDesign && (
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <span className="font-bold">{tabCounts.all}</span>
+              <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>tagihan</span>
+            </div>
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+              <span className="font-bold">{totalOutstanding}</span>
+              <span className="ml-1.5" style={{ color: 'var(--brand-muted)' }}>perlu dibayar</span>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
@@ -291,7 +320,9 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 items-center gap-2 border px-4 py-2 text-sm font-medium transition-colors ${
+                isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'
+              } ${
                 active ? '' : 'hover:opacity-90'
               }`}
               style={{
@@ -317,7 +348,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
 
       {loading && (
         <div
-          className="rounded-xl border p-10 text-center text-sm"
+          className={`border p-10 text-center text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
         >
           Memuat Tagihan…
@@ -326,7 +357,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
 
       {!loading && error && (
         <div
-          className="rounded-xl border p-5 text-sm"
+          className={`border p-5 text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(239,68,68,0.06)' }}
         >
           <p style={{ color: 'rgb(185, 28, 28)' }}>{error}</p>
@@ -336,7 +367,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
       {!loading && !error && (filtered.length > 0 || filteredGatheringInvoices.length > 0) ? (
         <section className="mb-8">
           <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="text-base font-semibold">Daftar tagihan</h2>
+            <h2 className={`font-semibold ${isStoreClassicDesign ? 'text-lg' : 'text-base'}`}>Daftar tagihan</h2>
             <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>{filtered.length + filteredGatheringInvoices.length} tagihan</span>
           </div>
           <div className="flex flex-col gap-3">
@@ -355,7 +386,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
                 ? `${group.invoices.length} invoice · ${group.invoices.slice(0, 2).map((item) => item.attendee_name).join(', ')}${group.invoices.length > 2 ? ` +${group.invoices.length - 2} lainnya` : ''}`
                 : `${invoice.invoice_id} · ${invoice.attendee_name}`;
               return (
-                <article key={group.id} className="border text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                <article key={group.id} className={`border text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : ''}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
                     <div>
                       <p className="font-semibold">{invoice.gathering_title}</p>
@@ -371,7 +402,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
                       {invoice.is_initiator && !invoice.can_pay ? <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Anda pengelola gathering ini.</p> : null}
                     </div>
                     {invoiceHref ? (
-                      <a href={invoiceHref} className="inline-flex rounded-full border px-4 py-2 text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat detail tagihan</a>
+                      <a href={invoiceHref} className={`inline-flex border px-4 py-2 text-xs font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat detail tagihan</a>
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--brand-muted)' }}>Tagihan tersedia setelah initiator membuka pembayaran.</span>
                     )}
@@ -384,8 +415,8 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
               const toneStyle = pillBg(tone);
               const orderHref = row.orderTransactionId ? `${basePath}/order/${row.orderTransactionId}` : undefined;
               return (
-                <article key={`termin:${row.id}`} className="rounded border text-sm" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-                  <div className="flex items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
+                <article key={`termin:${row.id}`} className={`border text-sm ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded'}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: 'var(--brand-border)' }}>
                     <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-muted)' }}>
                       <span className="font-semibold">{row.productName ?? 'Produk'}</span><span>•</span><span>{formatDate(row.createdAt)}</span>
                     </div>
@@ -400,8 +431,8 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
                     <div className="flex flex-col items-start gap-3 sm:shrink-0 sm:items-end">
                       <p className="text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{formatMoney(row.amount)}</p>
                       <div className="flex flex-wrap items-center gap-2">
-                        {orderHref ? <a href={orderHref} className="inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat Order</a> : null}
-                        {row.status === 'ISSUED' ? <button type="button" disabled={payingId === row.id} onClick={() => setPendingTermin({ id: row.id, label: row.label, amount: row.amount })} className="inline-flex rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>{payingId === row.id ? 'Memproses…' : 'Bayar'}</button> : null}
+                        {orderHref ? <a href={orderHref} className={`inline-flex border px-4 py-1.5 text-xs font-semibold transition-opacity hover:opacity-85 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Lihat Order</a> : null}
+                        {row.status === 'ISSUED' ? <button type="button" disabled={payingId === row.id} onClick={() => setPendingTermin({ id: row.id, label: row.label, amount: row.amount })} className={`inline-flex px-4 py-1.5 text-xs font-semibold disabled:opacity-60 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`} style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>{payingId === row.id ? 'Memproses…' : 'Bayar'}</button> : null}
                       </div>
                     </div>
                   </div>
@@ -415,7 +446,7 @@ export function TagihanContent({ basePath, websiteId }: TagihanContentProps & { 
 
       {!loading && !error && filtered.length === 0 && filteredGatheringInvoices.length === 0 && (
         <div
-          className="flex flex-col items-center gap-4 rounded-xl border p-10 text-center"
+          className={`flex flex-col items-center gap-4 border p-10 text-center ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
         >
           <p

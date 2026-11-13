@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { GatheringReservationDetail } from '../../../../../components/gathering-reservation-detail';
+import { renderTenantChrome } from '../../../../../lib/tenant-chrome';
 import { loadTenant } from '../../../../../lib/tenant-loader';
 import { resolveTenantLinkBase } from '../../../../../lib/tenant-link-base';
 
@@ -19,12 +20,21 @@ export async function generateMetadata({ params }: GatheringReservationRouteProp
 export default async function GatheringReservationRoute({ params }: GatheringReservationRouteProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
+  const basePath = resolveTenantLinkBase(params.website_slug);
+  const chrome = await renderTenantChrome(tenant, {
+    basePath,
+    pagePath: `${basePath}/gathering/reservation/${encodeURIComponent(params.registrationId)}`,
+  });
   return (
-    <GatheringReservationDetail
-      registrationId={params.registrationId}
-      websiteId={tenant.website.id}
-      websiteName={tenant.website.name}
-      basePath={resolveTenantLinkBase(params.website_slug)}
-    />
+    <>
+      {chrome.node}
+      <GatheringReservationDetail
+        registrationId={params.registrationId}
+        websiteId={tenant.website.id}
+        websiteName={tenant.website.name}
+        basePath={basePath}
+        hideHeader={chrome.active}
+      />
+    </>
   );
 }

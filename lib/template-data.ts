@@ -9,6 +9,7 @@ import type {
   ApiWebsiteProduct,
   ApiWebsiteTemplate,
 } from './api-client';
+import { richTextHtml, richTextToPlainText } from './rich-text';
 
 export interface GatheringOptionGroup {
   key: string;
@@ -16,8 +17,13 @@ export interface GatheringOptionGroup {
   options: Array<{
     id: string;
     label: string;
+    /** Teks polos (HTML editor dibuang). */
     description?: string;
+    /** HTML ringan tersanitasi dari Studio, khusus template package. */
+    descriptionHtml?: string;
     venueLocation?: string;
+    venueAddress?: string;
+    venueMapUrl?: string;
     availabilityNote?: string;
     benefits?: string[];
     images?: string[];
@@ -33,6 +39,7 @@ export interface CatalogItem {
   category?: string;
   name: string;
   slug: string;
+  price?: number;
   description?: string;
   detail?: string;
   gatheringMeta?: {
@@ -385,8 +392,11 @@ function normalizeGatheringMeta(
     group.options.push({
       id: option.id,
       label: option.label,
-      description: option.description ?? undefined,
+      description: richTextToPlainText(option.description) || undefined,
+      descriptionHtml: richTextHtml(option.description),
       venueLocation: option.venue_location ?? undefined,
+      venueAddress: option.venue_address?.trim() || undefined,
+      venueMapUrl: option.venue_map_url?.trim() || undefined,
       availabilityNote: typeof option.availability_window?.note === 'string'
         ? option.availability_window.note
         : undefined,
@@ -463,6 +473,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     category: product.category ?? undefined,
     name: product.name,
     slug: product.slug,
+    price: Number(product.price),
     description: product.description ?? undefined,
     detail: product.detail ?? undefined,
     gatheringMeta: normalizeGatheringMeta(product.metadata, product.gathering_options),
@@ -502,6 +513,8 @@ interface MasterDefaultsCatalogItem {
   image?: string;
   variant_attributes?: Record<string, string>;
   inherit_description?: boolean;
+  min_attendees?: number;
+  max_attendees?: number;
 }
 
 interface MasterDefaultsCategoryItem {
@@ -524,7 +537,7 @@ export interface TemplateDefaultsPreview {
 
 function buildCatalogFromSeed(
   items: MasterDefaultsCatalogItem[] | undefined,
-  type: 'service' | 'product',
+  type: 'service' | 'product' | 'gathering',
 ): CatalogItem[] {
   if (!items?.length) return [];
   return items.map((item, index) => {
@@ -539,11 +552,21 @@ function buildCatalogFromSeed(
       name: item.name,
       slug: id,
       description,
-      priceLabel: item.price > 0 ? formatIDR(item.price) : '',
+      priceLabel: item.price > 0
+        ? `${formatIDR(item.price)}${type === 'gathering' ? ' / peserta' : ''}`
+        : '',
       image: images?.[0],
       images,
       parentProductId: parent ? (parent.key ?? undefined) : undefined,
       variantAttributes: parseVariantAttributes(item.variant_attributes),
+      ...(type === 'gathering'
+        ? {
+            gatheringMeta: {
+              minAttendees: item.min_attendees,
+              maxAttendees: item.max_attendees,
+            },
+          }
+        : {}),
     };
   });
 }
@@ -558,6 +581,7 @@ export function buildTemplateDefaultsPreview(structure: Record<string, unknown> 
   const master = (structure?.master_defaults ?? {}) as {
     services?: MasterDefaultsCatalogItem[];
     products?: MasterDefaultsCatalogItem[];
+    gatherings?: MasterDefaultsCatalogItem[];
     categories?: MasterDefaultsCategoryItem[];
     faqs?: MasterDefaultsFaqItem[];
   };
@@ -565,7 +589,11 @@ export function buildTemplateDefaultsPreview(structure: Record<string, unknown> 
 
   return {
     sections: sectionsDef.map((s) => ({ type: s.type, content: s.defaults ?? {} })),
-    products: [...buildCatalogFromSeed(master.services, 'service'), ...buildCatalogFromSeed(master.products, 'product')],
+    products: [
+      ...buildCatalogFromSeed(master.services, 'service'),
+      ...buildCatalogFromSeed(master.products, 'product'),
+      ...buildCatalogFromSeed(master.gatherings, 'gathering'),
+    ],
     categories: (master.categories ?? []).map((c, index) => ({
       id: `cat-${index}`,
       label: c.label,

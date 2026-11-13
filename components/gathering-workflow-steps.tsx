@@ -8,6 +8,8 @@ import { GatheringInvitationManager } from './gathering-invitation-manager';
 import { GatheringInvitationCard } from './gathering-invitation-card';
 import { GatheringPlanControls } from './gathering-plan-controls';
 import type { GatheringPlanDetail } from './order-detail-content';
+import { VenueLocation } from './venue-location';
+import { richTextToPlainText } from '@/lib/rich-text';
 
 const STEPS = [
   { key: 'PLAN', label: 'Atur rencana' },
@@ -78,6 +80,8 @@ interface RegistrationRow {
     label: string;
     description: string | null;
     venue_location: string | null;
+    venue_address?: string | null;
+    venue_map_url?: string | null;
   }>;
   registration_status: string;
   payment_status: string;
@@ -134,8 +138,9 @@ function ReadOnlyPlan({ plan }: { plan: GatheringPlanDetail }) {
                 {option.is_final_selection ? <span className="border px-2 py-0.5 text-[10px] font-semibold uppercase" style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent-muted)' }}>Opsi final</span> : null}
               </div>
               <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
-                {[option.option_group_key, option.venue_location, option.description].filter(Boolean).join(' · ')}
+                {[option.option_group_key, option.venue_location, richTextToPlainText(option.description)].filter(Boolean).join(' · ')}
               </p>
+              <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
             </li>
           ))}
         </ul>
@@ -819,7 +824,7 @@ function ReadOnlyInvitationHistory({
               </div>
               {/* Mobile: footer melayang; spacer supaya baris terakhir tidak tertutup */}
               <div className="h-20 sm:hidden" aria-hidden="true" />
-              <div className="fixed inset-x-0 bottom-0 z-20 border-t px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] sm:hidden" style={{ backgroundColor: 'var(--brand-bg)', borderColor: 'var(--brand-border)' }}>
+              <div className="fixed inset-x-0 bottom-0 z-20 border-t px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] sm:hidden" style={{ backgroundColor: 'var(--brand-bg)', borderColor: 'var(--brand-border)', bottom: 'var(--template-bottom-nav-height, 0px)' }}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>{collectiveSelectedCount} tagihan dipilih</p>
@@ -898,7 +903,8 @@ function ReadOnlyInvitationHistory({
                             <p className="text-xs text-zinc-500">{option.option_group_key}</p>
                             <p className="mt-1 text-sm font-medium">{option.label}</p>
                             {option.venue_location ? <p className="mt-1 text-xs text-zinc-600">{option.venue_location}</p> : null}
-                            {option.description ? <p className="mt-1 text-xs text-zinc-600">{option.description}</p> : null}
+                            <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
+                            {option.description ? <p className="mt-1 whitespace-pre-line text-xs text-zinc-600">{richTextToPlainText(option.description)}</p> : null}
                           </li>
                         ))}
                       </ul>
@@ -947,6 +953,7 @@ function ReadOnlyInvitationHistory({
                               <span className="min-w-0 flex-1">
                                 <span className="block font-medium">{option.label}</span>
                                 {option.venue_location ? <span className="mt-1 block text-xs" style={{ color: 'var(--brand-muted)' }}>{option.venue_location}</span> : null}
+                                <VenueLocation address={option.venue_address} mapUrl={option.venue_map_url} />
                               </span>
                               <span className="shrink-0 text-right text-xs" style={{ color: 'var(--brand-muted)' }}>{vote ? `${vote.votes} suara · ${vote.percentage}%` : '0 suara'}</span>
                             </label>
@@ -1059,7 +1066,8 @@ export function GatheringWorkflowSteps({
   const [selectedIndex, setSelectedIndex] = useState(currentIndex);
   const [cancelling, setCancelling] = useState(false);
   const [invitationBannerUrl, setInvitationBannerUrl] = useState(plan.invitation_banner_url ?? '');
-  const [invitationDescription, setInvitationDescription] = useState(plan.invitation_description ?? '');
+  // Form Bagdja memakai teks polos; HTML dari editor template ditampilkan sebagai teks.
+  const [invitationDescription, setInvitationDescription] = useState(richTextToPlainText(plan.invitation_description));
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('Dibatalkan oleh initiator');
   const [cancelError, setCancelError] = useState('');

@@ -29,7 +29,15 @@ import { resolveSections } from '../../../lib/template-data';
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import { loadTenantPageView } from '../../../lib/tenant-page-view';
 import { PreviewShell } from '../../../components/preview/preview-shell';
+import { TemplateRuntimePreview } from '../../../components/preview/template-runtime-preview';
+import { TemplateRuntimeErrorView } from '../../../components/template-runtime-error';
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
+import {
+  getTemplateRuntimeTenantVersion,
+  renderTemplateThroughRuntime,
+  sanitizeTemplateRuntimeProps,
+  TemplateRuntimeError,
+} from '../../../lib/template-runtime-client';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -68,8 +76,67 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
   if (!view.templateSlug) notFound();
 
-  // Validasi di server: template tidak ter-build → UnsupportedTemplateError
-  // (ditangani app/[website_slug]/error.tsx), sama seperti route publik.
+  let runtimeVersion: string | null = null;
+  const runtime = view.tenant.website.template_runtime ?? null;
+  try {
+    runtimeVersion = runtime ? getTemplateRuntimeTenantVersion(runtime.slug, runtime.version) : null;
+  } catch (error) {
+    if (error instanceof TemplateRuntimeError) {
+      return <TemplateRuntimeErrorView code={error.code} message={error.message} />;
+    }
+    throw error;
+  }
+  if (runtimeVersion) {
+    try {
+      const runtimeProps = sanitizeTemplateRuntimeProps({
+        ...view.props,
+        isPreview: true,
+      });
+      const rendered = await renderTemplateThroughRuntime({
+        slug: view.templateSlug,
+        version: runtimeVersion,
+        props: runtimeProps,
+      });
+      // Pratinjau Studio inert: hanya HTML hasil render server. JavaScript browser template
+      // (progressive enhancement) sengaja tidak dijalankan di editor.
+      const isHome = !pageSlug;
+      return (
+        <TemplateRuntimePreview
+          html={rendered.html}
+          templateSlug={rendered.slug}
+          templateVersion={rendered.version}
+          digest={rendered.digest}
+          pageSlug={view.tenant.page?.slug ?? target?.slug ?? ''}
+          allowedOrigins={getAllowedAdminOrigins()}
+          allowDemoImageHost={
+            process.env.NODE_ENV !== 'production' &&
+            process.env.TEMPLATE_RUNTIME_STUDIO_PREVIEW_ENABLED === 'true'
+          }
+          {...(
+            process.env.NODE_ENV !== 'production' &&
+            process.env.TEMPLATE_RUNTIME_STUDIO_PREVIEW_ENABLED === 'true'
+              ? {
+                  draftEndpoint: '/api/template-runtime/studio-preview',
+                  initialProps: runtimeProps,
+                  draftIsHome: isHome,
+                  draftFallbackSections: isHome
+                    ? resolveSections(null, view.tenant.website.template)
+                    : [],
+                }
+              : {}
+          )}
+        />
+      );
+    } catch (error) {
+      if (error instanceof TemplateRuntimeError) {
+        return <TemplateRuntimeErrorView code={error.code} message={error.message} />;
+      }
+      throw error;
+    }
+  }
+
+  // Built-in hanya dipakai ketika preview runtime belum aktif untuk slug ini.
+  // Tidak ada fallback otomatis dari runtime ke built-in setelah runtime dipilih.
   getTemplateRenderer(view.templateSlug);
 
   const { tenant } = view;

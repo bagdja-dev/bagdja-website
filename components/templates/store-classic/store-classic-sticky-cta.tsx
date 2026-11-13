@@ -56,7 +56,12 @@ export function StoreClassicStickyCta({ targetId, secondaryActions }: StoreClass
         className={`fixed inset-x-0 bottom-0 z-20 border-t px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] transition-transform duration-200 sm:hidden ${
           visible ? 'translate-y-0' : 'pointer-events-none translate-y-full'
         }`}
-        style={{ backgroundColor: 'var(--brand-bg)', borderColor: 'var(--brand-border)' }}
+        style={{
+          backgroundColor: 'var(--brand-bg)',
+          borderColor: 'var(--brand-border)',
+          // Di atas navigasi bawah template (lihat TemplateRuntimeSsrFrame placement="bottom").
+          bottom: 'var(--template-bottom-nav-height, 0px)',
+        }}
         aria-hidden={!visible}
       >
         <div className="flex items-center gap-2">

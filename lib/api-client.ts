@@ -9,6 +9,10 @@ export interface ApiWebsiteTemplate {
   description: string | null;
   preview_image: string | null;
   structure: Record<string, unknown>;
+  /** `builtin` = renderer React internal; `package` = template designer via runtime. */
+  source?: 'builtin' | 'package';
+  /** Manifest katalog (versi terbit terbaru untuk template package). */
+  manifest?: { version?: string; isBuiltin?: boolean } | null;
 }
 
 export interface ApiWebsite {
@@ -17,6 +21,27 @@ export interface ApiWebsite {
   slug: string;
   domain: string | null;
   template_id: string | null;
+  /** Salinan versi package terpasang; null untuk template bawaan. Gunakan `template_runtime`. */
+  template_runtime_version: string | null;
+  /**
+   * Keputusan runtime dari API: hanya terisi untuk template package yang ter-pin.
+   * null = renderer bawaan (lib/tenant-template.ts).
+   */
+  template_runtime?: {
+    slug: string;
+    version: string;
+    /** `candidate` = uji kandidat belum terbit, hanya untuk viewer yang berhak (lib/template-trial.ts). */
+    status: 'published' | 'deprecated' | 'revoked' | 'candidate';
+    pageOverrides: string[];
+    /** Hanya untuk `candidate`: digest artefak di runtime `/v1/render-candidate`. */
+    candidateDigest?: string;
+    name?: string;
+    viewerRole?: 'designer' | 'reviewer' | 'tester' | 'reviewer_team';
+    /** Palet bawaan versi yang dipakai (`manifest.theme`); lihat tenantTemplateTheme. */
+    theme?: Record<string, unknown>;
+  } | null;
+  /** true bila website sedang menguji template kandidat (ID pengajuan tidak dibuka ke publik). */
+  template_trial_active?: boolean;
   template: ApiWebsiteTemplate | null;
   tagline: string | null;
   logo_url: string | null;
@@ -111,6 +136,8 @@ export interface ApiWebsiteProduct {
     max_attendees: number;
     availability_window?: Record<string, unknown>;
     venue_location?: string | null;
+    venue_address?: string | null;
+    venue_map_url?: string | null;
     benefits?: unknown[];
     images?: string[] | null;
     is_active: boolean;

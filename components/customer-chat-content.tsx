@@ -396,25 +396,78 @@ export function CustomerChatContent({
 
   useEffect(() => {
     const root = chatRootRef.current;
-    if (!root) return;
+    const pageShell = root?.parentElement;
+    if (!root || !pageShell) return;
+
+    const originalShellStyle = {
+      height: pageShell.style.height,
+      minHeight: pageShell.style.minHeight,
+      overflow: pageShell.style.overflow,
+    };
 
     const updateAvailableHeight = () => {
-      const footer = root.parentElement?.querySelector('footer');
+      const footer = pageShell.querySelector('footer');
       const footerHeight = footer?.getBoundingClientRect().height ?? 0;
       const top = root.getBoundingClientRect().top;
-      setAvailableHeight(Math.max(320, window.innerHeight - top - footerHeight));
+      const shellTop = pageShell.getBoundingClientRect().top;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const configuredBottomInset = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--template-bottom-nav-height'),
+      ) || 0;
+      const fixedBottomFrames = Array.from(document.querySelectorAll('iframe')).flatMap((frame) => {
+        const container = frame.parentElement;
+        if (!container || getComputedStyle(container).position !== 'fixed') return [];
+        const rect = container.getBoundingClientRect();
+        return rect.bottom >= viewportHeight - 1 && rect.top < viewportHeight
+          ? [viewportHeight - rect.top]
+          : [];
+      });
+      const bottomNavHeight = Math.max(configuredBottomInset, ...fixedBottomFrames);
+      const shellHeight = Math.max(0, viewportHeight - shellTop - bottomNavHeight);
+      const remainingHeight = Math.max(0, shellHeight - (top - shellTop) - footerHeight);
+
+      pageShell.style.height = `${shellHeight}px`;
+      pageShell.style.minHeight = '0';
+      pageShell.style.overflow = 'hidden';
+      setAvailableHeight(remainingHeight);
     };
 
     updateAvailableHeight();
     window.addEventListener('resize', updateAvailableHeight);
+    window.visualViewport?.addEventListener('resize', updateAvailableHeight);
     const observer = new ResizeObserver(updateAvailableHeight);
     observer.observe(root);
-    const footer = root.parentElement?.querySelector('footer');
+    observer.observe(pageShell);
+    if (pageShell.parentElement) observer.observe(pageShell.parentElement);
+    const precedingHeader = pageShell.previousElementSibling?.querySelector('iframe');
+    if (precedingHeader) observer.observe(precedingHeader);
+    const observeFixedBottomFrames = () => {
+      document.querySelectorAll('iframe').forEach((frame) => {
+        const container = frame.parentElement;
+        if (container && getComputedStyle(container).position === 'fixed') {
+          observer.observe(container);
+          observer.observe(frame);
+        }
+      });
+      updateAvailableHeight();
+    };
+    observeFixedBottomFrames();
+    const footer = pageShell.querySelector('footer');
     if (footer) observer.observe(footer);
+    const rootStyleObserver = new MutationObserver(updateAvailableHeight);
+    rootStyleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    const frameObserver = new MutationObserver(observeFixedBottomFrames);
+    frameObserver.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       window.removeEventListener('resize', updateAvailableHeight);
+      window.visualViewport?.removeEventListener('resize', updateAvailableHeight);
       observer.disconnect();
+      rootStyleObserver.disconnect();
+      frameObserver.disconnect();
+      pageShell.style.height = originalShellStyle.height;
+      pageShell.style.minHeight = originalShellStyle.minHeight;
+      pageShell.style.overflow = originalShellStyle.overflow;
     };
   }, []);
 
@@ -460,7 +513,7 @@ export function CustomerChatContent({
     <main
       ref={chatRootRef}
       className="flex min-h-0 flex-col bg-[var(--brand-bg,#f7f7f5)] text-[var(--brand-text,#17202a)]"
-      style={availableHeight ? { height: `${availableHeight}px` } : undefined}
+      style={availableHeight !== null ? { height: `${availableHeight}px` } : undefined}
     >
       <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden px-0 py-0 sm:px-6 sm:py-6">
         <div className="hidden shrink-0 pb-4 sm:block">

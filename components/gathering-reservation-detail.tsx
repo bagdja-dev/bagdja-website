@@ -62,7 +62,8 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : date.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
 }
 
-export function GatheringReservationDetail({ registrationId, websiteId, websiteName, basePath }: {
+export function GatheringReservationDetail({ registrationId, websiteId, websiteName, basePath, hideHeader = false }: {
+  hideHeader?: boolean;
   registrationId: string;
   websiteId: string;
   websiteName: string;
@@ -107,12 +108,18 @@ export function GatheringReservationDetail({ registrationId, websiteId, websiteN
 
   const shell = (children: React.ReactNode) => (
     <main className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 py-4">
-          <span className="text-sm font-semibold">{websiteName}</span>
-          <Link href={backHref} className="text-xs font-medium text-zinc-600 underline">Kembali ke undangan</Link>
+      {hideHeader ? (
+        <div className="mx-auto max-w-2xl px-5 pt-5">
+          <Link href={backHref} className="text-xs font-medium text-zinc-600 underline">← Kembali ke undangan</Link>
         </div>
-      </header>
+      ) : (
+        <header className="border-b border-zinc-200 bg-white">
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 py-4">
+            <span className="text-sm font-semibold">{websiteName}</span>
+            <Link href={backHref} className="text-xs font-medium text-zinc-600 underline">Kembali ke undangan</Link>
+          </div>
+        </header>
+      )}
       <article className="mx-auto max-w-2xl px-5 py-8">{children}</article>
     </main>
   );

@@ -89,13 +89,16 @@ export function CheckoutContent({
   websiteId,
   initialOrderIds = [],
   locations = [],
+  designVariant,
 }: {
   /** Kosong ('') di subdomain/custom domain, `/{slug}` di path-based (local dev) — lihat `resolveTenantLinkBase`. */
   basePath: string;
   websiteId: string;
   initialOrderIds?: string[];
   locations?: LocationItem[];
+  designVariant?: 'store-classic';
 }) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<ServerOrder[] | null>(null);
@@ -305,9 +308,14 @@ export function CheckoutContent({
 
   if (draftsLoading) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <main className={`mx-auto max-w-3xl px-4 py-16 text-center ${isStoreClassicDesign ? 'sm:py-20' : ''}`}>
+        {isStoreClassicDesign && (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+            Proses Pembelian
+          </p>
+        )}
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Checkout
+          {isStoreClassicDesign ? 'Selesaikan Pesanan' : 'Checkout'}
         </h1>
         <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
           Memuat pesanan…
@@ -319,9 +327,14 @@ export function CheckoutContent({
   if (!hasAnyItem) {
     const showRetry = draftsError;
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <main className={`mx-auto max-w-3xl px-4 py-16 text-center ${isStoreClassicDesign ? 'sm:py-20' : ''}`}>
+        {isStoreClassicDesign && (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+            Proses Pembelian
+          </p>
+        )}
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Checkout
+          {isStoreClassicDesign ? 'Selesaikan Pesanan' : 'Checkout'}
         </h1>
         <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
           {showRetry
@@ -334,7 +347,7 @@ export function CheckoutContent({
           <button
             type="button"
             onClick={() => void loadDrafts()}
-            className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            className={`mt-6 inline-flex px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >
             Coba Lagi
@@ -342,7 +355,7 @@ export function CheckoutContent({
         ) : (
           <Link
             href={basePath || '/'}
-            className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            className={`mt-6 inline-flex px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >
             Lihat Produk
@@ -355,7 +368,12 @@ export function CheckoutContent({
   if (paymentGroups.length > 1) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+        {isStoreClassicDesign && (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+            Proses Pembelian
+          </p>
+        )}
+        <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
           Pilih Jalur Pembayaran
         </h1>
         <p className="mt-2 max-w-2xl text-sm" style={{ color: 'var(--brand-muted)' }}>
@@ -372,7 +390,7 @@ export function CheckoutContent({
             return (
               <section
                 key={group.mode}
-                className="flex flex-col rounded-xl border p-5"
+                className={`flex flex-col border p-5 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
                 style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -421,7 +439,7 @@ export function CheckoutContent({
                 ) : (
                   <Link
                     href={checkoutHref}
-                    className="mt-5 inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition-opacity hover:opacity-85"
+                    className={`mt-5 inline-flex w-full items-center justify-center px-5 py-3 text-sm font-semibold transition-opacity hover:opacity-85 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                   >
                     Lanjut ke checkout {isEscrow ? 'Escrow' : 'Bayar Langsung'}
@@ -490,14 +508,58 @@ export function CheckoutContent({
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-      <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-        Checkout
-      </h1>
+    <main className={`mx-auto max-w-6xl px-4 py-8 sm:px-6 ${isStoreClassicDesign ? 'sm:py-12' : ''}`}>
+      {isStoreClassicDesign ? (
+        <header className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: 'var(--brand-accent-muted)' }}>
+            Proses Pembelian
+          </p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold sm:text-4xl" style={{ fontFamily: 'var(--font-heading)' }}>
+                Selesaikan Pesanan
+              </h1>
+              <p className="mt-2 max-w-xl text-sm" style={{ color: 'var(--brand-muted)' }}>
+                Periksa pesanan dan lengkapi informasi pengiriman sebelum melanjutkan pembayaran.
+              </p>
+            </div>
+            <Link href={`${basePath}/cart`} className="text-sm font-semibold underline underline-offset-4" style={{ color: 'var(--brand-accent-muted)' }}>
+              Kembali ke keranjang
+            </Link>
+          </div>
+          <ol aria-label="Tahapan checkout" className="mt-7 grid grid-cols-3 gap-2 sm:max-w-2xl sm:gap-4">
+            {['Pesanan', 'Pengiriman', 'Pembayaran'].map((step, index) => {
+              const isComplete = index === 0;
+              const isCurrent = index === 1;
+              return (
+                <li key={step} aria-current={isCurrent ? 'step' : undefined} className="flex items-center gap-2 text-xs sm:text-sm">
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                    style={{
+                      backgroundColor: isComplete || isCurrent ? 'var(--brand-accent)' : 'var(--brand-surface)',
+                      color: isComplete || isCurrent ? 'var(--brand-on-accent)' : 'var(--brand-muted)',
+                      border: isComplete || isCurrent ? 'none' : '1px solid var(--brand-border)',
+                    }}
+                  >
+                    {isComplete ? '✓' : index + 1}
+                  </span>
+                  <span style={{ color: isCurrent ? 'var(--brand-text)' : 'var(--brand-muted)', fontWeight: isCurrent ? 700 : 500 }}>
+                    {step}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </header>
+      ) : (
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+          Checkout
+        </h1>
+      )}
 
       {extraCount > 0 && (
         <p
-          className="mt-3 rounded-lg border px-4 py-3 text-xs"
+          className={`mt-3 border px-4 py-3 text-xs ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-lg'}`}
           style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}
         >
           {extraCount} item lain di keranjang Anda tidak ikut di-checkout
@@ -505,13 +567,13 @@ export function CheckoutContent({
         </p>
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
+      <div className={`${isStoreClassicDesign ? 'mt-7' : 'mt-8'} grid gap-6 lg:grid-cols-[1fr_340px] lg:gap-8`}>
         {/* Kolom kiri: detail pemesanan + alamat + kurir */}
         <div className="flex flex-col gap-8">
           {/* Detail pemesanan */}
           <section>
             <h2
-              className="text-sm font-bold uppercase tracking-wide"
+              className={`font-bold uppercase tracking-wide ${isStoreClassicDesign ? 'text-xs' : 'text-sm'}`}
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               Detail Pemesanan ({displayItems.length} item)
@@ -520,7 +582,7 @@ export function CheckoutContent({
               {displayItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex gap-4 rounded-xl border p-4"
+                  className={`flex gap-4 border p-4 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
                   style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
                 >
                   {item.image ? (
@@ -781,7 +843,7 @@ export function CheckoutContent({
 
         {/* Kolom kanan: ringkasan */}
         <aside
-          className="h-fit rounded-xl border p-5 lg:sticky lg:top-24"
+          className={`h-fit border p-5 lg:sticky lg:top-24 ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
         >
           <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -818,7 +880,7 @@ export function CheckoutContent({
             type="button"
             onClick={handlePay}
             disabled={!canPay}
-            className="mt-5 w-full rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`mt-5 w-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >
             {loading ? 'Memproses…' : 'Bayar Sekarang'}

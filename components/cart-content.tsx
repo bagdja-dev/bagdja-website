@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * Konten halaman Cart (keranjang) — client component, dirender DI DALAM
- * template (section type `cart`) supaya header/footer/theme konsisten
- * dengan home & halaman lain.
+ * Konten halaman Cart (keranjang) — client component, dirender oleh host
+ * template supaya operasi draft order tetap melalui API platform.
  *
  * Draft order server ADALAH satu-satunya sumber kebenaran (revisi
  * 2026-08-24) — fetch `GET /api/orders?cart=true` (difilter di
@@ -141,7 +140,16 @@ function RemoveIcon() {
   );
 }
 
-export function CartContent({ basePath, websiteId }: { basePath: string; websiteId: string }) {
+export function CartContent({
+  basePath,
+  websiteId,
+  designVariant,
+}: {
+  basePath: string;
+  websiteId: string;
+  designVariant?: 'store-classic';
+}) {
+  const isStoreClassicDesign = designVariant === 'store-classic';
   const router = useRouter();
   const [serverOrders, setServerOrders] = useState<ServerOrder[] | null>(null);
   const [gatheringPlans, setGatheringPlans] = useState<GatheringPlanRow[]>([]);
@@ -225,10 +233,11 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
   const knownLineKeysRef = useRef(new Set<string>());
   useEffect(() => {
     const selectableKeys = lines.filter(canCheckoutLine).map((line) => line.key);
+    const previouslyKnownKeys = knownLineKeysRef.current;
     setSelectedKeys((prev) => {
       const next = new Set<string>();
       for (const key of selectableKeys) {
-        if (!knownLineKeysRef.current.has(key) || prev.has(key)) next.add(key);
+        if (!previouslyKnownKeys.has(key) || prev.has(key)) next.add(key);
       }
       return next;
     });
@@ -354,9 +363,9 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
   if (serverOrders === null) {
     return (
-      <main className="mx-auto flex max-w-3xl flex-col items-center px-4 py-16 text-center">
+      <main className={`mx-auto flex flex-col items-center px-4 text-center ${isStoreClassicDesign ? 'max-w-6xl py-20' : 'max-w-3xl py-16'}`}>
         <span
-          className="h-10 w-10 animate-spin rounded-full border-4 border-current border-t-transparent"
+          className={`${isStoreClassicDesign ? 'h-12 w-12' : 'h-10 w-10'} animate-spin rounded-full border-4 border-current border-t-transparent`}
           style={{ color: 'var(--brand-accent)' }}
           role="status"
           aria-label="Memuat keranjang"
@@ -370,27 +379,27 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
   if (lines.length === 0) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <main className={`mx-auto px-4 py-16 text-center ${isStoreClassicDesign ? 'max-w-6xl sm:px-6' : 'max-w-3xl'}`}>
         <div
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
+          className={`mx-auto flex items-center justify-center rounded-full ${isStoreClassicDesign ? 'h-20 w-20' : 'h-16 w-16'}`}
           style={{ backgroundColor: 'var(--brand-muted)', color: 'var(--brand-on-accent)' }}
         >
           <CartIcon className="h-8 w-8" />
         </div>
-        <h1 className="mt-4 text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Keranjang Anda kosong
+        <h1 className={`mt-5 font-bold ${isStoreClassicDesign ? 'text-3xl' : 'text-2xl'}`} style={{ fontFamily: 'var(--font-heading)' }}>
+          {isStoreClassicDesign ? 'Keranjang Belanja Kosong' : 'Keranjang Anda kosong'}
         </h1>
-        <p className="mt-3 text-sm" style={{ color: 'var(--brand-muted)' }}>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-6" style={{ color: 'var(--brand-muted)' }}>
           {serverError ?? (gatheringPlans.length
             ? 'Keranjang produk kosong. Rencana acara Anda tersimpan terpisah di Kalender.'
             : 'Belum ada produk di keranjang. Yuk mulai belanja!')}
         </p>
         {gatheringPlans.length ? (
-          <Link href={`${basePath}/calendar`} className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+          <Link href={`${basePath}/calendar`} className={`mt-7 inline-flex px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-full'}`} style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
             Buka Kalender Acara
           </Link>
         ) : (
-          <Link href={basePath || '/'} className="mt-6 inline-flex rounded-full px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
+          <Link href={basePath || '/'} className={`mt-7 inline-flex px-6 py-3 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-full'}`} style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
             Lihat Produk
           </Link>
         )}
@@ -399,32 +408,44 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+    <main className={`mx-auto px-4 py-10 sm:px-6 ${isStoreClassicDesign ? 'max-w-6xl' : 'max-w-5xl'}`}>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Keranjang
-          <span className="ml-2 text-sm font-normal" style={{ color: 'var(--brand-muted)' }}>
-            ({displayCount} item)
-          </span>
-        </h1>
+        <div>
+          {isStoreClassicDesign ? (
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--brand-accent)' }}>
+              Belanja Anda
+            </p>
+          ) : null}
+          <h1 className={`${isStoreClassicDesign ? 'text-3xl' : 'text-2xl'} font-bold`} style={{ fontFamily: 'var(--font-heading)' }}>
+            {isStoreClassicDesign ? 'Keranjang Belanja' : 'Keranjang'}
+            <span className="ml-2 text-sm font-normal" style={{ color: 'var(--brand-muted)' }}>
+              ({displayCount} item)
+            </span>
+          </h1>
+          {isStoreClassicDesign ? (
+            <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
+              Tinjau pilihan Anda sebelum melanjutkan ke pembayaran.
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {actionError && (
         <p
-          className="mt-4 rounded-lg border px-4 py-3 text-sm"
+          className={`mt-4 border px-4 py-3 text-sm ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-lg'}`}
           style={{ borderColor: 'var(--brand-border)', color: 'crimson' }}
         >
           {actionError}
         </p>
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className={`mt-7 grid gap-6 ${isStoreClassicDesign ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : 'gap-8 lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
         {/* Daftar item */}
         <div className="min-w-0">
           <button
             type="button"
             onClick={toggleAll}
-            className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide hover:opacity-70"
+            className={`mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide hover:opacity-70 ${isStoreClassicDesign ? 'rounded-xl border px-4 py-3' : ''}`}
             style={{ color: 'var(--brand-muted)' }}
             role="checkbox"
             aria-checked={allSelected}
@@ -452,7 +473,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
             return (
               <li
                 key={line.key}
-                className="flex cursor-pointer gap-4 rounded-xl border p-4 transition-colors hover:shadow-sm"
+                className={`flex cursor-pointer gap-4 border p-4 transition-colors hover:shadow-sm ${isStoreClassicDesign ? 'rounded-2xl sm:gap-5 sm:p-5' : 'rounded-xl'}`}
                 role="link"
                 tabIndex={0}
                 onClick={(event) => {
@@ -498,7 +519,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                 </button>
                 </div>
                 {line.image ? (
-                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg">
+                  <div className={`relative shrink-0 overflow-hidden ${isStoreClassicDesign ? 'h-28 w-28 rounded-xl' : 'h-24 w-24 rounded-lg'}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={line.image}
@@ -509,7 +530,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                   </div>
                 ) : (
                   <div
-                    className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg text-lg font-bold uppercase"
+                    className={`flex shrink-0 items-center justify-center text-lg font-bold uppercase ${isStoreClassicDesign ? 'h-28 w-28 rounded-xl' : 'h-24 w-24 rounded-lg'}`}
                     style={{ backgroundColor: 'var(--brand-muted)', color: 'var(--brand-on-accent)' }}
                   >
                     {line.name.charAt(0)}
@@ -543,7 +564,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                     <div className="flex items-center gap-1">
                       <Link
                         href={`${basePath}/cart/order/${line.orderId}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/5"
+                        className={`flex h-8 w-8 items-center justify-center transition-colors hover:bg-black/5 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                         style={{ color: 'var(--brand-muted)' }}
                         aria-label={`Lihat detail order ${line.name}`}
                         title="Lihat detail pesanan draft"
@@ -554,7 +575,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                         type="button"
                         onClick={() => removeServerItem(line)}
                         disabled={isBusy}
-                        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/5 disabled:opacity-50"
+                        className={`flex h-8 w-8 items-center justify-center transition-colors hover:bg-black/5 disabled:opacity-50 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                         style={{ color: 'var(--brand-muted)' }}
                         aria-label={`Hapus ${line.name}`}
                         title="Hapus item"
@@ -582,7 +603,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                         type="button"
                         onClick={() => changeServerQty(line, line.quantity - 1)}
                         disabled={isBusy || quantityLocked || line.quantity <= 1}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
+                        className={`flex h-8 w-8 items-center justify-center border text-base transition-colors hover:opacity-70 disabled:opacity-40 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                         style={{ borderColor: 'var(--brand-border)' }}
                         aria-label="Kurangi"
                       >
@@ -595,7 +616,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
                         type="button"
                         onClick={() => changeServerQty(line, line.quantity + 1)}
                         disabled={isBusy || quantityLocked}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors hover:opacity-70 disabled:opacity-40"
+                        className={`flex h-8 w-8 items-center justify-center border text-base transition-colors hover:opacity-70 disabled:opacity-40 ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
                         style={{ borderColor: 'var(--brand-border)' }}
                         aria-label="Tambah"
                       >
@@ -696,7 +717,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
 
         {/* Ringkasan */}
         <aside
-          className="h-fit min-w-0 rounded-xl border p-5"
+          className={`h-fit min-w-0 border p-5 ${isStoreClassicDesign ? 'sticky top-6 rounded-2xl shadow-sm' : 'rounded-xl'}`}
           style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}
         >
           <h2 className="text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -720,7 +741,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
           {selectedLines.length > 0 && !hasUnquotedSelected ? (
             <Link
               href={checkoutHref}
-              className="mt-5 block rounded-full px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.03] active:scale-95"
+              className={`mt-5 block px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.03] active:scale-95 ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-full'}`}
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
               Checkout ({selectedLines.length})
@@ -729,7 +750,7 @@ export function CartContent({ basePath, websiteId }: { basePath: string; website
             <button
               type="button"
               disabled
-              className="mt-5 block w-full cursor-not-allowed rounded-full px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide opacity-50"
+              className={`mt-5 block w-full cursor-not-allowed px-6 py-3 text-center text-sm font-semibold uppercase tracking-wide opacity-50 ${isStoreClassicDesign ? 'rounded-xl' : 'rounded-full'}`}
               style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
             >
               {selectedLines.length > 0 && hasUnquotedSelected

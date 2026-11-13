@@ -13,9 +13,12 @@ import {
   toNavPage,
   type SectionEntry,
 } from '../../../../lib/template-data';
-import { getTemplateRenderer } from '../../../../lib/template-registry';
+import { getTemplateRenderer, type TemplateRenderProps } from '../../../../lib/template-registry';
+import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../../../../lib/template-runtime-route';
+import { buildProductDetailPage, createPageKeyFactory, PUBLIC_PAGE_KEY_SCOPE } from '../../../../lib/template-pages';
+import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../../../../lib/tenant-template';
 import { resolveTenantLinkBase } from '../../../../lib/tenant-link-base';
-import { extractTemplateTheme, sanitizeWebsiteTheme } from '../../../../lib/website-theme';
+import { sanitizeWebsiteTheme } from '../../../../lib/website-theme';
 
 export const revalidate = 60;
 
@@ -50,40 +53,81 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     redirect(`${resolveTenantLinkBase(params.website_slug)}/products/${product.slug}`);
   }
 
-  const Renderer = website.template ? getTemplateRenderer(website.template.slug) : null;
+  // Template package tidak merender halaman ini → konten memakai tampilan Bagdja,
+  // header tetap milik designer bila manifest menyatakan `header`.
+  const hostSlug = hostRendererSlug(website);
+  const Renderer = hostSlug ? getTemplateRenderer(hostSlug) : null;
   if (!Renderer) notFound();
 
   const sections: SectionEntry[] = [
     { type: 'product_detail', content: { product: toCatalogItem(product) } },
   ];
 
+  const props: TemplateRenderProps = {
+    isPreview: false,
+    profile: {
+      name: website.name,
+      tagline: website.tagline ?? undefined,
+      logoUrl: website.logo_url ?? undefined,
+      whatsapp: website.whatsapp ?? undefined,
+      phone: website.phone ?? undefined,
+      email: website.email ?? undefined,
+      socialLinks: website.social_links,
+      footerSettings: website.footer_settings,
+    },
+    templateTheme: tenantTemplateTheme(website),
+    websiteTheme: sanitizeWebsiteTheme(website.theme),
+    sections,
+    products: products.map(toCatalogItem),
+    locations: locations.map(toLocationItem),
+    faqs: faqs.map(toFaqItem),
+    websiteSlug: resolveTenantLinkBase(website.slug),
+    websiteId: website.id,
+    tenantSlug: website.slug,
+    pages: website.pages.map(toNavPage),
+    blogPosts: blogPosts.map(toBlogPostItem),
+    auth,
+  };
+  const runtime = tenantRuntime(website);
+  // Detail produk gathering milik template package (template-owned-system-pages-plan.md §8.6).
+  // Produk lain, atau bila render template gagal, tetap tampilan Bagdja di bawah.
+  if (runtime && product.type === 'gathering' && templateOwnsPage(website, 'product_detail')) {
+    const catalogProducts = props.products ?? [];
+    const page = buildProductDetailPage(
+      toCatalogItem(product),
+      catalogProducts.filter((item) => item.category && item.category === toCatalogItem(product).category),
+      {
+        key: createPageKeyFactory(PUBLIC_PAGE_KEY_SCOPE),
+        basePath: resolveTenantLinkBase(params.website_slug),
+        loggedIn: auth.isLoggedIn,
+      },
+    );
+    const templatePage = await renderPinnedTenantTemplate({
+      templateSlug: runtime.slug,
+      pinnedVersion: runtime.version,
+      candidateDigest: runtime.candidateDigest,
+      tenantSlug: website.slug,
+      props: { ...props, sections: [], page },
+    });
+    if (templatePage) return templatePage;
+  }
+  const designerHeader = runtime && templateOwnsPage(website, 'header')
+    ? await renderPinnedTenantHeader({
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        bottomNav: templateOwnsPage(website, 'bottom_nav'),
+        tenantSlug: website.slug,
+        props,
+      })
+    : { node: null, active: false };
+
   return (
-    <CartProvider slug={params.website_slug}>
-    <Renderer
-      isPreview={false}
-      profile={{
-        name: website.name,
-        tagline: website.tagline ?? undefined,
-        logoUrl: website.logo_url ?? undefined,
-        whatsapp: website.whatsapp ?? undefined,
-        phone: website.phone ?? undefined,
-        email: website.email ?? undefined,
-        socialLinks: website.social_links,
-        footerSettings: website.footer_settings,
-      }}
-      templateTheme={extractTemplateTheme(website.template?.structure)}
-      websiteTheme={sanitizeWebsiteTheme(website.theme)}
-      sections={sections}
-      products={products.map(toCatalogItem)}
-      locations={locations.map(toLocationItem)}
-      faqs={faqs.map(toFaqItem)}
-      websiteSlug={resolveTenantLinkBase(website.slug)}
-      websiteId={website.id}
-      tenantSlug={website.slug}
-      pages={website.pages.map(toNavPage)}
-      blogPosts={blogPosts.map(toBlogPostItem)}
-      auth={auth}
-    />
-    </CartProvider>
+    <>
+      {designerHeader.node}
+      <CartProvider slug={params.website_slug}>
+        <Renderer {...props} hideHeader={designerHeader.active} />
+      </CartProvider>
+    </>
   );
 }

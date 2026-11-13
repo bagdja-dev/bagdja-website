@@ -92,6 +92,13 @@ export interface StoreClassicViewProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  hideHeader?: boolean;
+  cartDesign?: 'store-classic';
+  checkoutDesign?: 'store-classic';
+  ordersDesign?: 'store-classic';
+  tagihanDesign?: 'store-classic';
+  calendarDesign?: 'store-classic';
+  orderDetailDesign?: 'store-classic';
   /** W1 auth renderer: state login buyer. */
   auth?: {
     isLoggedIn: boolean;
@@ -102,6 +109,8 @@ export interface StoreClassicViewProps {
     logoutHref?: string;
     cartHref?: string;
     ordersHref?: string;
+    tagihanHref?: string;
+    calendarHref?: string;
     profileHref?: string;
     chatHref?: string;
   };
@@ -1163,7 +1172,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                             <div className="min-w-0">
                               <p className="text-sm font-medium" style={{ color: 'var(--brand-text)' }}>{option.label}</p>
                               {option.description ? (
-                                <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
+                                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{option.description}</p>
                               ) : null}
                               {(option.venueLocation || option.availabilityNote) && (
                                 <dl className="mt-3 grid gap-2">
@@ -1235,6 +1244,13 @@ export function StoreClassicView({
   pages = [],
   blogPosts = [],
   auth,
+  hideHeader = false,
+  cartDesign,
+  checkoutDesign,
+  ordersDesign,
+  tagihanDesign,
+  calendarDesign,
+  orderDetailDesign,
 }: StoreClassicViewProps) {
   const title = profile.name?.trim() || 'Nama Toko Anda';
   const tagline = profile.tagline?.trim() || 'Belanja produk pilihan dengan kualitas terbaik.';
@@ -1268,6 +1284,8 @@ export function StoreClassicView({
   const cartSection = sections.find((s) => s.type === 'cart');
   const checkoutSection = sections.find((s) => s.type === 'checkout');
   const ordersSection = sections.find((s) => s.type === 'orders');
+  const tagihanSection = sections.find((s) => s.type === 'tagihan');
+  const calendarSection = sections.find((s) => s.type === 'gathering_calendar');
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
   const profileSection = sections.find((s) => s.type === 'profile');
   const chatSection = sections.find((s) => s.type === 'chat');
@@ -1278,6 +1296,8 @@ export function StoreClassicView({
       ? 'Daftar Pesanan'
       : ordersSection
         ? 'Daftar Transaksi'
+        : tagihanSection
+          ? 'Tagihan'
         : orderDetailSection
           ? 'Status Pesanan'
           : profileSection
@@ -1321,26 +1341,28 @@ export function StoreClassicView({
           fontWeight: 'var(--font-body-weight)',
         }}
       >
-        <StoreClassicHeader
-          title={title}
-          logoUrl={profile.logoUrl}
-          homeHref={homeHref}
-          waHref={waHref}
-          showWhatsappCta={showWhatsappCta}
-          leftNavLinks={regularNavLinks}
-          rightNavLinks={headerNavLinks}
-          socialLinks={socialLinks}
-          auth={auth}
-          websiteId={websiteId ?? ''}
-          cartHref={auth?.cartHref}
-          chatHref={chatHref}
-        />
+        {!hideHeader ? (
+          <StoreClassicHeader
+            title={title}
+            logoUrl={profile.logoUrl}
+            homeHref={homeHref}
+            waHref={waHref}
+            showWhatsappCta={showWhatsappCta}
+            leftNavLinks={regularNavLinks}
+            rightNavLinks={headerNavLinks}
+            socialLinks={socialLinks}
+            auth={auth}
+            websiteId={websiteId ?? ''}
+            cartHref={auth?.cartHref}
+            chatHref={chatHref}
+          />
+        ) : null}
 
         {productDetailItem ? (
           <PageHeroBanner label={productPageTitle} imageUrl={productDetailItem.image} />
         ) : categoryListingLabel ? (
           <PageHeroBanner label={categoryListingLabel} imageUrl={categoryListingImage} />
-        ) : isChatPage ? null : pageBannerLabel ? (
+        ) : isChatPage || (hideHeader && (cartSection || checkoutSection || ordersSection || tagihanSection || calendarSection || orderDetailSection)) ? null : pageBannerLabel ? (
           <PageHeroBanner label={pageBannerLabel} />
         ) : (
           <SectionFrame section={sections.find((s) => s.type === 'hero')}>
@@ -1515,7 +1537,14 @@ export function StoreClassicView({
                 return <BlogArticleSection key={key} post={post} allPosts={blogPosts} websiteSlug={websiteSlug} />;
               }
               case 'cart': {
-                return <CartContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+                return (
+                  <CartContent
+                    key={key}
+                    basePath={websiteSlug ?? ''}
+                    websiteId={websiteId ?? ''}
+                    designVariant={cartDesign}
+                  />
+                );
               }
               case 'checkout': {
                 const websiteId =
@@ -1530,17 +1559,18 @@ export function StoreClassicView({
                     websiteId={websiteId}
                     initialOrderIds={orderIds}
                     locations={locations}
+                    designVariant={checkoutDesign}
                   />
                 );
               }
               case 'orders': {
-                return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+                return <OrdersContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} designVariant={ordersDesign} />;
               }
               case 'tagihan': {
-                return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+                return <TagihanContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} designVariant={tagihanDesign} />;
               }
               case 'gathering_calendar': {
-                return <GatheringCalendarContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} />;
+                return <GatheringCalendarContent key={key} basePath={websiteSlug ?? ''} websiteId={websiteId ?? ''} designVariant={calendarDesign} />;
               }
               case 'profile': {
                 return <ProfileContent key={key} basePath={websiteSlug ?? ''} auth={auth} />;
@@ -1560,7 +1590,7 @@ export function StoreClassicView({
                 const transaction = section.content.transaction as TransactionDetail | null | undefined;
                 const order = section.content.order as OrderDetail | null | undefined;
                 const gatheringPlan = section.content.gatheringPlan as import('../../order-detail-content').GatheringPlanDetail | null | undefined;
-                return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} />;
+                return <OrderDetailContent key={key} transaction={transaction} order={order} gatheringPlan={gatheringPlan} basePath={websiteSlug ?? ''} websiteId={websiteId} loginHref={auth?.loginHref} designVariant={orderDetailDesign} />;
               }
               case 'product_detail': {
                 const item = section.content.product as CatalogItem | undefined;
