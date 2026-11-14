@@ -52,6 +52,8 @@
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 
+import { sessionMaxAgeSeconds } from './session-max-age';
+
 const TOKEN_COOKIE = 'site_token';
 const USER_COOKIE = 'site_user';
 const AUTH_SELECTED_COOKIE = 'site_auth_selected';
@@ -123,9 +125,9 @@ export function setSessionCookies(
   targetOrigin: string,
 ): void {
   const hostname = new URL(targetOrigin).hostname;
-  const cookieOptions = getCookieOptions(hostname);
+  const cookieOptions = { ...getCookieOptions(hostname), maxAge: sessionMaxAgeSeconds(token) };
   response.cookies.set(TOKEN_COOKIE, token, cookieOptions);
-  response.cookies.set(AUTH_SELECTED_COOKIE, '1', { ...cookieOptions, maxAge: 60 * 60 });
+  response.cookies.set(AUTH_SELECTED_COOKIE, '1', cookieOptions);
   response.cookies.set(USER_COOKIE, JSON.stringify(user), {
     ...cookieOptions,
     httpOnly: false, // client needs to read user info
