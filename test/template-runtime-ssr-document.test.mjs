@@ -326,6 +326,10 @@ test('reports bounded header height through the identity-bound resize bridge', a
   assert.match(bootstrap, /new ResizeObserver/);
   assert.match(bootstrap, /new MutationObserver/);
   assert.match(bootstrap, /document\.body\.scrollHeight/);
+  // Chrome Android (TWA) men-throttle iframe tak terlihat: tinggi juga dilaporkan segera & lewat timer.
+  assert.match(bootstrap, /reportHeight\(\);\n\s*requestAnimationFrame\(reportHeight\)/);
+  assert.match(bootstrap, /setTimeout\(reportHeight, delay\)/);
+  assert.doesNotThrow(() => new Function(bootstrap));
 
   const message = {
     protocol: 1,
