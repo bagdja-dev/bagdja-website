@@ -429,11 +429,18 @@ export function TemplateRuntimeSsrFrame({
       className={`block w-full border-0 ${
         placement === 'bottom'
           ? 'overflow-hidden'
-          : resizeToContent ? 'absolute left-0 top-0 z-20 overflow-hidden' : 'min-h-screen'
+          : resizeToContent ? 'absolute left-0 top-0 z-20 overflow-hidden' : ''
       }`}
       // Navigasi bawah: jangan pernah 0px — Chrome Android (TWA) men-throttle iframe lintas-origin yang
       // tak terlihat, sehingga rAF/ResizeObserver di dalamnya tidak jalan dan tinggi tak pernah dilaporkan.
-      style={resizeToContent ? { height: placement === 'bottom' ? Math.max(frameHeight, 1) : frameHeight } : undefined}
+      // Halaman penuh: tinggi = layar yang TERLIHAT (dvh, bukan vh yang di Android lebih tinggi dari layar)
+      // dikurangi navigasi bawah template — modal/bottom sheet di dalam iframe menempel ke bawah iframe,
+      // jadi tidak tertutup navigasi bawah maupun bar sistem.
+      style={
+        resizeToContent
+          ? { height: placement === 'bottom' ? Math.max(frameHeight, 1) : frameHeight }
+          : { height: 'calc(100dvh - var(--template-bottom-nav-height, 0px))' }
+      }
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       srcDoc={frameDocument || '<!doctype html><html><body></body></html>'}
