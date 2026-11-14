@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createTemplateRuntimeIntentBridge,
@@ -128,8 +128,17 @@ export function TemplateRuntimeSsrFrame({
 }: TemplateRuntimeSsrFrameProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const frameLoadedRef = useRef(false);
-  const [frameDocument, setFrameDocument] = useState('');
+  // Pengaman navigasi: dokumen diberi versi. Load kedua untuk VERSI YANG SAMA = template menavigasi
+  // frame-nya sendiri. Load terlambat dari dokumen lama (event `load` menunggu semua gambar, bisa
+  // beberapa detik di HP) tidak lagi dihitung sebagai navigasi saat dokumen baru menggantikannya.
+  const documentVersionRef = useRef(0);
+  const committedVersionRef = useRef(0);
+  const loadedVersionRef = useRef(-1);
+  const [frameState, setFrameState] = useState<{ document: string; version: number }>({ document: '', version: 0 });
+  const frameDocument = frameState.document;
+  useLayoutEffect(() => {
+    committedVersionRef.current = frameState.version;
+  }, [frameState.version]);
   const [frameHeight, setFrameHeight] = useState(0);
   const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -169,9 +178,9 @@ export function TemplateRuntimeSsrFrame({
         .filter((url): url is string => url !== null),
     }).then((frameDocument) => {
       if (!active) return;
-      // Load berikutnya = dokumen baru yang disengaja, bukan navigasi keluar oleh template.
-      frameLoadedRef.current = false;
-      setFrameDocument(frameDocument);
+      setFrameState((current) => (current.document === frameDocument
+        ? current
+        : { document: frameDocument, version: (documentVersionRef.current += 1) }));
     }).catch((cause: unknown) => {
       if (active) {
         setError(cause instanceof Error ? cause.message : 'Template tidak dapat disiapkan.');
@@ -446,11 +455,12 @@ export function TemplateRuntimeSsrFrame({
       srcDoc={frameDocument || '<!doctype html><html><body></body></html>'}
       onLoad={() => {
         if (!frameDocument) return;
-        if (frameLoadedRef.current && clientBundle !== null) {
+        const version = committedVersionRef.current;
+        if (loadedVersionRef.current === version && clientBundle !== null) {
           setError('Template mencoba menavigasi keluar dari frame terisolasi, sehingga konten dihentikan.');
           return;
         }
-        frameLoadedRef.current = true;
+        loadedVersionRef.current = version;
         pendingRefreshRef.current = null;
         setRefreshing(false);
       }}
