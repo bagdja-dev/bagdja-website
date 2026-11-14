@@ -431,7 +431,9 @@ export function TemplateRuntimeSsrFrame({
           ? 'overflow-hidden'
           : resizeToContent ? 'absolute left-0 top-0 z-20 overflow-hidden' : 'min-h-screen'
       }`}
-      style={resizeToContent ? { height: frameHeight } : undefined}
+      // Navigasi bawah: jangan pernah 0px — Chrome Android (TWA) men-throttle iframe lintas-origin yang
+      // tak terlihat, sehingga rAF/ResizeObserver di dalamnya tidak jalan dan tinggi tak pernah dilaporkan.
+      style={resizeToContent ? { height: placement === 'bottom' ? Math.max(frameHeight, 1) : frameHeight } : undefined}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       srcDoc={frameDocument || '<!doctype html><html><body></body></html>'}

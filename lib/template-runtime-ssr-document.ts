@@ -518,7 +518,12 @@ function createNavigationBootstrap({
   });
   document.addEventListener('toggle', reportHeight, true);
   window.addEventListener('load', reportHeight);
-  requestAnimationFrame(reportHeight);` : ''}
+  // rAF/ResizeObserver bisa tertahan selama iframe belum terlihat (throttle Chrome) → laporkan juga
+  // segera, setelah font siap, dan lewat timer cadangan.
+  reportHeight();
+  requestAnimationFrame(reportHeight);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(reportHeight, () => {});
+  [100, 400, 1000, 2500].forEach((delay) => setTimeout(reportHeight, delay));` : ''}
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
     if (!target) return;
