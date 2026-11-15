@@ -575,6 +575,15 @@ export const TEMPLATE_RUNTIME_INTENTS = [
   'gathering.invitation.verify_otp',
   'gathering.invitation.resend_otp',
   'gathering.invitation.pay',
+  // Draft pesanan (praorder sebelum penawaran & checkout).
+  'order.quantity.set',
+  'order.praorder.save',
+  'order.praorder.submit',
+  'order.praorder.upload',
+  'order.praorder.file.remove',
+  'order.draft.pay',
+  'order.draft.cancel',
+  'order.chat.open',
 ] as const;
 
 export type TemplateRuntimeIntentAction = typeof TEMPLATE_RUNTIME_INTENTS[number];
@@ -619,6 +628,12 @@ export interface TemplateRuntimeIntent {
   message?: string;
   /** gathering.cancel. */
   reason?: string;
+  /** Draft pesanan: langkah praorder (`step.key` opaque dari props.page). */
+  step?: string;
+  /** Draft pesanan: isian field non-file (nama field → nilai). */
+  values?: Record<string, string>;
+  /** Draft pesanan: urutan file yang dihapus (`order.praorder.file.remove`). */
+  index?: number;
   /**
    * Pengguna sudah mengonfirmasi lewat popup template (klik asli pada elemen
    * `data-bagdja-confirmed="true"`, divalidasi bootstrap). Host lalu tidak memakai window.confirm.
@@ -637,7 +652,28 @@ export const TEMPLATE_RUNTIME_INTENT_CONFIRMATIONS: Partial<Record<TemplateRunti
   'gathering.registration.refund': 'Refund kursi peserta ini? Dana dikembalikan ke dompet pembayar.',
   'gathering.event.confirm': 'Konfirmasi acara dengan opsi final terpilih? DP dicairkan ke penyelenggara.',
   'gathering.cancel': 'Batalkan acara ini? Proses refund dijalankan sesuai kebijakan.',
+  'order.praorder.submit': 'Kirim data langkah ini? Data tidak bisa diubah setelah dikirim.',
+  'order.praorder.file.remove': 'Hapus file ini?',
+  'order.draft.cancel': 'Batalkan pesanan ini?',
 };
+
+/** Nama field praorder (sama dengan `form_schema[].key`). */
+const PRAORDER_FIELD_NAME = /^[A-Za-z0-9_.-]{1,100}$/;
+/** Batas file praorder di bridge (tipe & ukuran per field divalidasi ulang host). */
+const PRAORDER_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+
+function parsePraorderValues(value: unknown): Record<string, string> | null {
+  if (value === undefined) return {};
+  if (!isRecord(value)) return null;
+  const entries = Object.entries(value);
+  if (entries.length > 60) return null;
+  const values: Record<string, string> = {};
+  for (const [name, item] of entries) {
+    if (!PRAORDER_FIELD_NAME.test(name) || typeof item !== 'string' || item.length > 5000) return null;
+    values[name] = item;
+  }
+  return values;
+}
 
 export interface TemplateRuntimeIntentMessage extends TemplateRuntimeIdentity {
   protocol: typeof TEMPLATE_RUNTIME_BRIDGE_VERSION;
@@ -820,6 +856,31 @@ function parseTemplateRuntimeIntentFields(value: unknown): TemplateRuntimeIntent
       const reason = boundedText(value.reason, 500);
       if (reason === null) return null;
       return reason ? { action, key, reason } : { action, key };
+    }
+    case 'order.quantity.set': {
+      const quantity = value.quantity;
+      if (!key || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 999) return null;
+      return { action, key, quantity };
+    }
+    case 'order.praorder.save':
+    case 'order.praorder.submit':
+    case 'order.praorder.upload':
+    case 'order.praorder.file.remove': {
+      const step = typeof value.step === 'string' && OPAQUE_KEY_PATTERN.test(value.step) ? value.step : undefined;
+      if (!key || !step) return null;
+      if (action === 'order.praorder.save' || action === 'order.praorder.submit') {
+        const values = parsePraorderValues(value.values);
+        return values && value.bannerFile === undefined ? { action, key, step, values } : null;
+      }
+      const target = typeof value.target === 'string' && PRAORDER_FIELD_NAME.test(value.target) ? value.target : undefined;
+      if (!target) return null;
+      if (action === 'order.praorder.file.remove') {
+        const index = value.index;
+        return typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < 50 ? { action, key, step, target, index } : null;
+      }
+      const file = value.bannerFile;
+      if (typeof Blob === 'undefined' || !(file instanceof Blob) || file.size === 0 || file.size > PRAORDER_UPLOAD_MAX_BYTES) return null;
+      return { action, key, step, target, bannerFile: file };
     }
     default:
       return key ? { action, key } : null;
