@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { getProducts } from '../../../lib/api-client';
 import { buildProductHref, toCatalogItem, type CatalogItem, type CategoryItem } from '../../../lib/template-data';
+import { matchesProductGridFilter } from '../../../lib/product-grid-filter';
 import { CatalogCard } from './barber-classic-view';
 
 const PAGE_SIZE = 8;
@@ -136,17 +137,21 @@ function CatalogHeading({ title }: { title: string }) {
 export function CatalogGridSection({
   title,
   filterType,
+  categoryIds = [],
   initialProducts,
   tenantSlug,
   websiteSlug,
 }: {
   title: string;
   filterType?: string;
+  /** Kategori yang ditampilkan (kosong = semua) — section Daftar Produk `category_ids`. */
+  categoryIds?: string[];
   initialProducts: CatalogItem[];
   tenantSlug?: string;
   websiteSlug?: string;
 }) {
-  const initialFiltered = initialProducts.filter((p) => !filterType || p.type === filterType);
+  const gridFilter = { type: filterType && filterType !== 'all' ? filterType : undefined, categoryIds };
+  const initialFiltered = initialProducts.filter((p) => matchesProductGridFilter(p, gridFilter));
   const [items, setItems] = useState<CatalogItem[]>(initialFiltered.slice(0, PAGE_SIZE));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialFiltered.length > PAGE_SIZE);
@@ -157,7 +162,13 @@ export function CatalogGridSection({
     setLoading(true);
     try {
       const nextPage = page + 1;
-      const result = await getProducts(tenantSlug, { type: filterType, page: nextPage, size: PAGE_SIZE, topLevel: true });
+      const result = await getProducts(tenantSlug, {
+        type: gridFilter.type,
+        categoryIds: gridFilter.categoryIds,
+        page: nextPage,
+        size: PAGE_SIZE,
+        topLevel: true,
+      });
       setItems((prev) => [...prev, ...result.data.map(toCatalogItem)]);
       setPage(nextPage);
       setHasMore(result.meta.currentPage < result.meta.totalPages);

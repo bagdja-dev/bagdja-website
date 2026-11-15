@@ -114,6 +114,8 @@ export interface ApiWebsiteProduct {
   slug: string;
   type: string;
   category: string | null;
+  /** Id kategori (kolom entity, ikut di respons publik) — dipakai filter section Daftar Produk. */
+  category_id?: string | null;
   parent_product_id: string | null;
   location_ids?: string[];
   description: string | null;
@@ -297,6 +299,8 @@ export interface ProductsQuery {
   size?: number;
   type?: string;
   categoryId?: string;
+  /** Beberapa kategori sekaligus (section Daftar Produk); dikirim sebagai id dipisah koma. */
+  categoryIds?: string[];
   /** Format `kolom:asc|desc` — kolom yang didukung: name, price, sort_order, created_at. */
   sort?: string;
   /** Kalau true, hanya produk top-level (bukan varian warna/ukuran) — dipakai grid/listing supaya 1 keluarga varian cuma tampil 1 kartu. */
@@ -319,7 +323,8 @@ export async function getProducts(
   if (opts.page) params.set('page', String(opts.page));
   if (opts.size) params.set('size', String(opts.size));
   if (opts.type) params.set('filter[type]', opts.type);
-  if (opts.categoryId) params.set('filter[category_id]', opts.categoryId);
+  const categoryFilter = opts.categoryIds?.length ? opts.categoryIds.join(',') : opts.categoryId;
+  if (categoryFilter) params.set('filter[category_id]', categoryFilter);
   if (opts.sort) params.set('sort', opts.sort);
   if (opts.topLevel) params.set('filter[top_level]', 'true');
   const qs = params.toString() ? `?${params.toString()}` : '';
