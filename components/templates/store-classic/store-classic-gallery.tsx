@@ -36,15 +36,19 @@ interface Slide {
 export function StoreClassicProductGallery({
   images,
   videoUrl,
+  videoUrls,
   model3dUrl,
 }: {
   images: string[];
   videoUrl?: string;
+  /** Semua video (urut tampil); bila kosong pakai `videoUrl`. */
+  videoUrls?: string[];
   model3dUrl?: string;
 }) {
+  const videos = videoUrls?.length ? videoUrls : videoUrl ? [videoUrl] : [];
   const slides: Slide[] = [
     ...images.map((url): Slide => ({ type: 'image', url })),
-    ...(videoUrl ? [{ type: 'video', url: videoUrl } as Slide] : []),
+    ...videos.map((url): Slide => ({ type: 'video', url }) as Slide),
     ...(model3dUrl ? [{ type: 'model', url: model3dUrl } as Slide] : []),
   ];
 

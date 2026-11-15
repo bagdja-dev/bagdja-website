@@ -828,6 +828,7 @@ function ProductDetailSection({
         <BarberClassicGalleryCarousel
           images={images.map((url) => ({ url }))}
           videoUrl={item.videoUrl}
+          videoUrls={item.videoUrls}
           model3dUrl={item.model3dUrl}
         />
       )}

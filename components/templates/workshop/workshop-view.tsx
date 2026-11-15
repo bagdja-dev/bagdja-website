@@ -677,7 +677,8 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
     : [];
   const slides = [
     ...images.map((url) => ({ type: 'image' as const, url })),
-    ...(item.videoUrl ? [{ type: 'video' as const, url: item.videoUrl }] : []),
+    ...(item.videoUrls?.length ? item.videoUrls : item.videoUrl ? [item.videoUrl] : [])
+      .map((url) => ({ type: 'video' as const, url })),
     ...(item.model3dUrl ? [{ type: 'model' as const, url: item.model3dUrl }] : []),
   ];
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);

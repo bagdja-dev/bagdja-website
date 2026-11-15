@@ -51,12 +51,16 @@ type Slide =
 export function BarberClassicGalleryCarousel({
   images,
   videoUrl,
+  videoUrls,
   model3dUrl,
 }: {
   images: GalleryImageItem[];
   videoUrl?: string;
+  /** Semua video (urut tampil); bila kosong pakai `videoUrl`. */
+  videoUrls?: string[];
   model3dUrl?: string;
 }) {
+  const videos = videoUrls?.length ? videoUrls : videoUrl ? [videoUrl] : [];
   const [index, setIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -64,7 +68,7 @@ export function BarberClassicGalleryCarousel({
 
   const slides: Slide[] = [
     ...images.map((image): Slide => ({ type: 'image', ...image })),
-    ...(videoUrl ? [{ type: 'video', url: videoUrl } as Slide] : []),
+    ...videos.map((url) => ({ type: 'video', url }) as Slide),
     ...(model3dUrl ? [{ type: 'model', url: model3dUrl } as Slide] : []),
   ];
 
