@@ -20,6 +20,9 @@ export async function renderTenantChrome(
     templateSlug: runtime.slug,
     pinnedVersion: runtime.version,
     candidateDigest: runtime.candidateDigest,
+    // Tanpa ini halaman gathering (reservasi, undangan, tiket, invoice) jatuh ke SSR di iframe.
+    browserBundle: runtime.browserBundle,
+    pageOverrides: runtime.pageOverrides,
     bottomNav: templateOwnsPage(tenant.website, 'bottom_nav'),
     tenantSlug: tenant.website.slug,
     props: buildSystemPageProps(tenant, { basePath: options.basePath, auth, sections: [] }),

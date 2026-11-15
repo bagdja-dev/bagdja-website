@@ -34,6 +34,7 @@ export default async function GatheringInvitePage({ params }: GatheringInvitePag
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         tenantSlug: tenant.website.slug,
         props: { ...props, page: loaded.page },
       });

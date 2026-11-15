@@ -223,7 +223,8 @@ export function TemplateFooter({
 
   return (
     <footer
-      className="border-t"
+      // bagdja-host-footer: disembunyikan bila halaman berada di dalam shell template (footer milik template).
+      className="bagdja-host-footer border-t"
       style={{ backgroundColor: 'var(--c-footer-bg)', borderColor: 'var(--c-footer-border)', color: 'var(--c-footer-text)' }}
     >
       {columns.length > 0 && (

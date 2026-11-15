@@ -101,6 +101,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

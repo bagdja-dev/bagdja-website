@@ -15,3 +15,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Shell persisten template (D8): footer milik template; footer bawaan Bagdja di dalam outlet disembunyikan. */
+[data-bagdja-outlet] .bagdja-host-footer {
+  display: none;
+}

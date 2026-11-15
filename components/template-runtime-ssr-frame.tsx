@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   createTemplateRuntimeIntentBridge,
   createTemplateRuntimeOrderActionBridge,
@@ -22,9 +23,12 @@ import {
 import {
   installTemplateDocumentNavigation,
   loadInlineTemplate,
+  markActiveShellNav,
+  registerTemplateRoot,
   scheduleTemplateClientScript,
   startInlineBootstrap,
   templateClientScriptRan,
+  templateClientSupportsMount,
 } from '../lib/template-inline-runtime';
 import {
   getAllowedTemplateNavigationUrl,
@@ -98,6 +102,11 @@ interface TemplateRuntimeSsrFrameProps {
    * Bridge aksi sama (postMessage ke jendela ini), client.js sekali per dokumen.
    */
   inline?: boolean;
+  /**
+   * Shell persisten (D8, hanya bersama `inline`): HTML template berisi `[data-bagdja-outlet]`; isi halaman
+   * (halaman template maupun halaman Bagdja) dipasang ke outlet itu lewat portal.
+   */
+  outlet?: ReactNode;
   resizeToContent?: boolean;
   /**
    * `bottom` = navigasi bawah template (menempel di bawah layar, tinggi 0 bila template
@@ -145,6 +154,7 @@ export function TemplateRuntimeSsrFrame({
   clientBundleSha256 = null,
   clientRender = null,
   inline: inlineRequested = false,
+  outlet,
   resizeToContent = false,
   placement = 'top',
   reserveBottomSpace = true,
@@ -157,6 +167,11 @@ export function TemplateRuntimeSsrFrame({
   const inline = inlineRequested && clientRender !== null;
   const inlineRootRef = useRef<HTMLDivElement>(null);
   const instanceId = useId();
+  const pathname = usePathname();
+  // Pratinjau editor Studio (`__preview`) merender halaman lengkap sendiri → tanpa shell.
+  const isShell = inline && outlet !== undefined && !/\/__preview\/?$/.test(pathname ?? '');
+  const [outletElement, setOutletElement] = useState<HTMLElement | null>(null);
+  const inlineContainerRef = useRef<HTMLElement | null>(null);
   // Pengaman navigasi: setiap `load`, host bertanya ke isi frame (ping) apakah masih dokumen Bagdja.
   // Menghitung jumlah `load` tidak andal (load dokumen lama/kosong bisa datang terlambat di HP).
   // Hanya bila TIDAK ada jawaban sama sekali — isi frame sudah halaman lain — konten dihentikan.
@@ -188,7 +203,7 @@ export function TemplateRuntimeSsrFrame({
   const bridgeTarget = (): Window | null => (inline ? window : frameRef.current?.contentWindow ?? null);
   // Render langsung: data baru = dokumen baru (client.js template dijalankan sekali per dokumen).
   const reloadData = () => {
-    if (inline) window.location.reload();
+    if (inline && !templateClientSupportsMount()) window.location.reload();
     else {
       setRefreshing(true);
       startRefresh(() => router.refresh());
@@ -206,25 +221,38 @@ export function TemplateRuntimeSsrFrame({
     if (!inline || !clientRenderUrl || !clientRenderSha256 || clientRenderProps === null) return;
     const root = inlineRootRef.current;
     if (!root) return;
-    if (templateClientScriptRan()) {
-      // client.js sudah memasang listener untuk DOM lama di dokumen ini → perlu dokumen segar.
+    if (templateClientScriptRan() && !templateClientSupportsMount()) {
+      // client.js lama (tanpa mount) sudah memasang listener untuk DOM lama di dokumen ini → dokumen segar.
       window.location.reload();
       return;
     }
     let active = true;
+    let unregister: (() => void) | null = null;
     installTemplateDocumentNavigation();
     loadInlineTemplate({ url: clientRenderUrl, sha256: clientRenderSha256 })
       .then((template) => {
         if (!active) return;
         const rendered = template.render(JSON.parse(clientRenderProps) as Record<string, unknown>);
         if (typeof rendered !== 'string') throw new Error('Template tidak menghasilkan HTML.');
-        root.innerHTML = sanitizeTemplateHtml(rendered, window.location.origin).html;
-        startInlineBootstrap(root, createTemplateInlineBootstrap({
+        // Kontainer baru per render: listener bootstrap/template milik render lama ikut terlepas bersamanya.
+        const container = document.createElement('div');
+        container.setAttribute('data-bagdja-template-part', '');
+        container.innerHTML = sanitizeTemplateHtml(rendered, window.location.origin).html;
+        root.replaceChildren(container);
+        inlineContainerRef.current = container;
+        startInlineBootstrap(container, createTemplateInlineBootstrap({
           identity: stableIdentity,
           parentOrigin: window.location.origin,
           tenantPathPrefix,
         }));
-        root.dispatchEvent(new CustomEvent('bagdja:template:rendered'));
+        if (isShell) {
+          const outletNode = container.querySelector<HTMLElement>('[data-bagdja-outlet]');
+          if (!outletNode) throw new Error('Shell template tidak memiliki [data-bagdja-outlet].');
+          markActiveShellNav(container, window.location.pathname);
+          setOutletElement(outletNode);
+        }
+        container.dispatchEvent(new CustomEvent('bagdja:template:rendered'));
+        unregister = registerTemplateRoot(container);
         scheduleTemplateClientScript(template);
       })
       .catch((cause: unknown) => {
@@ -232,8 +260,43 @@ export function TemplateRuntimeSsrFrame({
       });
     return () => {
       active = false;
+      unregister?.();
     };
-  }, [clientRenderProps, clientRenderSha256, clientRenderUrl, inline, stableIdentity, tenantPathPrefix]);
+  }, [clientRenderProps, clientRenderSha256, clientRenderUrl, inline, isShell, stableIdentity, tenantPathPrefix]);
+
+  // Shell (D8): menu aktif mengikuti isi outlet (data-bagdja-active-nav) atau path, tanpa merender ulang shell.
+  useEffect(() => {
+    const container = inlineContainerRef.current;
+    if (!isShell || !outletElement || !container) return;
+    const update = () => {
+      const announced = outletElement.querySelector('[data-bagdja-active-nav]')?.getAttribute('data-bagdja-active-nav') ?? '';
+      markActiveShellNav(container, pathname ?? window.location.pathname, announced.split(/\s+/).filter(Boolean));
+    };
+    update();
+    // Isi halaman template dirender asinkron setelah navigasi → tandai ulang saat isi outlet berganti.
+    const observer = typeof MutationObserver === 'function' ? new MutationObserver(update) : null;
+    observer?.observe(outletElement, { childList: true, subtree: true });
+    return () => observer?.disconnect();
+  }, [isShell, outletElement, pathname]);
+
+  // Shell (D8): tinggi navigasi bawah template → --template-bottom-nav-height (bilah Bagdja tidak tertutup).
+  useEffect(() => {
+    if (!isShell || !outletElement) return;
+    const container = inlineContainerRef.current;
+    const nav = container?.querySelector<HTMLElement>('[data-bagdja-bottom-nav]');
+    if (!nav) return;
+    const rootStyle = document.documentElement.style;
+    const measure = () => rootStyle.setProperty('--template-bottom-nav-height', `${Math.round(nav.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(nav);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      rootStyle.removeProperty('--template-bottom-nav-height');
+    };
+  }, [isShell, outletElement]);
 
   // Navigasi bawah render langsung: tinggi = elemen template di root (biasanya position:fixed).
   useEffect(() => {
@@ -403,7 +466,10 @@ export function TemplateRuntimeSsrFrame({
       if (!destination) return;
       // Peta lokasi gathering → tab baru; tautan tenant & WhatsApp → tab ini.
       if (isGoogleMapsNavigationUrl(destination)) window.open(destination.href, '_blank', 'noopener,noreferrer');
-      else window.location.assign(destination.href);
+      else if (inline && templateClientSupportsMount() && destination.origin === window.location.origin) {
+        // Template SPA (D8): shell tetap, isi berganti di outlet.
+        router.push(`${destination.pathname}${destination.search}${destination.hash}`);
+      } else window.location.assign(destination.href);
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
@@ -589,6 +655,15 @@ export function TemplateRuntimeSsrFrame({
   if (error) {
     // Navigasi bawah bersifat tambahan: gagal = tidak ditampilkan (header & isi halaman tetap tampil).
     if (placement === 'bottom') return null;
+    // Shell gagal → isi halaman tetap tampil tanpa shell.
+    if (isShell) {
+      return (
+        <>
+          <p role="alert" className="p-4 text-sm text-red-700">{error}</p>
+          {outlet}
+        </>
+      );
+    }
     return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
   }
 
@@ -688,6 +763,18 @@ export function TemplateRuntimeSsrFrame({
         {reserveBottomSpace ? <div aria-hidden="true" style={{ height: frameHeight }} /> : null}
         <div className="fixed inset-x-0 bottom-0 z-40">{frame}</div>
       </>
+    );
+  }
+
+  if (outlet !== undefined && !isShell) return <>{outlet}</>;
+
+  if (isShell) {
+    return (
+      <div className="relative w-full" data-bagdja-shell="">
+        {frame}
+        {notification}
+        {outletElement ? createPortal(outlet, outletElement) : null}
+      </div>
     );
   }
 

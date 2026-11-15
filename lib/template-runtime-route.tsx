@@ -4,6 +4,7 @@ import { resolveTenantLinkBase } from './tenant-link-base';
 import {
   getTemplateClientRenderBundle,
   isTemplateInlineRenderEnabled,
+  isTemplateShellActive,
   getTemplateRuntimeTenantVersion,
   isTemplateRuntimeClientBundleApproved,
   renderTemplateThroughRuntime,
@@ -44,6 +45,7 @@ export async function renderPinnedTenantTemplate({
   orderActionContext,
   candidateDigest,
   browserBundle,
+  pageOverrides,
 }: {
   templateSlug: string;
   pinnedVersion: string | null | undefined;
@@ -51,6 +53,8 @@ export async function renderPinnedTenantTemplate({
   candidateDigest?: string;
   /** browser.js versi ini dari API (`template_runtime.browserBundle`); ada + flag aktif → mode client. */
   browserBundle?: TemplateBrowserBundleRef;
+  /** `template_runtime.pageOverrides`; berisi `shell` → isi saja, shell dirender layout (D8). */
+  pageOverrides?: readonly string[];
   tenantSlug: string;
   props: TemplateRenderProps;
   orderActionContext?: {
@@ -74,7 +78,9 @@ export async function renderPinnedTenantTemplate({
       ? { tenantSlug, pageType: props.page.type, actions: pageActions }
       : undefined;
     const bridgeAvailable = Boolean(intentContext) || (orderActionContext?.actions.length ?? 0) > 0;
-    const safeProps = sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...props, bridgeVersion: 1 } : props);
+    const shell = isTemplateShellActive(templateSlug, version, browserBundle, pageOverrides);
+    const pageProps = shell ? { ...props, contentOnly: true } : props;
+    const safeProps = sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...pageProps, bridgeVersion: 1 } : pageProps);
     const clientBundleRef = getTemplateClientRenderBundle(templateSlug, version, browserBundle);
     if (clientBundleRef) {
       // Mode client: tanpa runtime/container — iframe merender dari browser.js (template-client-rendering-plan §5).
@@ -142,6 +148,7 @@ export async function renderPinnedTenantHeader({
   props,
   candidateDigest,
   browserBundle,
+  pageOverrides,
   bottomNav = false,
   reserveBottomSpace = true,
 }: {
@@ -149,6 +156,8 @@ export async function renderPinnedTenantHeader({
   pinnedVersion: string | null | undefined;
   candidateDigest?: string;
   browserBundle?: TemplateBrowserBundleRef;
+  /** `template_runtime.pageOverrides`; berisi `shell` → header & navigasi bawah dari shell di layout (D8). */
+  pageOverrides?: readonly string[];
   tenantSlug: string;
   props: TemplateRenderProps;
   /** Manifest menyatakan `bottom_nav`: render juga navigasi bawah template (menempel di bawah layar). */
@@ -159,6 +168,9 @@ export async function renderPinnedTenantHeader({
   try {
     const version = getTemplateRuntimeTenantVersion(templateSlug, pinnedVersion);
     if (version === null) return { node: null, active: false };
+    // Shell persisten (D8): header/menu/navigasi bawah sudah tampil dari layout → halaman cukup menyembunyikan
+    // header bawaan Bagdja (active) tanpa merender potongan header sendiri.
+    if (isTemplateShellActive(templateSlug, version, browserBundle, pageOverrides)) return { node: null, active: true };
     const notificationContext = getNotificationContext(templateSlug, tenantSlug, props);
 
     const chromeProps = sanitizeTemplateRuntimeProps({
@@ -325,3 +337,75 @@ async function renderPinnedTenantBottomNav({
     throw error;
   }
 }
+
+/**
+ * Shell persisten template (D8) untuk layout tenant: header/menu/footer/navigasi bawah dirender SEKALI dan
+ * tetap terpasang saat berpindah halaman; `children` (isi halaman template atau halaman Bagdja) dipasang ke
+ * `[data-bagdja-outlet]`. null → template/versi/flag tidak mendukung shell (halaman merender header sendiri).
+ */
+export function renderTemplateShell({
+  runtime,
+  tenantSlug,
+  props,
+  children,
+}: {
+  runtime: {
+    slug: string;
+    version: string;
+    pageOverrides: readonly string[];
+    browserBundle?: TemplateBrowserBundleRef;
+    candidateDigest?: string;
+  } | null;
+  tenantSlug: string;
+  props: TemplateRenderProps;
+  children: ReactNode;
+}): ReactNode | null {
+  if (!runtime) return null;
+  try {
+    const version = getTemplateRuntimeTenantVersion(runtime.slug, runtime.version);
+    if (version === null || !isTemplateShellActive(runtime.slug, version, runtime.browserBundle, runtime.pageOverrides)) {
+      return null;
+    }
+    const bundle = getTemplateClientRenderBundle(runtime.slug, version, runtime.browserBundle);
+    if (!bundle) return null;
+    const shellProps = sanitizeTemplateRuntimeProps({
+      isPreview: false,
+      profile: {
+        name: props.profile.name,
+        tagline: props.profile.tagline,
+        logoUrl: props.profile.logoUrl,
+        whatsapp: props.profile.whatsapp,
+        phone: props.profile.phone,
+        socialLinks: props.profile.socialLinks,
+        footerSettings: props.profile.footerSettings,
+      },
+      templateTheme: props.templateTheme,
+      websiteTheme: props.websiteTheme,
+      sections: [],
+      products: [],
+      locations: [],
+      faqs: [],
+      websiteSlug: props.websiteSlug,
+      pages: props.pages ?? [],
+      auth: props.auth,
+    });
+    return (
+      <>
+        <TemplateRuntimeSsrFrame
+          html=""
+          identity={{ slug: runtime.slug, version, digest: bundle.sha256 }}
+          tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+          clientRender={{ props: { ...shellProps, shell: true }, bundle }}
+          inline
+          outlet={children}
+          notificationContext={getNotificationContext(runtime.slug, tenantSlug, props)}
+        />
+        {runtime.candidateDigest ? <TemplateTrialBanner slug={runtime.slug} version={version} /> : null}
+      </>
+    );
+  } catch (error) {
+    if (error instanceof TemplateRuntimeError) return null;
+    throw error;
+  }
+}
+

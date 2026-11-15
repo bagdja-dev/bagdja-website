@@ -90,6 +90,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         reserveBottomSpace: false,
         tenantSlug: website.slug,

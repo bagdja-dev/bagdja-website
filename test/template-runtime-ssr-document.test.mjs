@@ -786,6 +786,8 @@ new Function('exports', 'module', 'require', ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
 ).outputText)(inlineRuntimeModule.exports, inlineRuntimeModule, (specifier) =>
   specifier.endsWith('template-browser-bundle') ? browserBundleModule.exports : require(specifier));
+const { markActiveShellNav, registerTemplateRoot, scheduleTemplateClientScript } = inlineRuntimeModule.exports;
+const { isTemplateShellActive } = runtimeClientModule.exports;
 const { startInlineBootstrap, isTemplateInlineRenderEnabled } = {
   ...inlineRuntimeModule.exports,
   isTemplateInlineRenderEnabled: runtimeClientModule.exports.isTemplateInlineRenderEnabled,
@@ -859,4 +861,117 @@ test('inline bridges accept messages from the tenant window itself, never from o
 test('inline render is opt-in through TEMPLATE_INLINE_RENDER_ENABLED', () => {
   assert.equal(isTemplateInlineRenderEnabled({}), false);
   assert.equal(isTemplateInlineRenderEnabled({ TEMPLATE_INLINE_RENDER_ENABLED: 'true' }), true);
+});
+
+
+// ── D8: shell persisten + SPA ─────────────────────────────────────────────────
+
+test('shell menu marks the exact or longest-prefix link, home only when exact', () => {
+  const link = (href) => {
+    const attributes = {};
+    return {
+      href,
+      attributes,
+      setAttribute: (name, value) => { attributes[name] = value; },
+      removeAttribute: (name) => { delete attributes[name]; },
+    };
+  };
+  const links = [link('/kumpul'), link('/kumpul/katalog'), link('/kumpul/calendar')];
+  const container = { querySelectorAll: () => links };
+  const previous = globalThis.window.location;
+  globalThis.window.location = { href: 'https://tenant.example.test/kumpul' };
+  try {
+    const active = (path) => {
+      markActiveShellNav(container, path);
+      return links.filter((item) => item.attributes['aria-current'] === 'page').map((item) => item.href);
+    };
+    assert.deepEqual(active('/kumpul'), ['/kumpul']);
+    assert.deepEqual(active('/kumpul/katalog/gathering-a'), ['/kumpul/katalog']);
+    assert.deepEqual(active('/kumpul/calendar/'), ['/kumpul/calendar']);
+    assert.deepEqual(active('/kumpul/profile'), [], 'no menu link → nothing active (home is not a prefix match)');
+    // Isi halaman mengumumkan menunya (mis. detail rencana → Keranjang) → menang atas path.
+    links.forEach((item, index) => { item.getAttribute = () => ['page:home', 'page:katalog', 'calendar'][index]; });
+    markActiveShellNav(container, '/kumpul/order/123', ['calendar']);
+    assert.deepEqual(links.filter((item) => item.attributes['aria-current'] === 'page').map((item) => item.href), ['/kumpul/calendar']);
+  } finally {
+    globalThis.window.location = previous;
+  }
+});
+
+test('template client mount runs for every registered root and is cleaned up on unregister', async () => {
+  const events = [];
+  const previousDocument = globalThis.document;
+  const previousSetTimeout = globalThis.window.setTimeout;
+  globalThis.window.setTimeout = (callback) => { callback(); return 0; };
+  globalThis.window.BagdjaTemplateClient = undefined;
+  globalThis.URL.createObjectURL ??= () => 'blob:x';
+  const originalCreate = globalThis.URL.createObjectURL;
+  const originalRevoke = globalThis.URL.revokeObjectURL;
+  globalThis.URL.createObjectURL = () => 'blob:client';
+  globalThis.URL.revokeObjectURL = () => {};
+  globalThis.document = {
+    createElement: () => ({}),
+    head: {
+      appendChild: (script) => {
+        // client.js template: daftarkan kontrak SPA lalu "load".
+        globalThis.window.BagdjaTemplateClient = {
+          mount: (root) => { events.push(`mount:${root.name}`); return () => events.push(`unmount:${root.name}`); },
+        };
+        script.onload();
+      },
+    },
+  };
+  try {
+    const shell = { name: 'shell' };
+    const page = { name: 'page' };
+    registerTemplateRoot(shell);
+    const unregisterPage = registerTemplateRoot(page);
+    scheduleTemplateClientScript({ render: () => '', clientSource: 'client' });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(events, ['mount:shell', 'mount:page']);
+    unregisterPage();
+    const next = { name: 'next-page' };
+    registerTemplateRoot(next);
+    assert.deepEqual(events, ['mount:shell', 'mount:page', 'unmount:page', 'mount:next-page']);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window.setTimeout = previousSetTimeout;
+    globalThis.URL.createObjectURL = originalCreate;
+    globalThis.URL.revokeObjectURL = originalRevoke;
+  }
+});
+
+test('shell bootstrap ignores events from inside its outlet (page content has its own bridge)', () => {
+  const handled = [];
+  let listener;
+  const outlet = {};
+  const root = {
+    addEventListener: (_type, handler) => { listener = handler; },
+    contains: (node) => node === outlet,
+  };
+  globalThis.Element = class {};
+  const element = (closestOutlet) => Object.assign(new globalThis.Element(), {
+    closest: (selector) => (selector === '[data-bagdja-outlet]' ? closestOutlet : null),
+  });
+  globalThis.document = {};
+  try {
+    startInlineBootstrap(root, "document.addEventListener('click', (event) => window.__handled.push(event.id));");
+  } finally {
+    delete globalThis.document;
+  }
+  globalThis.window.__handled = handled;
+  listener({ id: 'shell-menu', target: element(null) });
+  listener({ id: 'inside-outlet', target: element(outlet) });
+  assert.deepEqual(handled, ['shell-menu']);
+  delete globalThis.Element;
+});
+
+test('shell is active only with the shell page override, inline render, and a valid bundle', () => {
+  const bundle = { url: 'https://cdn.example.test/kumpul.js', sha256: BROWSER_SHA };
+  const env = { TEMPLATE_CLIENT_RENDER_ENABLED: 'true', TEMPLATE_INLINE_RENDER_ENABLED: 'true' };
+  assert.equal(isTemplateShellActive('kumpul', '1.4.0', bundle, ['shell', 'header'], env), true);
+  assert.equal(isTemplateShellActive('kumpul', '1.4.0', bundle, ['header'], env), false);
+  assert.equal(isTemplateShellActive('kumpul', '1.4.0', bundle, ['shell'], { ...env, TEMPLATE_INLINE_RENDER_ENABLED: 'false' }), false);
+  assert.equal(isTemplateShellActive('kumpul', '1.4.0', undefined, ['shell'], env), false);
+  assert.equal(isTemplateShellActive('kumpul', null, bundle, ['shell'], env), false);
 });
