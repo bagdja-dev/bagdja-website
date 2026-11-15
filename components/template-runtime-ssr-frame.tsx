@@ -25,6 +25,7 @@ import {
   loadInlineTemplate,
   markActiveShellNav,
   registerTemplateRoot,
+  reloadForFreshTemplateDocument,
   scheduleTemplateClientScript,
   startInlineBootstrap,
   templateClientScriptRan,
@@ -209,8 +210,9 @@ export function TemplateRuntimeSsrFrame({
   const bridgeTarget = (): Window | null => (inline ? window : frameRef.current?.contentWindow ?? null);
   // Render langsung: data baru = dokumen baru (client.js template dijalankan sekali per dokumen).
   const reloadData = () => {
-    if (inline && !templateClientSupportsMount()) window.location.reload();
-    else {
+    // Reload hanya bila client.js lama (tanpa mount) benar-benar sudah jalan; selagi dimuat cukup refresh data.
+    if (inline && templateClientScriptRan() && !templateClientSupportsMount() && reloadForFreshTemplateDocument()) return;
+    {
       setRefreshing(true);
       startRefresh(() => router.refresh());
     }
@@ -227,9 +229,8 @@ export function TemplateRuntimeSsrFrame({
     if (!inline || !clientRenderUrl || !clientRenderSha256 || clientRenderProps === null) return;
     const root = inlineRootRef.current;
     if (!root) return;
-    if (templateClientScriptRan() && !templateClientSupportsMount()) {
+    if (templateClientScriptRan() && !templateClientSupportsMount() && reloadForFreshTemplateDocument()) {
       // client.js lama (tanpa mount) sudah memasang listener untuk DOM lama di dokumen ini → dokumen segar.
-      window.location.reload();
       return;
     }
     let active = true;
@@ -556,8 +557,7 @@ export function TemplateRuntimeSsrFrame({
           window.location.assign(checkoutUrl.href);
           return;
         }
-        if (inline) window.location.reload();
-        else router.refresh();
+        reloadData();
       },
     });
     window.addEventListener('message', handleOrderAction);
