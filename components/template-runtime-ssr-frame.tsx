@@ -187,6 +187,9 @@ export function TemplateRuntimeSsrFrame({
   const [frameDocument, setFrameDocument] = useState('');
   const [frameHeight, setFrameHeight] = useState(0);
   const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
+  // Render langsung: lonceng dipasang DI DALAM header template (header Kumpul sticky) agar ikut menempel saat
+  // halaman di-scroll; koordinat `notificationAnchor` lalu relatif ke header itu, bukan ke root.
+  const [notificationHost, setNotificationHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Refresh lembut setelah intent: dokumen lama tetap tampil (dengan overlay) sampai dokumen baru siap.
   const [refreshing, setRefreshing] = useState(false);
@@ -404,6 +407,8 @@ export function TemplateRuntimeSsrFrame({
     const handleMessage = (event: MessageEvent<unknown>) => {
       if (event.source !== frame || event.origin !== messageOrigin) return;
       if (stableIdentity.slug === 'kumpul' && isTemplateRuntimeNotificationAnchorMessage(event.data, stableIdentity)) {
+        // Render langsung: posisi dihitung langsung dari header (efek di bawah), bukan dari pesan.
+        if (inline) return;
         const anchor = event.data;
         // Iframe: koordinat relatif dokumen frame. Render langsung: koordinat halaman → relatif root.
         const rootRect = inline ? frameElement.getBoundingClientRect() : null;
@@ -631,6 +636,48 @@ export function TemplateRuntimeSsrFrame({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bridgeTarget/reloadData hanya bergantung pada inline
   }, [inline, intentContext, messageOrigin, router, stableIdentity]);
 
+  // Render langsung: cari header template yang memuat merek (.kumpul-brand-copy), pasang lonceng di dalamnya.
+  // Diperbarui saat isi root diganti (render ulang) dan saat ukuran merek berubah.
+  useEffect(() => {
+    if (!inline || !inlineReady || !notificationContext?.isLoggedIn || stableIdentity.slug !== 'kumpul') return;
+    const root = inlineRootRef.current;
+    if (!root) return;
+    let brandObserver: ResizeObserver | null = null;
+    let observedBrand: HTMLElement | null = null;
+    const update = () => {
+      const brand = root.querySelector<HTMLElement>('.kumpul-brand-copy');
+      const header = brand?.closest<HTMLElement>('header') ?? null;
+      if (!brand || !header) {
+        setNotificationHost(null);
+        return;
+      }
+      // Header harus jadi containing block (sticky/relative) agar posisi absolut lonceng relatif ke header.
+      if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
+      const headerRect = header.getBoundingClientRect();
+      const brandRect = brand.getBoundingClientRect();
+      setNotificationHost(header);
+      setNotificationAnchor({
+        left: brandRect.right - headerRect.left + 12,
+        top: brandRect.top - headerRect.top + brandRect.height / 2,
+      });
+      if (observedBrand !== brand && typeof ResizeObserver === 'function') {
+        brandObserver?.disconnect();
+        brandObserver = new ResizeObserver(update);
+        brandObserver.observe(brand);
+        observedBrand = brand;
+      }
+    };
+    update();
+    const rootObserver = new MutationObserver(update);
+    rootObserver.observe(root, { childList: true });
+    window.addEventListener('resize', update);
+    return () => {
+      rootObserver.disconnect();
+      brandObserver?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [inline, inlineReady, notificationContext?.isLoggedIn, stableIdentity.slug]);
+
   // Batalkan pemeriksaan navigasi yang masih berjalan saat komponen dilepas.
   useEffect(() => () => {
     const check = navigationCheckRef.current;
@@ -745,7 +792,7 @@ export function TemplateRuntimeSsrFrame({
       <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-zinc-300 border-t-zinc-700" />
     </div>
   ) : null;
-  const notification = notificationContext?.isLoggedIn ? (
+  const notificationBell = notificationContext?.isLoggedIn ? (
     <div
       className="absolute z-50 max-[620px]:!left-auto max-[620px]:!right-3 max-[620px]:!top-3 max-[620px]:!translate-y-0"
       style={notificationAnchor
@@ -761,6 +808,9 @@ export function TemplateRuntimeSsrFrame({
       />
     </div>
   ) : null;
+  const notification = notificationBell && inline && notificationHost?.isConnected
+    ? createPortal(notificationBell, notificationHost)
+    : notificationBell;
 
   if (placement === 'bottom') {
     return (
