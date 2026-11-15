@@ -70,6 +70,9 @@ import { NotificationBell } from './notification-bell';
 import { loadTemplateBrowserBundle, type TemplateBrowserBundleRef } from '../lib/template-browser-bundle';
 import type { ThemeColors } from '../lib/website-theme';
 
+/** Berapa kali iframe dimuat ulang saat ping pengaman navigasi tidak dijawab, sebelum konten dihentikan. */
+const NAVIGATION_GUARD_RELOADS = 2;
+
 interface TemplateRuntimeSsrFrameProps {
   html: string;
   identity: TemplateRuntimeIdentity;
@@ -140,6 +143,11 @@ export function TemplateRuntimeSsrFrame({
   // Menghitung jumlah `load` tidak andal (load dokumen lama/kosong bisa datang terlambat di HP).
   // Hanya bila TIDAK ada jawaban sama sekali — isi frame sudah halaman lain — konten dihentikan.
   const navigationCheckRef = useRef<{ requestId: string; retry: number; deadline: number } | null>(null);
+  // Ping tak terjawab → iframe dimuat ulang dulu (maks. NAVIGATION_GUARD_RELOADS) sebelum konten dihentikan.
+  // Iframe yang nyaris tak terlihat (navigasi bawah 1px) bisa tertahan sesaat oleh throttle browser; memuat
+  // ulang juga memulihkan dokumen Bagdja bila template benar-benar menavigasi frame-nya.
+  const guardReloadsRef = useRef(0);
+  const [frameNonce, setFrameNonce] = useState(0);
   const [frameDocument, setFrameDocument] = useState('');
   const [frameHeight, setFrameHeight] = useState(0);
   const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
@@ -253,6 +261,7 @@ export function TemplateRuntimeSsrFrame({
           window.clearInterval(check.retry);
           window.clearTimeout(check.deadline);
           navigationCheckRef.current = null;
+          guardReloadsRef.current = 0;
         }
         return;
       }
@@ -300,7 +309,8 @@ export function TemplateRuntimeSsrFrame({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [resizeToContent, router, stableIdentity, tenantPathPrefix]);
+    // frameNonce: iframe dipasang ulang → contentWindow baru harus didengarkan.
+  }, [frameNonce, resizeToContent, router, stableIdentity, tenantPathPrefix]);
 
   useEffect(() => {
     const frame = frameRef.current?.contentWindow;
@@ -472,7 +482,11 @@ export function TemplateRuntimeSsrFrame({
     return () => window.clearTimeout(timer);
   }, [refreshPending, refreshing, stableIdentity]);
 
-  if (error) return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
+  if (error) {
+    // Navigasi bawah bersifat tambahan: gagal = tidak ditampilkan (header & isi halaman tetap tampil).
+    if (placement === 'bottom') return null;
+    return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
+  }
 
   const stopNavigationCheck = () => {
     const check = navigationCheckRef.current;
@@ -491,6 +505,13 @@ export function TemplateRuntimeSsrFrame({
     const retry = window.setInterval(ping, 500);
     const deadline = window.setTimeout(() => {
       stopNavigationCheck();
+      if (guardReloadsRef.current < NAVIGATION_GUARD_RELOADS) {
+        guardReloadsRef.current += 1;
+        console.warn(`[template-frame] ${placement} frame did not answer the ping; reloading (${guardReloadsRef.current}/${NAVIGATION_GUARD_RELOADS}).`);
+        setFrameNonce((nonce) => nonce + 1);
+        return;
+      }
+      console.warn(`[template-frame] ${placement} frame stopped: no Bagdja document after ${NAVIGATION_GUARD_RELOADS} reloads.`);
       setError('Template mencoba menavigasi keluar dari frame terisolasi, sehingga konten dihentikan.');
     }, 4000);
     navigationCheckRef.current = { requestId, retry, deadline };
@@ -499,6 +520,7 @@ export function TemplateRuntimeSsrFrame({
 
   const frame = (
     <iframe
+      key={frameNonce}
       ref={frameRef}
       title={`Website template ${stableIdentity.slug} ${stableIdentity.version}`}
       className={`block w-full border-0 ${
