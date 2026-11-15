@@ -255,6 +255,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
       templateSlug: orderRuntime.slug,
       pinnedVersion: orderRuntime.version,
       candidateDigest: orderRuntime.candidateDigest,
+      browserBundle: orderRuntime.browserBundle,
       tenantSlug: website.slug,
       props: { ...props, page: orderDetail.page },
       orderActionContext: {
@@ -270,6 +271,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

@@ -33,6 +33,7 @@ export default async function GatheringInvitePage({ params }: GatheringInvitePag
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
         tenantSlug: tenant.website.slug,
         props: { ...props, page: loaded.page },
       });

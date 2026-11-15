@@ -58,6 +58,11 @@ const contractModule = { exports: {} };
 new Function('exports', 'module', 'require', ts.transpileModule(contractSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText)(contractModule.exports, contractModule, require);
+const browserBundleModule = { exports: {} };
+new Function('exports', 'module', 'require', ts.transpileModule(
+  await readFile(join(projectRoot, 'lib/template-browser-bundle.ts'), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
+).outputText)(browserBundleModule.exports, browserBundleModule, require);
 const runtimeClientSource = await readFile(join(projectRoot, 'lib/template-runtime-client.ts'), 'utf8');
 const runtimeClientTranspiled = ts.transpileModule(runtimeClientSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -70,9 +75,11 @@ new Function('exports', 'module', 'require', runtimeClientTranspiled)(
     ? bridgeModule.exports
     : specifier.endsWith('template-page-contract')
       ? contractModule.exports
-      : require(specifier),
+      : specifier.endsWith('template-browser-bundle')
+        ? browserBundleModule.exports
+        : require(specifier),
 );
-const { sanitizeTemplateRuntimeProps } = runtimeClientModule.exports;
+const { sanitizeTemplateRuntimeProps, getTemplateClientRenderBundle } = runtimeClientModule.exports;
 globalThis.DOMParser = class {
   parseFromString(markup) {
     const body = markup.match(/<body>([\s\S]*)<\/body>/i)?.[1]
@@ -635,4 +642,136 @@ test('accepts only identity-bound pong replies for the navigation guard', () => 
   assert.equal(isTemplateRuntimePongMessage({ ...pong, digest: 'b'.repeat(64) }, identity), false);
   assert.equal(isTemplateRuntimePongMessage({ ...pong, type: 'bagdja:template:ping' }, identity), false);
   assert.equal(isTemplateRuntimePongMessage({ ...pong, requestId: 'x'.repeat(65) }, identity), false);
+});
+
+
+// ── Mode client (template-client-rendering-plan §5) ───────────────────────────
+
+const BROWSER_BUNDLE = Buffer.from(
+  'globalThis.BagdjaTemplate = Object.freeze({\n' +
+  `  render: (props) => ${JSON.stringify('<main class="kumpul-brand-copy" onclick="steal()">Halo ')} + props.profile.name + "</main>",\n` +
+  `  clientSource: ${JSON.stringify('document.body.dataset.enhanced = "yes";')},\n` +
+  '});',
+);
+const BROWSER_SHA = createHash('sha256').update(BROWSER_BUNDLE).digest('hex');
+
+async function clientDocument(overrides = {}) {
+  return createTemplateRuntimeSsrDocument({
+    html: '',
+    // slug kumpul: bootstrap memasang anchor notifikasi yang menunggu template siap.
+    identity: { ...identity, slug: 'kumpul', digest: BROWSER_SHA },
+    parentOrigin: 'https://tenant.example.test',
+    tenantPathPrefix: '/store',
+    stylesheetUrls: [],
+    clientRender: {
+      props: { profile: { name: 'Toko </script><script>alert(1)</script>' } },
+      bundleBase64: BROWSER_BUNDLE.toString('base64'),
+      bundleSha256: BROWSER_SHA,
+    },
+    ...overrides,
+  });
+}
+
+test('client mode: props as inert JSON, bundle hash verified, blob scripts and https images only', async () => {
+  const document = await clientDocument();
+  const bootstrap = document.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(bootstrap);
+  assert.doesNotThrow(() => new Function(bootstrap));
+  const policy = document.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]?.replaceAll('&#39;', "'");
+  assert.ok(policy?.includes(`script-src 'sha256-${createHash('sha256').update(bootstrap).digest('base64')}' blob:`));
+  assert.ok(policy?.includes("connect-src 'none'"));
+  assert.ok(policy?.includes('img-src data: blob: https:'));
+  const propsJson = document.match(/<script type="application\/json" id="bagdja-template-props">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(propsJson, 'props are embedded as non-executable JSON');
+  assert.ok(!propsJson.includes('</script>'), 'props cannot close the JSON script element');
+  assert.deepEqual(JSON.parse(propsJson), { profile: { name: 'Toko </script><script>alert(1)</script>' } });
+
+  await assert.rejects(
+    clientDocument({ clientRender: { props: {}, bundleBase64: BROWSER_BUNDLE.toString('base64'), bundleSha256: 'b'.repeat(64) } }),
+    /integrity check failed/,
+  );
+  await assert.rejects(clientDocument({ html: '<main></main>' }), /browser bundle is invalid/);
+});
+
+test('client mode bootstrap renders the template, sanitizes it, then runs clientSource and fires template-ready', async () => {
+  const document = await clientDocument();
+  const bootstrap = document.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  const propsJson = document.match(/id="bagdja-template-props">([\s\S]*?)<\/script>/)?.[1];
+
+  const listeners = new Map();
+  const events = [];
+  const blobs = new Map();
+  const sandbox = {};
+  const fakeDocument = {
+    body: {
+      innerHTML: '',
+      dataset: {},
+      appendChild(script) {
+        // Blob script: jalankan isinya di "jendela" iframe tiruan, lalu onload.
+        const source = blobs.get(script.src);
+        new Function('globalThis', 'document', source)(sandbox, fakeDocument);
+        script.onload?.();
+      },
+    },
+    getElementById: (id) => (id === 'bagdja-template-props'
+      ? { textContent: propsJson, remove() {} }
+      : null),
+    createElement: () => ({}),
+    querySelector: (selector) => (selector === '.kumpul-brand-copy' && fakeDocument.body.innerHTML.includes('kumpul-brand-copy')
+      ? { getBoundingClientRect: () => ({ right: 10, top: 4, height: 20 }) }
+      : null),
+    addEventListener(type, callback) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(callback);
+    },
+    dispatchEvent(event) {
+      events.push(event.type);
+      for (const callback of listeners.get(event.type) ?? []) callback(event);
+    },
+  };
+  const posted = [];
+  const run = new Function(
+    'window', 'document', 'parent', 'globalThis', 'URL', 'Blob', 'CustomEvent', 'atob', 'DOMParser', 'ResizeObserver',
+    bootstrap,
+  );
+  run(
+    { addEventListener() {}, scrollX: 0, scrollY: 0 },
+    fakeDocument,
+    { postMessage: (message) => posted.push(message) },
+    sandbox,
+    { createObjectURL: (blob) => { const key = `blob:${blobs.size}`; blobs.set(key, blob.source); return key; }, revokeObjectURL() {} },
+    class { constructor([part]) { this.source = typeof part === 'string' ? part : Buffer.from(part).toString('utf8'); } },
+    class { constructor(type) { this.type = type; } },
+    atob,
+    globalThis.DOMParser,
+    undefined,
+  );
+  for (const callback of listeners.get('DOMContentLoaded') ?? []) callback();
+
+  assert.equal(fakeDocument.body.innerHTML.includes('onclick'), false, 'template HTML is sanitized like SSR');
+  assert.match(fakeDocument.body.innerHTML, /Halo Toko/);
+  assert.equal(fakeDocument.body.dataset.enhanced, 'yes', 'clientSource runs after the HTML is in place');
+  assert.deepEqual(events, ['bagdja:template:rendered']);
+  assert.ok(
+    posted.some((message) => message.type === 'bagdja:template:notification-anchor'),
+    'listeners waiting for the template (Kumpul notification anchor) run after the client render',
+  );
+});
+
+test('client mode is chosen only with the flag, a valid bundle, https in production, and browser JS allowed', () => {
+  const bundle = { url: 'https://cdn.example.test/org/app/kumpul-browser.js', sha256: BROWSER_SHA };
+  const on = { TEMPLATE_CLIENT_RENDER_ENABLED: 'true', NODE_ENV: 'production' };
+  assert.deepEqual(getTemplateClientRenderBundle('kumpul', '1.3.42', bundle, on), bundle);
+  assert.equal(getTemplateClientRenderBundle('kumpul', '1.3.42', bundle, { NODE_ENV: 'production' }), null);
+  assert.equal(getTemplateClientRenderBundle('kumpul', '1.3.42', undefined, on), null);
+  assert.equal(getTemplateClientRenderBundle('kumpul', '1.3.42', { ...bundle, sha256: 'xyz' }, on), null);
+  assert.equal(getTemplateClientRenderBundle('kumpul', '1.3.42', { ...bundle, url: 'http://cdn.example.test/a.js' }, on), null);
+  assert.deepEqual(
+    getTemplateClientRenderBundle('kumpul', '1.3.42', { ...bundle, url: 'http://localhost:4008/a.js' }, { TEMPLATE_CLIENT_RENDER_ENABLED: 'true' }),
+    { ...bundle, url: 'http://localhost:4008/a.js' },
+  );
+  assert.equal(
+    getTemplateClientRenderBundle('kumpul', '1.3.42', bundle, { ...on, TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED: 'false' }),
+    null,
+  );
 });

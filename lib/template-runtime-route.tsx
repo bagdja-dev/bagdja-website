@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { TemplateRenderProps } from './template-registry';
 import { resolveTenantLinkBase } from './tenant-link-base';
 import {
+  getTemplateClientRenderBundle,
   getTemplateRuntimeTenantVersion,
   isTemplateRuntimeClientBundleApproved,
   renderTemplateThroughRuntime,
@@ -13,6 +14,7 @@ import { TemplateRuntimeSsrFrame } from '../components/template-runtime-ssr-fram
 import { TemplateRuntimeErrorView } from '../components/template-runtime-error';
 import { TemplateTrialBanner } from '../components/template-trial-banner';
 import { resolveTheme } from './website-theme';
+import type { TemplateBrowserBundleRef } from './template-browser-bundle';
 
 export interface PinnedTenantHeaderResult {
   node: ReactNode | null;
@@ -40,11 +42,14 @@ export async function renderPinnedTenantTemplate({
   props,
   orderActionContext,
   candidateDigest,
+  browserBundle,
 }: {
   templateSlug: string;
   pinnedVersion: string | null | undefined;
   /** Uji kandidat belum terbit (lib/template-trial.ts). */
   candidateDigest?: string;
+  /** browser.js versi ini dari API (`template_runtime.browserBundle`); ada + flag aktif → mode client. */
+  browserBundle?: TemplateBrowserBundleRef;
   tenantSlug: string;
   props: TemplateRenderProps;
   orderActionContext?: {
@@ -69,6 +74,24 @@ export async function renderPinnedTenantTemplate({
       : undefined;
     const bridgeAvailable = Boolean(intentContext) || (orderActionContext?.actions.length ?? 0) > 0;
     const safeProps = sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...props, bridgeVersion: 1 } : props);
+    const clientBundleRef = getTemplateClientRenderBundle(templateSlug, version, browserBundle);
+    if (clientBundleRef) {
+      // Mode client: tanpa runtime/container — iframe merender dari browser.js (template-client-rendering-plan §5).
+      return (
+        <>
+          <TemplateRuntimeSsrFrame
+            html=""
+            identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
+            tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+            clientRender={{ props: safeProps, bundle: clientBundleRef }}
+            orderActionContext={orderActionContext}
+            intentContext={intentContext}
+            notificationContext={notificationContext}
+          />
+          {candidateDigest ? <TemplateTrialBanner slug={templateSlug} version={version} /> : null}
+        </>
+      );
+    }
     const rendered = await renderTemplateThroughRuntime({
       slug: templateSlug,
       version,
@@ -116,12 +139,14 @@ export async function renderPinnedTenantHeader({
   tenantSlug,
   props,
   candidateDigest,
+  browserBundle,
   bottomNav = false,
   reserveBottomSpace = true,
 }: {
   templateSlug: string;
   pinnedVersion: string | null | undefined;
   candidateDigest?: string;
+  browserBundle?: TemplateBrowserBundleRef;
   tenantSlug: string;
   props: TemplateRenderProps;
   /** Manifest menyatakan `bottom_nav`: render juga navigasi bawah template (menempel di bawah layar). */
@@ -154,9 +179,30 @@ export async function renderPinnedTenantHeader({
           tenantSlug,
           chromeProps,
           candidateDigest,
+          browserBundle,
           reserveBottomSpace,
         })
       : null;
+    const clientBundleRef = getTemplateClientRenderBundle(templateSlug, version, browserBundle);
+    if (clientBundleRef) {
+      return {
+        node: (
+          <>
+            <TemplateRuntimeSsrFrame
+              html=""
+              identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
+              tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+              clientRender={{ props: { ...chromeProps, headerOnly: true }, bundle: clientBundleRef }}
+              resizeToContent
+              notificationContext={notificationContext}
+            />
+            {candidateDigest ? <TemplateTrialBanner slug={templateSlug} version={version} /> : null}
+            {navNode}
+          </>
+        ),
+        active: true,
+      };
+    }
     const rendered = await renderTemplateThroughRuntime({
       slug: templateSlug,
       version,
@@ -225,6 +271,7 @@ async function renderPinnedTenantBottomNav({
   tenantSlug,
   chromeProps,
   candidateDigest,
+  browserBundle,
   reserveBottomSpace,
 }: {
   templateSlug: string;
@@ -232,9 +279,24 @@ async function renderPinnedTenantBottomNav({
   tenantSlug: string;
   chromeProps: Record<string, unknown>;
   candidateDigest?: string;
+  browserBundle?: TemplateBrowserBundleRef;
   reserveBottomSpace: boolean;
 }): Promise<ReactNode | null> {
   try {
+    const clientBundleRef = getTemplateClientRenderBundle(templateSlug, version, browserBundle);
+    if (clientBundleRef) {
+      return (
+        <TemplateRuntimeSsrFrame
+          html=""
+          identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
+          tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
+          clientRender={{ props: { ...chromeProps, bottomNavOnly: true }, bundle: clientBundleRef }}
+          resizeToContent
+          placement="bottom"
+          reserveBottomSpace={reserveBottomSpace}
+        />
+      );
+    }
     const rendered = await renderTemplateThroughRuntime({
       slug: templateSlug,
       version,

@@ -39,6 +39,11 @@ export interface ApiWebsite {
     viewerRole?: 'designer' | 'reviewer' | 'tester' | 'reviewer_team';
     /** Palet bawaan versi yang dipakai (`manifest.theme`); lihat tenantTemplateTheme. */
     theme?: Record<string, unknown>;
+    /**
+     * browser.js versi ini (R2/CDN) untuk mode client; tidak ada → SSR lewat runtime.
+     * Renderer memverifikasi SHA-256 sebelum dijalankan (template-client-rendering-plan §6).
+     */
+    browserBundle?: { url: string; sha256: string };
   } | null;
   /** true bila website sedang menguji template kandidat (ID pengajuan tidak dibuka ke publik). */
   template_trial_active?: boolean;
