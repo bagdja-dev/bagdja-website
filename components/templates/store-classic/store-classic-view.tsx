@@ -887,7 +887,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
     <>
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="grid gap-10 sm:grid-cols-2">
-          <StoreClassicProductGallery images={images} videoUrl={item.videoUrl} model3dUrl={item.model3dUrl} />
+          <StoreClassicProductGallery images={images} videoUrl={item.videoUrl} videoUrls={item.videoUrls} model3dUrl={item.model3dUrl} />
           <div id={PRODUCT_CTA_ID}>
             <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
               {item.name}

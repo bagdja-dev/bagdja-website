@@ -60,8 +60,10 @@ export interface CatalogItem {
   uomSymbol?: string;
   image?: string;
   images?: string[];
-  /** Video produk (opsional), diupload lewat bagdja-storage-service. */
+  /** Video produk pertama (opsional), diupload lewat bagdja-storage-service. */
   videoUrl?: string;
+  /** Semua video produk (urut tampil); `videoUrl` = elemen pertama. */
+  videoUrls?: string[];
   /** Model 3D produk (opsional, glTF/GLB), diupload lewat bagdja-storage-service. */
   model3dUrl?: string;
   /** Kalau diisi, produk ini adalah varian (warna/ukuran) dari produk lain. */
@@ -486,7 +488,8 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     uomSymbol: product.uom?.symbol,
     image: product.images?.[0],
     images: product.images,
-    videoUrl: product.video_url ?? undefined,
+    videoUrl: product.video_urls?.[0] ?? product.video_url ?? undefined,
+    videoUrls: product.video_urls?.length ? product.video_urls : product.video_url ? [product.video_url] : [],
     model3dUrl: product.model3d_url ?? undefined,
     parentProductId: product.parent_product_id ?? undefined,
     locationIds: product.location_ids ?? [],

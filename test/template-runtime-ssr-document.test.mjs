@@ -80,7 +80,7 @@ new Function('exports', 'module', 'require', runtimeClientTranspiled)(
         ? browserBundleModule.exports
         : require(specifier),
 );
-const { sanitizeTemplateRuntimeProps, getTemplateClientRenderBundle } = runtimeClientModule.exports;
+const { sanitizeTemplateRuntimeProps, getTemplateClientRenderBundle, getTemplateStudioPreviewBundle } = runtimeClientModule.exports;
 globalThis.DOMParser = class {
   parseFromString(markup) {
     const body = markup.match(/<body>([\s\S]*)<\/body>/i)?.[1]
@@ -974,4 +974,20 @@ test('shell is active only with the shell page override, inline render, and a va
   assert.equal(isTemplateShellActive('kumpul', '1.4.0', bundle, ['shell'], { ...env, TEMPLATE_INLINE_RENDER_ENABLED: 'false' }), false);
   assert.equal(isTemplateShellActive('kumpul', '1.4.0', undefined, ['shell'], env), false);
   assert.equal(isTemplateShellActive('kumpul', null, bundle, ['shell'], env), false);
+});
+
+
+test('Studio preview renders in the browser whenever the version has a valid browser.js, without the visitor flag', () => {
+  const bundle = { url: 'https://cdn.example.test/kumpul.js', sha256: 'd'.repeat(64) };
+  assert.deepEqual(getTemplateStudioPreviewBundle('kumpul', '1.4.0', bundle, { NODE_ENV: 'production' }), bundle);
+  assert.equal(getTemplateStudioPreviewBundle('kumpul', '1.4.0', undefined, { NODE_ENV: 'production' }), null);
+  assert.equal(getTemplateStudioPreviewBundle('kumpul', '1.4.0', { ...bundle, url: 'http://cdn.example.test/a.js' }, { NODE_ENV: 'production' }), null);
+  assert.deepEqual(
+    getTemplateStudioPreviewBundle('kumpul', '1.4.0', { ...bundle, url: 'http://localhost:4008/a.js' }, {}),
+    { ...bundle, url: 'http://localhost:4008/a.js' },
+  );
+  assert.equal(
+    getTemplateStudioPreviewBundle('kumpul', '1.4.0', bundle, { TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED: 'false' }),
+    null,
+  );
 });

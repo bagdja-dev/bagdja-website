@@ -6,6 +6,8 @@ import {
   PREVIEW_PROTOCOL_VERSION,
   parsePreviewInboundMessage,
 } from '../../lib/preview-protocol';
+import type { TemplateBrowserBundleRef } from '../../lib/template-browser-bundle';
+import { loadInlineTemplate, type InlineTemplate } from '../../lib/template-inline-runtime';
 
 interface TemplateRuntimePreviewProps {
   html: string;
@@ -16,6 +18,11 @@ interface TemplateRuntimePreviewProps {
   allowedOrigins: string[];
   allowDemoImageHost?: boolean;
   draftEndpoint?: string;
+  /**
+   * Render di browser dari browser.js (fase 3): HTML awal & setiap draft dirender lokal — tanpa runtime dan
+   * tanpa draftEndpoint. `html` diabaikan (kosong). Hasil tetap ditampilkan di iframe inert (tanpa skrip).
+   */
+  clientBundle?: TemplateBrowserBundleRef;
   initialProps?: Record<string, unknown>;
   draftIsHome?: boolean;
   draftFallbackSections?: Array<{ id?: string; type: string; content: Record<string, unknown> }>;
@@ -78,6 +85,7 @@ export function TemplateRuntimePreview({
   allowedOrigins,
   allowDemoImageHost = false,
   draftEndpoint,
+  clientBundle,
   initialProps,
   draftIsHome = false,
   draftFallbackSections = [],
@@ -92,6 +100,24 @@ export function TemplateRuntimePreview({
   const draftInFlight = useRef(false);
   const pendingDraft = useRef<{ props: Record<string, unknown>; generation: number } | null>(null);
   const draftGeneration = useRef(0);
+  const clientTemplateRef = useRef<InlineTemplate | null>(null);
+  const clientBundleUrl = clientBundle?.url ?? null;
+  const clientBundleSha256 = clientBundle?.sha256 ?? null;
+  const isClientPreview = Boolean(clientBundleUrl && clientBundleSha256);
+
+  /** Mode client: render props → HTML di browser (sinkron setelah browser.js termuat). */
+  const renderLocally = (props: Record<string, unknown>) => {
+    const template = clientTemplateRef.current;
+    if (!template) return;
+    try {
+      const output = template.render(props);
+      if (typeof output !== 'string') throw new Error('Template tidak menghasilkan HTML.');
+      setRenderedHtml(output);
+      setDraftError(null);
+    } catch (error) {
+      setDraftError(error instanceof Error ? error.message : 'Template gagal dirender di browser.');
+    }
+  };
 
   const previewDocument = useMemo(
     () => createPreviewDocument(renderedHtml, stylesheetUrls, allowDemoImageHost, highlightedSectionId),
@@ -99,10 +125,30 @@ export function TemplateRuntimePreview({
   );
 
   useEffect(() => {
+    if (isClientPreview) return;
     setRenderedHtml(html);
     setRenderedDigest(digest);
     setDraftError(null);
-  }, [digest, html]);
+  }, [digest, html, isClientPreview]);
+
+  // Mode client: muat browser.js (SHA-256 diverifikasi, cache) lalu render props awal.
+  useEffect(() => {
+    if (!clientBundleUrl || !clientBundleSha256 || !initialProps) return;
+    let active = true;
+    loadInlineTemplate({ url: clientBundleUrl, sha256: clientBundleSha256 })
+      .then((template) => {
+        if (!active) return;
+        clientTemplateRef.current = template;
+        renderLocally(initialProps);
+      })
+      .catch((error: unknown) => {
+        if (active) setDraftError(error instanceof Error ? error.message : 'Template tidak dapat dimuat.');
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- renderLocally hanya memakai ref & setter state
+  }, [clientBundleSha256, clientBundleUrl, initialProps]);
 
   useEffect(() => {
     setStylesheetUrls(Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'))
@@ -131,9 +177,10 @@ export function TemplateRuntimePreview({
   }, [allowedOrigins, digest, pageSlug, templateSlug, templateVersion]);
 
   useEffect(() => {
-    if (!draftEndpoint || !initialProps) return;
+    if ((!draftEndpoint && !isClientPreview) || !initialProps) return;
 
     const renderDraft = async (props: Record<string, unknown>, generation: number) => {
+      if (!draftEndpoint) return;
       if (draftInFlight.current) {
         pendingDraft.current = { props, generation };
         return;
@@ -212,6 +259,11 @@ export function TemplateRuntimePreview({
       const generation = ++draftGeneration.current;
       setDraftError(null);
       if (draftTimer.current) clearTimeout(draftTimer.current);
+      if (isClientPreview) {
+        // Render lokal: cukup debounce singkat agar ketikan beruntun tidak merender tiap huruf.
+        draftTimer.current = setTimeout(() => renderLocally(props), 60);
+        return;
+      }
       pendingDraft.current = { props, generation };
       draftTimer.current = setTimeout(() => {
         const latestDraft = pendingDraft.current;
@@ -233,6 +285,7 @@ export function TemplateRuntimePreview({
     draftFallbackSections,
     draftIsHome,
     initialProps,
+    isClientPreview,
     pageSlug,
     templateSlug,
     templateVersion,

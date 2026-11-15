@@ -126,6 +126,8 @@ export interface ApiWebsiteProduct {
   uom?: { code: string; label: string; symbol: string } | null;
   images: string[];
   video_url?: string | null;
+  /** Semua video produk (urut tampil); video_url = elemen pertama (API lama hanya mengirim video_url). */
+  video_urls?: string[] | null;
   model3d_url?: string | null;
   metadata: Record<string, unknown>;
   gathering_options?: Array<{
