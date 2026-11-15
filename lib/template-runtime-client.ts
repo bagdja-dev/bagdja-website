@@ -248,6 +248,14 @@ export function getTemplateClientRenderBundle(
   return { url: bundle.url, sha256: bundle.sha256 };
 }
 
+/**
+ * Render langsung di halaman tanpa iframe (template-client-rendering-plan D7). Berlaku hanya bersama mode client
+ * (getTemplateClientRenderBundle); false → mode client tetap di iframe sandbox.
+ */
+export function isTemplateInlineRenderEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.TEMPLATE_INLINE_RENDER_ENABLED === 'true';
+}
+
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {
   url: string;
   token: string;

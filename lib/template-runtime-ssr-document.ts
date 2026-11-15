@@ -191,6 +191,7 @@ function createNavigationBootstrap({
   resizeToContent,
   clientBundleBase64,
   browserBundleBase64 = null,
+  inline = false,
   minHeight = 56,
 }: {
   identity: TemplateRuntimeIdentity;
@@ -200,6 +201,8 @@ function createNavigationBootstrap({
   clientBundleBase64: string | null;
   /** Mode client: browser.js template (render di iframe, lalu clientSource dijalankan). */
   browserBundleBase64?: string | null;
+  /** Render langsung di halaman (D7): template siap = event `bagdja:template:rendered` di root, client.js dimuat host. */
+  inline?: boolean;
   /** 0 untuk navigasi bawah (tersembunyi di desktop); header tetap minimal 56. */
   minHeight?: number;
 }): string {
@@ -208,7 +211,7 @@ function createNavigationBootstrap({
   const parentOrigin = ${scriptJson(parentOrigin)};
   // Isi template siap di DOM: SSR = DOMContentLoaded; mode client = setelah render di browser.
   const onTemplateReady = (callback) => document.addEventListener(
-    ${browserBundleBase64 === null ? "'DOMContentLoaded'" : "'bagdja:template:rendered'"}, callback, { once: true });
+    ${browserBundleBase64 === null && !inline ? "'DOMContentLoaded'" : "'bagdja:template:rendered'"}, callback, { once: true });
   ${browserBundleBase64 === null ? '' : createClientRenderSegment(browserBundleBase64)}
   // Pengaman navigasi host: setiap \`load\` iframe, host bertanya apakah isi frame masih dokumen Bagdja.
   // Halaman lain (template menavigasi frame-nya) tidak menjawab → host menghentikan konten.
@@ -427,7 +430,7 @@ function createNavigationBootstrap({
     if (key) intent.key = key;
     // Konfirmasi lewat popup template: hanya dari klik asli pengguna. Klik sintetis hanya
     // dipercaya bila client bundle template (yang sudah di-approve) dimuat.
-    if (element.getAttribute('data-bagdja-confirmed') === 'true' && (event.isTrusted || ${clientBundleBase64 === null && browserBundleBase64 === null ? 'false' : 'true'})) {
+    if (element.getAttribute('data-bagdja-confirmed') === 'true' && (event.isTrusted || ${clientBundleBase64 === null && browserBundleBase64 === null && !inline ? 'false' : 'true'})) {
       intent.confirmed = true;
     }
     if (action.startsWith('gathering.') && action !== 'gathering.respond') {
@@ -710,7 +713,7 @@ function isAllowedImageUrl(value: string, parentOrigin: string): URL | null {
   }
 }
 
-function sanitizeTemplateHtml(html: string, parentOrigin: string): { html: string; resourceOrigins: string[] } {
+export function sanitizeTemplateHtml(html: string, parentOrigin: string): { html: string; resourceOrigins: string[] } {
   const parsed = new DOMParser().parseFromString(`<!doctype html><body>${html}`, 'text/html');
   parsed.querySelectorAll('script, meta, base, iframe, frame, object, embed, form, link[rel="import"]')
     .forEach((element) => element.remove());
@@ -984,3 +987,29 @@ export function isTemplateRuntimeNotificationAnchorMessage(
     Number.isFinite(message.y) &&
     message.y >= 0;
 }
+
+/**
+ * Bootstrap bridge untuk render LANGSUNG di halaman tenant (D7, tanpa iframe). Kode sama dengan bootstrap
+ * iframe; pemanggil menjalankannya dengan `document` yang dibatasi ke root bagian template (listener klik/submit
+ * hanya di root itu) — `parent` = jendela ini sendiri, jadi pesan ke host tetap lewat postMessage ke origin tenant.
+ */
+export function createTemplateInlineBootstrap({
+  identity,
+  parentOrigin,
+  tenantPathPrefix,
+}: {
+  identity: TemplateRuntimeIdentity;
+  parentOrigin: string;
+  tenantPathPrefix: string;
+}): string {
+  return createNavigationBootstrap({
+    identity,
+    parentOrigin,
+    tenantPathPrefix,
+    resizeToContent: false,
+    clientBundleBase64: null,
+    inline: true,
+    minHeight: 0,
+  });
+}
+
