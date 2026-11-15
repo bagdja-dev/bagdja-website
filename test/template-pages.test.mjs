@@ -93,18 +93,23 @@ test('calendar page carries scheduled services in WIB with tenant links', () => 
     ...options,
     now: new Date('2026-11-15T00:00:00.000Z'),
     services: [
-      { order_id: 'o-old', transaction_id: 'tx-old', product_name: 'Servis AC', product_image: null, quantity: 1, status: 'done', start_at: '2026-10-20T02:00:00.000Z', end_at: null, all_day: false },
-      { order_id: 'o-photo', transaction_id: 'tx-1', product_name: 'Foto Prewedding', product_image: 'https://cdn.example.com/a.jpg', quantity: 1, status: 'scheduled', start_at: '2026-12-05T02:00:00.000Z', end_at: '2026-12-05T06:00:00.000Z', all_day: false },
-      { order_id: 'o-villa', transaction_id: null, product_name: 'Sewa Villa', product_image: null, quantity: 2, status: 'proposed', start_at: '2026-12-23T17:00:00.000Z', end_at: null, all_day: true },
+      { order_id: 'o-old', transaction_id: 'tx-old', product_name: 'Servis AC', product_image: null, quantity: 1, status: 'completed', start_at: '2026-10-20T02:00:00.000Z', end_at: null, all_day: false },
+      { order_id: 'o-photo', transaction_id: 'tx-1', product_name: 'Foto Prewedding', product_image: 'https://cdn.example.com/a.jpg', quantity: 1, status: 'confirmed', start_at: '2026-12-05T02:00:00.000Z', end_at: '2026-12-05T06:00:00.000Z', all_day: false },
+      { order_id: 'o-villa', transaction_id: null, product_name: 'Sewa Villa', product_image: null, quantity: 2, status: 'payment', start_at: '2026-12-23T17:00:00.000Z', end_at: null, all_day: true },
+      { order_id: 'o-catering', transaction_id: null, product_name: 'Katering', product_image: null, quantity: 1, status: 'planning', start_at: null, end_at: '2026-12-01T00:00:00.000Z', all_day: false },
     ],
   });
   assert.deepEqual(validateTemplatePage(page), []);
   assert.equal(page.initialMonth, '2026-12', 'riwayat jasa tidak memundurkan bulan awal');
-  assert.equal(page.services.length, 3);
-  const [, photo, villa] = page.services;
+  assert.equal(page.services.length, 4);
+  const [, photo, villa, catering] = page.services;
+  assert.equal(catering.startAt, undefined, 'jasa belum bertanggal tanpa startAt');
+  assert.equal(catering.endAt, undefined);
+  assert.equal(catering.statusLabel, 'Perencanaan');
   assert.equal(photo.startAt, '2026-12-05T09:00:00+07:00');
   assert.equal(photo.endAt, '2026-12-05T13:00:00+07:00');
-  assert.equal(photo.statusLabel, 'Terjadwal');
+  assert.equal(photo.statusLabel, 'Dikonfirmasi');
+  assert.equal(villa.statusLabel, 'Menunggu pembayaran');
   assert.equal(photo.detailHref, '/toko/order/tx-1');
   assert.equal(villa.startAt, '2026-12-24T00:00:00+07:00', 'tanggal sepanjang hari tetap di hari yang sama dalam WIB');
   assert.equal(villa.allDay, true);

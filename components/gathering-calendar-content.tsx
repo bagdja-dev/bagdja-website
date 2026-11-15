@@ -55,8 +55,9 @@ type ServiceRow = {
   product_name: string;
   product_image: string | null;
   quantity: number;
-  status: 'proposed' | 'scheduled' | 'done';
-  start_at: string;
+  status: 'planning' | 'payment' | 'confirmed' | 'completed';
+  /** null = belum dijadwalkan. */
+  start_at: string | null;
   end_at: string | null;
   all_day: boolean;
 };
@@ -64,9 +65,25 @@ type ServiceRow = {
 type MainTab = 'plans' | 'invitations' | 'services';
 
 const SERVICE_STATUS_LABELS: Record<ServiceRow['status'], string> = {
-  proposed: 'Diusulkan · belum dibayar',
-  scheduled: 'Terjadwal',
-  done: 'Selesai',
+  planning: 'Perencanaan',
+  payment: 'Menunggu pembayaran',
+  confirmed: 'Dikonfirmasi',
+  completed: 'Selesai',
+};
+
+const SERVICE_TABS: Array<{ key: 'all' | ServiceRow['status']; label: string }> = [
+  { key: 'all', label: 'Semua' },
+  { key: 'planning', label: 'Perencanaan' },
+  { key: 'payment', label: 'Pembayaran' },
+  { key: 'confirmed', label: 'Dikonfirmasi' },
+  { key: 'completed', label: 'Selesai' },
+];
+
+const SERVICE_ACTION_LABELS: Record<ServiceRow['status'], string> = {
+  planning: 'Lengkapi pesanan',
+  payment: 'Bayar pesanan',
+  confirmed: 'Lihat pesanan',
+  completed: 'Lihat pesanan',
 };
 
 /** Sebulan ke belakang s/d ~setahun ke depan (batas API 400 hari). */
@@ -79,6 +96,7 @@ function serviceScheduleUrl(websiteId: string): string {
 }
 
 function formatServiceSchedule(row: ServiceRow) {
+  if (!row.start_at) return 'Jadwal belum ditentukan';
   const start = new Date(row.start_at);
   if (Number.isNaN(start.getTime())) return 'Belum ditentukan';
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -313,11 +331,11 @@ function ServiceCard({ basePath, row, designVariant }: { basePath: string; row: 
       <Link
         href={href}
         className={`inline-flex w-fit items-center justify-center border px-4 py-2 text-xs font-semibold ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
-        style={row.status === 'proposed'
+        style={row.status === 'planning' || row.status === 'payment'
           ? { backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }
           : { borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
       >
-        {row.transaction_id ? 'Lihat pesanan' : 'Lanjutkan pesanan'}
+        {SERVICE_ACTION_LABELS[row.status]}
       </Link>
     </article>
   );
@@ -325,32 +343,63 @@ function ServiceCard({ basePath, row, designVariant }: { basePath: string; row: 
 
 function ServicesTab({ basePath, rows, loading, error, designVariant }: { basePath: string; rows: ServiceRow[]; loading: boolean; error: string; designVariant?: 'store-classic' }) {
   const isStoreClassicDesign = designVariant === 'store-classic';
+  const [activeTab, setActiveTab] = useState<(typeof SERVICE_TABS)[number]['key']>('all');
   const [startOfToday] = useState(() => new Date(new Date().setHours(0, 0, 0, 0)).getTime());
-  const upcoming = rows.filter((row) => new Date(row.end_at ?? row.start_at).getTime() >= startOfToday && row.status !== 'done');
-  const past = rows.filter((row) => !upcoming.includes(row)).reverse();
+  const filtered = rows.filter((row) => activeTab === 'all' || row.status === activeTab);
+  // Belum bertanggal & masih berjalan → "Belum dijadwalkan"; yang selesai/lewat masuk riwayat.
+  const unscheduled = filtered.filter((row) => !row.start_at && row.status !== 'completed');
+  const upcoming = filtered.filter((row) => row.start_at && row.status !== 'completed'
+    && new Date(row.end_at ?? row.start_at).getTime() >= startOfToday);
+  const past = filtered.filter((row) => !unscheduled.includes(row) && !upcoming.includes(row));
   const list = (items: ServiceRow[]) => (
     <div className={`flex flex-col ${isStoreClassicDesign ? 'gap-3' : 'divide-y'}`} style={{ borderColor: 'var(--brand-border)' }}>
       {items.map((row) => <ServiceCard key={row.order_id} basePath={basePath} row={row} designVariant={designVariant} />)}
     </div>
   );
+  const section = (title: string, hint: string, items: ServiceRow[]) => items.length ? (
+    <section className="mb-8">
+      <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>{title} <span className="font-normal">({items.length})</span></h2>
+      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{hint}</p>
+      {list(items)}
+    </section>
+  ) : null;
   return (
     <>
+      <nav className="mb-5 flex gap-2 overflow-x-auto pb-1" aria-label="Filter tahap jasa">
+        {SERVICE_TABS.map((tab) => {
+          const selected = activeTab === tab.key;
+          const count = tab.key === 'all' ? rows.length : rows.filter((row) => row.status === tab.key).length;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={selected}
+              className={`flex shrink-0 items-center gap-2 border px-3 py-1.5 text-xs font-medium ${isStoreClassicDesign ? 'rounded-lg' : 'rounded-full'}`}
+              style={{
+                borderColor: selected ? 'var(--brand-accent)' : 'var(--brand-border)',
+                backgroundColor: isStoreClassicDesign && selected ? 'var(--brand-accent)' : undefined,
+                color: isStoreClassicDesign && selected ? 'var(--brand-on-accent)' : selected ? 'var(--brand-text)' : 'var(--brand-muted)',
+              }}
+            >
+              {tab.label}
+              <span>{count}</span>
+            </button>
+          );
+        })}
+      </nav>
       <StatusLine loading={loading} error={error} loadingText="Memuat jadwal jasa…" designVariant={designVariant} />
-      {!loading && !error && rows.length === 0 ? (
+      {!loading && !error && filtered.length === 0 ? (
         <section className={`border p-10 text-center ${isStoreClassicDesign ? 'rounded-2xl shadow-sm' : 'border-y'}`} style={{ borderColor: 'var(--brand-border)', backgroundColor: isStoreClassicDesign ? 'var(--brand-surface)' : undefined }}>
-          <h2 className="text-lg font-semibold">Belum ada jadwal jasa</h2>
-          <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>Tanggal layanan yang Anda isi saat memesan jasa akan muncul di sini.</p>
+          <h2 className="text-lg font-semibold">{rows.length === 0 ? 'Belum ada pesanan jasa' : 'Tidak ada jasa pada tahap ini'}</h2>
+          <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>Pesanan jasa dengan penawaran dan jadwal layanannya akan muncul di sini.</p>
         </section>
       ) : null}
-      {upcoming.length ? (
-        <section className="mb-8">
-          <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>Akan datang <span className="font-normal">({upcoming.length})</span></h2>
-          {list(upcoming)}
-        </section>
-      ) : null}
+      {section('Akan datang', 'Diurutkan dari jadwal terdekat.', upcoming)}
+      {section('Belum dijadwalkan', 'Tanggal layanan belum diisi pada pesanan.', unscheduled)}
       {past.length ? (
         <details className={`mb-8 ${isStoreClassicDesign ? 'rounded-2xl border p-5' : ''}`} style={isStoreClassicDesign ? { borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' } : undefined}>
-          <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>Sudah lewat ({past.length})</summary>
+          <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-muted)' }}>Selesai / sudah lewat ({past.length})</summary>
           {list(past)}
         </details>
       ) : null}
@@ -490,7 +539,7 @@ export function GatheringCalendarContent({ basePath, websiteId, designVariant }:
             {mainTab === 'plans'
               ? 'Kelola rencana, peserta, voting, dan pembayaran seat acara yang Anda buat.'
               : mainTab === 'services'
-                ? 'Jadwal layanan dari jasa yang Anda pesan.'
+                ? 'Pantau pesanan jasa Anda dari perencanaan, pembayaran, hingga selesai.'
                 : 'Acara yang mengundang Anda. Buka undangan untuk menjawab RSVP, membayar seat, dan melihat tiket masuk.'}
           </p>
         </div>

@@ -357,16 +357,17 @@ export interface ServiceScheduleInput {
   product_name: string;
   product_image: string | null;
   quantity: number;
-  status: 'proposed' | 'scheduled' | 'done';
-  start_at: string;
+  status: 'planning' | 'payment' | 'confirmed' | 'completed';
+  start_at: string | null;
   end_at: string | null;
   all_day: boolean;
 }
 
 const SERVICE_STATUS_LABELS: Record<ServiceScheduleInput['status'], string> = {
-  proposed: 'Diusulkan',
-  scheduled: 'Terjadwal',
-  done: 'Selesai',
+  planning: 'Perencanaan',
+  payment: 'Menunggu pembayaran',
+  confirmed: 'Dikonfirmasi',
+  completed: 'Selesai',
 };
 
 /** Instant → ISO dengan offset WIB, agar template yang membaca tanggal mentah tidak bergeser hari. */
@@ -386,22 +387,26 @@ export function buyerServiceScheduleRange(now = new Date()): { from: string; to:
 
 function buildCalendarServices(services: ServiceScheduleInput[], options: { basePath: string; key: PageKeyFactory }) {
   return services
-    .filter((service) => SERVICE_STATUS_LABELS[service.status] && toPageLocalIso(service.start_at))
+    .filter((service) => Object.prototype.hasOwnProperty.call(SERVICE_STATUS_LABELS, service.status))
     .slice(0, MAX_ROWS)
-    .map((service) => compact({
+    .map((service) => {
+      const startAt = toPageLocalIso(service.start_at);
+      return compact({
       key: options.key('service_order', service.order_id),
       title: text(service.product_name, 'Jasa'),
       imageUrl: service.product_image ?? undefined,
       status: service.status,
       statusLabel: SERVICE_STATUS_LABELS[service.status],
-      startAt: toPageLocalIso(service.start_at) as string,
-      endAt: toPageLocalIso(service.end_at),
+      startAt,
+      // endAt tanpa startAt melanggar kontrak → hanya bila jadwal mulai ada.
+      endAt: startAt ? toPageLocalIso(service.end_at) : undefined,
       allDay: Boolean(service.all_day),
       quantity: Math.max(1, Math.trunc(Number(service.quantity) || 1)),
       detailHref: service.transaction_id
         ? `${options.basePath}/order/${encodeURIComponent(service.transaction_id)}`
         : `${options.basePath}/cart/order/${encodeURIComponent(service.order_id)}`,
-    }));
+      });
+    });
 }
 
 export function buildCalendarPage(
@@ -445,7 +450,7 @@ export function buildCalendarPage(
   const firstEvent = [
     ...[...planRows, ...invitationRows].map((row) => row.eventAt),
     // Jasa: hanya yang belum dimulai, supaya bulan awal tidak mundur ke riwayat.
-    ...serviceRows.map((row) => row.startAt).filter((value) => Date.parse(value) >= Date.parse(nowIso)),
+    ...serviceRows.map((row) => row.startAt).filter((value): value is string => Boolean(value) && Date.parse(value as string) >= Date.parse(nowIso)),
   ]
     .filter((value): value is string => Boolean(value))
     .sort()[0];

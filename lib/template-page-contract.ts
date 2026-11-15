@@ -102,8 +102,8 @@ const GOOGLE_MAPS_URL = /^https:\/\/(?:maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps
 const UNSAFE_HTML = /<\s*(script|style|iframe|object|embed)\b|\son[a-z]+\s*=|javascript:/i;
 const FORBIDDEN_KEY = /(^|_)(email|token|password|secret)$|email|accessToken|refreshToken/i;
 
-/** Status jasa terjadwal di kalender: belum dibayar | sudah dibayar | selesai. */
-export const CALENDAR_SERVICE_STATUSES = ['proposed', 'scheduled', 'done'];
+/** Tahap jasa di kalender: praorder | menunggu bayar | sudah dibayar (DP) | selesai & lunas. */
+export const CALENDAR_SERVICE_STATUSES = ['planning', 'payment', 'confirmed', 'completed'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -183,7 +183,7 @@ export function validateTemplatePage(page: unknown): string[] {
         issues.push(`page.services[${index}].status: ${CALENDAR_SERVICE_STATUSES.join(' | ')}`);
       }
       if (typeof service?.allDay !== 'boolean') issues.push(`page.services[${index}].allDay: harus boolean`);
-      if (!isIsoDateTimeWithOffset(service?.startAt)) issues.push(`page.services[${index}].startAt: wajib ISO 8601 dengan offset`);
+      if (service?.endAt !== undefined && service?.startAt === undefined) issues.push(`page.services[${index}].endAt: butuh startAt`);
     });
   }
   if (page.type === 'draft_order' && Array.isArray(page.steps)) {
