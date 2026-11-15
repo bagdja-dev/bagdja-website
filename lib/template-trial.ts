@@ -11,6 +11,7 @@
 import { backendFetch } from './backend-api';
 import type { ApiWebsite } from './api-client';
 import { getSession } from './session';
+import { isTemplateBrowserBundleRef } from './template-browser-bundle';
 
 type TrialRuntime = NonNullable<ApiWebsite['template_runtime']>;
 
@@ -42,6 +43,9 @@ export function parseTemplateTrialRuntime(value: unknown): TrialRuntime | null {
       : {}),
     ...(runtime.theme && typeof runtime.theme === 'object' && !Array.isArray(runtime.theme)
       ? { theme: runtime.theme as Record<string, unknown> }
+      : {}),
+    ...(isTemplateBrowserBundleRef(runtime.browserBundle)
+      ? { browserBundle: { url: runtime.browserBundle.url, sha256: runtime.browserBundle.sha256 } }
       : {}),
   };
 }

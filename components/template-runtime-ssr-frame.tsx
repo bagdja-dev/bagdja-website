@@ -67,6 +67,7 @@ async function shareOrCopy(mode: 'share' | 'copy', url: string, title?: string):
   return (await copyText(url)) ? 'copied' : 'failed';
 }
 import { NotificationBell } from './notification-bell';
+import { loadTemplateBrowserBundle, type TemplateBrowserBundleRef } from '../lib/template-browser-bundle';
 import type { ThemeColors } from '../lib/website-theme';
 
 interface TemplateRuntimeSsrFrameProps {
@@ -75,6 +76,11 @@ interface TemplateRuntimeSsrFrameProps {
   tenantPathPrefix: string;
   clientBundle?: string | null;
   clientBundleSha256?: string | null;
+  /**
+   * Mode client (template-client-rendering-plan §5): template dirender di iframe dari browser.js
+   * (diambil & diverifikasi halaman induk). `html` diabaikan (kosong).
+   */
+  clientRender?: { props: Record<string, unknown>; bundle: TemplateBrowserBundleRef } | null;
   resizeToContent?: boolean;
   /**
    * `bottom` = navigasi bawah template (menempel di bawah layar, tinggi 0 bila template
@@ -120,6 +126,7 @@ export function TemplateRuntimeSsrFrame({
   tenantPathPrefix,
   clientBundle = null,
   clientBundleSha256 = null,
+  clientRender = null,
   resizeToContent = false,
   placement = 'top',
   reserveBottomSpace = true,
@@ -148,17 +155,31 @@ export function TemplateRuntimeSsrFrame({
     [identity.digest, identity.slug, identity.version],
   );
 
+  // Props mode client dibandingkan per isi (bukan referensi objek) agar dokumen hanya dibuat ulang bila data berubah.
+  const clientRenderProps = clientRender ? JSON.stringify(clientRender.props) : null;
+  const clientRenderUrl = clientRender?.bundle.url ?? null;
+  const clientRenderSha256 = clientRender?.bundle.sha256 ?? null;
+  const scriptsInFrame = clientBundle !== null || clientRender !== null;
+
   useEffect(() => {
     let active = true;
     // Dokumen lama dibiarkan tampil sampai dokumen baru siap (tanpa layar kosong saat refresh).
     setError(null);
-    void createTemplateRuntimeSsrDocument({
-      html,
+    const bundleRef = clientRenderUrl && clientRenderSha256 ? { url: clientRenderUrl, sha256: clientRenderSha256 } : null;
+    void (bundleRef ? loadTemplateBrowserBundle(bundleRef) : Promise.resolve(null)).then((bundleBase64) => createTemplateRuntimeSsrDocument({
+      html: bundleRef ? '' : html,
       identity: stableIdentity,
       parentOrigin: window.location.origin,
       tenantPathPrefix,
       clientBundle,
       clientBundleSha256,
+      clientRender: bundleRef && bundleBase64 !== null && clientRenderProps !== null
+        ? {
+            props: JSON.parse(clientRenderProps) as Record<string, unknown>,
+            bundleBase64,
+            bundleSha256: bundleRef.sha256,
+          }
+        : null,
       resizeToContent,
       minHeight: placement === 'bottom' ? 0 : 56,
       stylesheetUrls: Array.from(window.document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'))
@@ -171,7 +192,7 @@ export function TemplateRuntimeSsrFrame({
           }
         })
         .filter((url): url is string => url !== null),
-    }).then((frameDocument) => {
+    })).then((frameDocument) => {
       if (!active) return;
       setFrameDocument(frameDocument);
     }).catch((cause: unknown) => {
@@ -182,7 +203,18 @@ export function TemplateRuntimeSsrFrame({
     return () => {
       active = false;
     };
-  }, [clientBundle, clientBundleSha256, html, placement, resizeToContent, stableIdentity, tenantPathPrefix]);
+  }, [
+    clientBundle,
+    clientBundleSha256,
+    clientRenderProps,
+    clientRenderSha256,
+    clientRenderUrl,
+    html,
+    placement,
+    resizeToContent,
+    stableIdentity,
+    tenantPathPrefix,
+  ]);
 
   // Navigasi bawah template: bilah lain yang menempel di bawah layar (mis. tombol Beli)
   // naik setinggi navigasi lewat `bottom: var(--template-bottom-nav-height, 0px)`.
@@ -489,7 +521,7 @@ export function TemplateRuntimeSsrFrame({
       srcDoc={frameDocument || '<!doctype html><html><body></body></html>'}
       onLoad={() => {
         if (!frameDocument) return;
-        if (clientBundle !== null) verifyFrameDocument();
+        if (scriptsInFrame) verifyFrameDocument();
         pendingRefreshRef.current = null;
         setRefreshing(false);
       }}

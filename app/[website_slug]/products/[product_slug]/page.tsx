@@ -106,6 +106,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       templateSlug: runtime.slug,
       pinnedVersion: runtime.version,
       candidateDigest: runtime.candidateDigest,
+      browserBundle: runtime.browserBundle,
       tenantSlug: website.slug,
       props: { ...props, sections: [], page },
     });
@@ -116,6 +117,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

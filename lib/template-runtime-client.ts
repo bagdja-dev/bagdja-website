@@ -1,6 +1,7 @@
 import { validateTemplatePage } from './template-page-contract';
 import { createHash } from 'node:crypto';
 import type { TemplateRenderProps } from './template-registry';
+import { isTemplateBrowserBundleRef, type TemplateBrowserBundleRef } from './template-browser-bundle';
 
 export interface TemplateRuntimeRenderRequest {
   slug: string;
@@ -228,6 +229,23 @@ export function isTemplateRuntimeClientBundleApproved(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   return env.TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED !== 'false' && VERSION_PATTERN.test(version);
+}
+
+/**
+ * Mode client (template-client-rendering-plan §10 fase 1): aktif hanya bila
+ * TEMPLATE_CLIENT_RENDER_ENABLED=true, versi punya browser.js dari API, dan JavaScript browser
+ * template diizinkan deployment ini. Selain itu null → SSR lewat runtime seperti biasa.
+ */
+export function getTemplateClientRenderBundle(
+  slug: string,
+  version: string,
+  bundle: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+): TemplateBrowserBundleRef | null {
+  if (env.TEMPLATE_CLIENT_RENDER_ENABLED !== 'true' || !isTemplateBrowserBundleRef(bundle)) return null;
+  if (env.NODE_ENV === 'production' && !bundle.url.startsWith('https://')) return null;
+  if (!isTemplateRuntimeClientBundleApproved(slug, version, env)) return null;
+  return { url: bundle.url, sha256: bundle.sha256 };
 }
 
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {

@@ -24,6 +24,8 @@ export const INVITATION_BANNER_MAX_BYTES = 5 * 1024 * 1024;
 export const INVITATION_DESCRIPTION_MAX_LENGTH = 5000;
 
 const MAX_TEMPLATE_CLIENT_BUNDLE_BYTES = 512 * 1024;
+/** Sama dengan MAX_BROWSER_BUNDLE_BYTES publisher (template-client-rendering-plan D4). */
+export const MAX_TEMPLATE_BROWSER_BUNDLE_BYTES = 1024 * 1024;
 const MAX_TEMPLATE_CLIENT_BUNDLE_BASE64_LENGTH = Math.ceil(MAX_TEMPLATE_CLIENT_BUNDLE_BYTES / 3) * 4;
 
 function toBase64(bytes: Uint8Array): string {
@@ -88,12 +90,107 @@ function scriptJson(value: unknown): string {
   })[character] ?? character);
 }
 
+/**
+ * Mode client (template-client-rendering-plan §5): didaftarkan PERTAMA di bootstrap sehingga
+ * listener DOMContentLoaded ini jalan sebelum listener lain (anchor notifikasi, resize).
+ * browser.js → BagdjaTemplate.render(props) → HTML disaring (aturan sama dengan SSR) → body,
+ * lalu clientSource dijalankan lewat blob script seperti client bundle mode SSR.
+ */
+function createClientRenderSegment(browserBundleBase64: string): string {
+  return `const storageHostSuffixes = ${scriptJson(STORAGE_HOST_SUFFIXES)};
+  const sanitizeTemplateHtml = (html) => {
+    const parsed = new DOMParser().parseFromString('<!doctype html><body>' + html, 'text/html');
+    parsed.querySelectorAll('script, meta, base, iframe, frame, object, embed, form, link[rel="import"]')
+      .forEach((element) => element.remove());
+    parsed.body.querySelectorAll('*').forEach((element) => {
+      for (const attribute of Array.from(element.attributes)) {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value.trim();
+        if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction') {
+          element.removeAttribute(attribute.name);
+        } else if (['src', 'poster', 'xlink:href'].includes(name)) {
+          if (value.startsWith('data:') || value.startsWith('blob:')) {
+            if (element.tagName.toLowerCase() !== 'img') element.removeAttribute(attribute.name);
+            continue;
+          }
+          let resource = null;
+          try { resource = new URL(value, parentOrigin); } catch { resource = null; }
+          const isImage = element.tagName.toLowerCase() === 'img' && name === 'src';
+          const isKnownStorage = resource && storageHostSuffixes.some((suffix) => resource.hostname.endsWith(suffix));
+          if (!resource || resource.protocol !== 'https:' || resource.username || resource.password ||
+              (!isKnownStorage && !isImage)) {
+            element.removeAttribute(attribute.name);
+            continue;
+          }
+          element.setAttribute(attribute.name, resource.href);
+        } else if (['href', 'action'].includes(name) && /^(?:javascript|vbscript|data):/i.test(value)) {
+          element.removeAttribute(attribute.name);
+        }
+      }
+    });
+    return parsed.body.innerHTML;
+  };
+  const runBlobScript = (source, onload) => {
+    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = () => {
+      URL.revokeObjectURL(url);
+      if (onload) onload();
+    };
+    script.onerror = () => {
+      URL.revokeObjectURL(url);
+      document.dispatchEvent(new CustomEvent('bagdja:template:script-error'));
+    };
+    document.body.appendChild(script);
+  };
+  const failClientRender = () => {
+    document.body.innerHTML = '<p style="font:14px/1.5 system-ui,sans-serif;padding:24px;color:#52525b">' +
+      'Halaman belum dapat ditampilkan. Muat ulang halaman ini.</p>';
+    document.dispatchEvent(new CustomEvent('bagdja:template:render-error'));
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    const propsElement = document.getElementById('bagdja-template-props');
+    let props = null;
+    try {
+      props = JSON.parse(propsElement ? propsElement.textContent || '' : '');
+    } catch {
+      props = null;
+    }
+    if (propsElement) propsElement.remove();
+    if (!props || typeof props !== 'object' || Array.isArray(props)) {
+      failClientRender();
+      return;
+    }
+    try {
+      const binary = atob(${scriptJson(browserBundleBase64)});
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      runBlobScript(bytes, () => {
+        try {
+          const template = globalThis.BagdjaTemplate;
+          if (!template || typeof template.render !== 'function') throw new Error('missing render');
+          const html = template.render(props);
+          if (typeof html !== 'string') throw new Error('invalid html');
+          document.body.innerHTML = sanitizeTemplateHtml(html);
+          document.dispatchEvent(new CustomEvent('bagdja:template:rendered'));
+          if (typeof template.clientSource === 'string' && template.clientSource) runBlobScript(template.clientSource);
+        } catch {
+          failClientRender();
+        }
+      });
+    } catch {
+      failClientRender();
+    }
+  }, { once: true });`;
+}
+
 function createNavigationBootstrap({
   identity,
   parentOrigin,
   tenantPathPrefix,
   resizeToContent,
   clientBundleBase64,
+  browserBundleBase64 = null,
   minHeight = 56,
 }: {
   identity: TemplateRuntimeIdentity;
@@ -101,12 +198,18 @@ function createNavigationBootstrap({
   tenantPathPrefix: string;
   resizeToContent: boolean;
   clientBundleBase64: string | null;
+  /** Mode client: browser.js template (render di iframe, lalu clientSource dijalankan). */
+  browserBundleBase64?: string | null;
   /** 0 untuk navigasi bawah (tersembunyi di desktop); header tetap minimal 56. */
   minHeight?: number;
 }): string {
   return `(() => {
   const identity = ${scriptJson(identity)};
   const parentOrigin = ${scriptJson(parentOrigin)};
+  // Isi template siap di DOM: SSR = DOMContentLoaded; mode client = setelah render di browser.
+  const onTemplateReady = (callback) => document.addEventListener(
+    ${browserBundleBase64 === null ? "'DOMContentLoaded'" : "'bagdja:template:rendered'"}, callback, { once: true });
+  ${browserBundleBase64 === null ? '' : createClientRenderSegment(browserBundleBase64)}
   // Pengaman navigasi host: setiap \`load\` iframe, host bertanya apakah isi frame masih dokumen Bagdja.
   // Halaman lain (template menavigasi frame-nya) tidak menjawab → host menghentikan konten.
   window.addEventListener('message', (event) => {
@@ -324,7 +427,7 @@ function createNavigationBootstrap({
     if (key) intent.key = key;
     // Konfirmasi lewat popup template: hanya dari klik asli pengguna. Klik sintetis hanya
     // dipercaya bila client bundle template (yang sudah di-approve) dimuat.
-    if (element.getAttribute('data-bagdja-confirmed') === 'true' && (event.isTrusted || ${clientBundleBase64 === null ? 'false' : 'true'})) {
+    if (element.getAttribute('data-bagdja-confirmed') === 'true' && (event.isTrusted || ${clientBundleBase64 === null && browserBundleBase64 === null ? 'false' : 'true'})) {
       intent.confirmed = true;
     }
     if (action.startsWith('gathering.') && action !== 'gathering.respond') {
@@ -490,13 +593,13 @@ function createNavigationBootstrap({
       y: rect.top + window.scrollY + rect.height / 2,
     }, parentOrigin);
   };
-  document.addEventListener('DOMContentLoaded', () => {
+  onTemplateReady(() => {
     const brandCopy = document.querySelector('.kumpul-brand-copy');
     if (!brandCopy) return;
     reportNotificationAnchor();
     if (typeof ResizeObserver === 'function') new ResizeObserver(reportNotificationAnchor).observe(brandCopy);
     else window.addEventListener('resize', reportNotificationAnchor);
-  }, { once: true });` : ''}
+  });` : ''}
   ${resizeToContent ? `let lastHeight = 0;
   const reportHeight = () => {
     const height = Math.min(600, Math.max(${minHeight}, Math.ceil(
@@ -651,9 +754,11 @@ export async function createTemplateRuntimeSsrDocument({
   stylesheetUrls,
   clientBundle = null,
   clientBundleSha256 = null,
+  clientRender = null,
   resizeToContent = false,
   minHeight = 56,
 }: {
+  /** Mode SSR: HTML dari runtime. Mode client: string kosong (HTML dibuat di iframe). */
   html: string;
   identity: TemplateRuntimeIdentity;
   parentOrigin: string;
@@ -661,6 +766,11 @@ export async function createTemplateRuntimeSsrDocument({
   stylesheetUrls: readonly string[];
   clientBundle?: string | null;
   clientBundleSha256?: string | null;
+  /**
+   * Mode client (template-client-rendering-plan §5): props tersanitasi + browser.js (base64) yang
+   * SHA-256-nya diverifikasi di sini. Tidak boleh digabung dengan html/clientBundle mode SSR.
+   */
+  clientRender?: { props: Record<string, unknown>; bundleBase64: string; bundleSha256: string } | null;
   resizeToContent?: boolean;
   /** Tinggi minimum frame yang menyesuaikan isi (0 = boleh kosong, untuk navigasi bawah). */
   minHeight?: number;
@@ -719,6 +829,28 @@ export async function createTemplateRuntimeSsrDocument({
     throw new TypeError('Template client bundle digest is invalid.');
   }
 
+  if (clientRender !== null) {
+    const { props, bundleBase64, bundleSha256 } = clientRender;
+    if (
+      html !== '' ||
+      clientBundle !== null ||
+      props === null || typeof props !== 'object' || Array.isArray(props) ||
+      typeof bundleBase64 !== 'string' ||
+      bundleBase64.length > Math.ceil(MAX_TEMPLATE_BROWSER_BUNDLE_BYTES / 3) * 4 ||
+      typeof bundleSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(bundleSha256) ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(bundleBase64)
+    ) {
+      throw new TypeError('Template browser bundle is invalid.');
+    }
+    const bytes = Uint8Array.from(window.atob(bundleBase64), (character) => character.charCodeAt(0));
+    if (
+      bytes.length === 0 ||
+      toHex(new Uint8Array(await window.crypto.subtle.digest('SHA-256', new Uint8Array(bytes).buffer))) !== bundleSha256
+    ) {
+      throw new TypeError('Template browser bundle integrity check failed.');
+    }
+  }
+
   const sanitized = sanitizeTemplateHtml(html, origin.origin);
   const bootstrap = createNavigationBootstrap({
     identity,
@@ -726,6 +858,7 @@ export async function createTemplateRuntimeSsrDocument({
     tenantPathPrefix: prefix.pathname,
     resizeToContent,
     clientBundleBase64: clientBundle,
+    browserBundleBase64: clientRender?.bundleBase64 ?? null,
     minHeight: Math.max(0, Math.min(56, Math.round(minHeight))),
   });
   const bootstrapBytes = new TextEncoder().encode(bootstrap);
@@ -742,15 +875,23 @@ export async function createTemplateRuntimeSsrDocument({
       return [];
     }
   }).join('');
-  const scriptSources = [`'sha256-${bootstrapHash}'`, ...(clientBundle === null ? [] : ['blob:'])];
+  const scriptSources = [
+    `'sha256-${bootstrapHash}'`,
+    ...(clientBundle === null && clientRender === null ? [] : ['blob:']),
+  ];
+  // Mode client: asal gambar baru diketahui setelah render di iframe → https apa pun (sama longgarnya
+  // dengan SSR, yang mengizinkan origin gambar mana pun yang ditulis template di HTML-nya).
+  const resourceSources = clientRender === null
+    ? sanitized.resourceOrigins
+    : ['https:'];
   const policy = [
     "default-src 'none'",
     `script-src ${scriptSources.join(' ')}`,
     "connect-src 'none'",
-    `img-src data: blob:${sanitized.resourceOrigins.length ? ` ${sanitized.resourceOrigins.join(' ')}` : ''}`,
+    `img-src data: blob:${resourceSources.length ? ` ${resourceSources.join(' ')}` : ''}`,
     `style-src 'unsafe-inline' ${origin.origin}`,
     'font-src data:',
-    `media-src data: blob:${sanitized.resourceOrigins.length ? ` ${sanitized.resourceOrigins.join(' ')}` : ''}`,
+    `media-src data: blob:${resourceSources.length ? ` ${resourceSources.join(' ')}` : ''}`,
     "form-action 'none'",
     "navigate-to 'none'",
     "base-uri 'none'",
@@ -761,7 +902,9 @@ export async function createTemplateRuntimeSsrDocument({
     "manifest-src 'none'",
   ].join('; ');
 
-  return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}"><script>${bootstrap}</script>${stylesheets}</head><body>${sanitized.html}</body></html>`;
+  return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}"><script>${bootstrap}</script>${stylesheets}</head><body>${clientRender === null
+    ? sanitized.html
+    : `<script type="application/json" id="bagdja-template-props">${scriptJson(clientRender.props)}</script>`}</body></html>`;
 }
 
 function toHex(bytes: Uint8Array): string {
