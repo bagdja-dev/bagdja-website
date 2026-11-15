@@ -3,7 +3,8 @@
  *
  * Kontrak template tidak berubah: `render(props)` + `client.js` apa adanya. Agar `client.js` (yang memasang
  * listener di `document` saat dimuat) tetap mendapat "dokumen segar" seperti di iframe:
- * - browser.js dimuat sekali per dokumen; header, isi, dan navigasi bawah dirender ke root masing-masing;
+ * - browser.js dimuat sekali per versi per dokumen (terisolasi, versi baru tidak memaksa reload); header, isi,
+ *   dan navigasi bawah dirender ke root masing-masing;
  * - `client.js` dijalankan SEKALI per dokumen, setelah semua bagian pada muat halaman itu terpasang;
  * - perubahan DOM template setelah itu (navigasi SPA, refresh data) = muat ulang halaman penuh.
  */
@@ -23,9 +24,11 @@ export interface TemplateClientApi {
 }
 
 interface InlineTemplateWindow extends Window {
-  BagdjaTemplate?: InlineTemplate;
   BagdjaTemplateClient?: TemplateClientApi;
-  __bagdjaTemplateSha256?: string;
+  /** Template yang sudah dimuat di dokumen ini, per SHA-256 browser.js (beberapa versi boleh berdampingan). */
+  __bagdjaTemplates?: Record<string, InlineTemplate>;
+  /** Objek global bayangan per SHA selama browser.js dijalankan (lihat `runIsolatedBundle`). */
+  __bagdjaTemplateTargets?: Record<string, Record<string, unknown>>;
   __bagdjaTemplateClientState?: 'scheduled' | 'ran';
   __bagdjaTemplateLinkGuard?: boolean;
   /** Tanda untuk client.js template: dirender langsung oleh Bagdja → daftarkan mount, jangan pasang ke dokumen. */
@@ -61,26 +64,50 @@ function isInlineTemplate(value: unknown): value is InlineTemplate {
   return Boolean(value) && typeof (value as InlineTemplate).render === 'function';
 }
 
-/** browser.js (SHA-256 terverifikasi) → `window.BagdjaTemplate`, sekali per dokumen. */
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Jalankan browser.js dengan `globalThis`/`self` bayangan milik versi ini. browser.js mendefinisikan
+ * `BagdjaTemplate` (non-writable) dan React UMD menulis `self.React`; tanpa isolasi, versi kedua di dokumen
+ * yang sama gagal dan dulu memaksa reload — yang berulang terus bila sumber versi bergantian (cache) setelah
+ * template baru dipublish. Dengan isolasi, versi lama & baru berdampingan dan halaman tidak perlu dimuat ulang.
+ */
+async function runIsolatedBundle(sha256: string, bytes: Uint8Array<ArrayBuffer>): Promise<InlineTemplate> {
+  if (!SHA256_HEX.test(sha256)) throw new Error('SHA-256 browser.js tidak valid.');
+  const win = inlineWindow();
+  const target: Record<string, unknown> = {};
+  win.__bagdjaTemplateTargets = { ...(win.__bagdjaTemplateTargets ?? {}), [sha256]: target };
+  const slot = `window.__bagdjaTemplateTargets[${JSON.stringify(sha256)}]`;
+  try {
+    await runBlobScript(new Blob([
+      `;(function (globalThis, self) {\n`,
+      bytes,
+      `\n}).call(${slot}, ${slot}, ${slot});\n`,
+    ], { type: 'text/javascript' }));
+  } finally {
+    if (win.__bagdjaTemplateTargets) delete win.__bagdjaTemplateTargets[sha256];
+  }
+  const template = target.BagdjaTemplate;
+  if (!isInlineTemplate(template)) throw new Error('browser.js tidak memuat BagdjaTemplate.render.');
+  return template;
+}
+
+/**
+ * browser.js (SHA-256 terverifikasi) → template, sekali per versi per dokumen. Versi berbeda (mis. template
+ * baru dipublish saat halaman terbuka) dimuat berdampingan, tanpa reload.
+ */
 export function loadInlineTemplate(ref: TemplateBrowserBundleRef): Promise<InlineTemplate> {
   const win = inlineWindow();
-  if (win.__bagdjaTemplateSha256 === ref.sha256 && isInlineTemplate(win.BagdjaTemplate)) {
-    return Promise.resolve(win.BagdjaTemplate);
-  }
+  const loaded = win.__bagdjaTemplates?.[ref.sha256];
+  if (loaded) return Promise.resolve(loaded);
   let pending = loading.get(ref.sha256);
   if (!pending) {
     pending = (async () => {
-      if (win.__bagdjaTemplateSha256 && win.__bagdjaTemplateSha256 !== ref.sha256) {
-        // Versi template lain sudah dimuat di dokumen ini (global tidak bisa diganti) → dokumen baru.
-        window.location.reload();
-        throw new Error('Memuat ulang halaman untuk versi template terbaru.');
-      }
       const base64 = await loadTemplateBrowserBundle(ref);
       const bytes = Uint8Array.from(window.atob(base64), (character) => character.charCodeAt(0));
-      await runBlobScript(bytes);
-      if (!isInlineTemplate(win.BagdjaTemplate)) throw new Error('browser.js tidak memuat BagdjaTemplate.render.');
-      win.__bagdjaTemplateSha256 = ref.sha256;
-      return win.BagdjaTemplate;
+      const template = await runIsolatedBundle(ref.sha256, bytes);
+      win.__bagdjaTemplates = { ...(win.__bagdjaTemplates ?? {}), [ref.sha256]: template };
+      return template;
     })();
     loading.set(ref.sha256, pending);
     pending.catch(() => loading.delete(ref.sha256));

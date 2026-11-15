@@ -91,8 +91,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // W1: protect route checkout — cek session SEBELUM tenant resolution,
-  // karena di localhost path langsung `/{slug}/cart` dst.
-  if (shouldProtect(request.nextUrl.pathname)) {
+  // karena di localhost path langsung `/{slug}/cart` dst. HANYA untuk host yang path-nya sudah berbentuk
+  // `/{slug}/...` (lokal & apex). Di subdomain/custom domain path belum ber-slug: `/cart/order/x` ikut cocok
+  // dengan pola `/{slug}/order` (slug = "cart") dan dulu lolos tanpa rewrite → jatuh ke route root di luar
+  // layout tenant, sehingga shell template (header, dock, CSS) hilang. Host tenant dicek setelah rewrite (case 2/3).
+  const pathHasTenantSlug = !hostname || LOCAL_HOSTS.has(hostname) || hostname === PLATFORM_HOST;
+  if (pathHasTenantSlug && shouldProtect(request.nextUrl.pathname)) {
     if (!hasSession(request)) {
       return redirectToLogin(request);
     }

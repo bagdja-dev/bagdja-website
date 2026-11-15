@@ -350,11 +350,71 @@ function tenantPath(basePath: string, path: string | null): string | undefined {
   return basePath && !path.startsWith(`${basePath}/`) ? `${basePath}${path}` : path;
 }
 
+/** Baris `GET /api/orders/schedule` (website-api `ServiceScheduleItemDto`). */
+export interface ServiceScheduleInput {
+  order_id: string;
+  transaction_id: string | null;
+  product_name: string;
+  product_image: string | null;
+  quantity: number;
+  status: 'planning' | 'payment' | 'confirmed' | 'completed';
+  start_at: string | null;
+  end_at: string | null;
+  all_day: boolean;
+}
+
+const SERVICE_STATUS_LABELS: Record<ServiceScheduleInput['status'], string> = {
+  planning: 'Perencanaan',
+  payment: 'Menunggu pembayaran',
+  confirmed: 'Dikonfirmasi',
+  completed: 'Selesai',
+};
+
+/** Instant → ISO dengan offset WIB, agar template yang membaca tanggal mentah tidak bergeser hari. */
+export function toPageLocalIso(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return undefined;
+  return `${new Date(parsed + 7 * 60 * 60 * 1000).toISOString().slice(0, 19)}${PAGE_OFFSET}`;
+}
+
+/** Rentang jadwal jasa untuk kalender pembeli: sebulan ke belakang s/d ~setahun ke depan (batas API 400 hari). */
+export function buyerServiceScheduleRange(now = new Date()): { from: string; to: string } {
+  const day = 24 * 60 * 60 * 1000;
+  const from = new Date(now.getTime() - 31 * day);
+  return { from: from.toISOString(), to: new Date(from.getTime() + 399 * day).toISOString() };
+}
+
+function buildCalendarServices(services: ServiceScheduleInput[], options: { basePath: string; key: PageKeyFactory }) {
+  return services
+    .filter((service) => Object.prototype.hasOwnProperty.call(SERVICE_STATUS_LABELS, service.status))
+    .slice(0, MAX_ROWS)
+    .map((service) => {
+      const startAt = toPageLocalIso(service.start_at);
+      return compact({
+      key: options.key('service_order', service.order_id),
+      title: text(service.product_name, 'Jasa'),
+      imageUrl: service.product_image ?? undefined,
+      status: service.status,
+      statusLabel: SERVICE_STATUS_LABELS[service.status],
+      startAt,
+      // endAt tanpa startAt melanggar kontrak → hanya bila jadwal mulai ada.
+      endAt: startAt ? toPageLocalIso(service.end_at) : undefined,
+      allDay: Boolean(service.all_day),
+      quantity: Math.max(1, Math.trunc(Number(service.quantity) || 1)),
+      detailHref: service.transaction_id
+        ? `${options.basePath}/order/${encodeURIComponent(service.transaction_id)}`
+        : `${options.basePath}/cart/order/${encodeURIComponent(service.order_id)}`,
+      });
+    });
+}
+
 export function buildCalendarPage(
   plans: CalendarPlanInput[],
   invitations: CalendarInvitationInput[],
-  options: { basePath: string; key: PageKeyFactory; now?: Date },
+  options: { basePath: string; key: PageKeyFactory; now?: Date; services?: ServiceScheduleInput[] },
 ) {
+  const serviceRows = buildCalendarServices(options.services ?? [], options);
   const planRows = plans.slice(0, MAX_ROWS).map((plan) =>
     compact({
       key: options.key('gathering_plan', plan.id),
@@ -386,8 +446,12 @@ export function buildCalendarPage(
       detailHref: tenantPath(options.basePath, invitation.action_path),
     });
   });
-  const firstEvent = [...planRows, ...invitationRows]
-    .map((row) => row.eventAt)
+  const nowIso = (options.now ?? new Date()).toISOString();
+  const firstEvent = [
+    ...[...planRows, ...invitationRows].map((row) => row.eventAt),
+    // Jasa: hanya yang belum dimulai, supaya bulan awal tidak mundur ke riwayat.
+    ...serviceRows.map((row) => row.startAt).filter((value): value is string => Boolean(value) && Date.parse(value as string) >= Date.parse(nowIso)),
+  ]
     .filter((value): value is string => Boolean(value))
     .sort()[0];
   const month = (firstEvent ?? (options.now ?? new Date()).toISOString()).slice(0, 7);
@@ -397,6 +461,7 @@ export function buildCalendarPage(
     initialMonth: month,
     plans: planRows,
     invitations: invitationRows,
+    services: serviceRows,
     actions: ['gathering.respond'] as const,
   };
 }
