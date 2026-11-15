@@ -302,12 +302,16 @@ function createNavigationBootstrap({
       if (feedback) feedback.textContent = 'Aksi transaksi belum mendapatkan respons. Coba lagi.';
     }, 30000);
     pendingOrderActions.set(requestId, { button, timeout });
+    // Konfirmasi lewat popup template (sama dengan intent): klik asli, atau klik lanjutan dari client bundle.
+    const confirmed = button.getAttribute('data-bagdja-confirmed') === 'true'
+      && (event.isTrusted || ${clientBundleBase64 === null && browserBundleBase64 === null && !inline ? 'false' : 'true'});
     parent.postMessage({
       protocol: 1,
       type: 'bagdja:template:order-action',
       ...identity,
       requestId,
       action,
+      ...(confirmed ? { confirmed: true } : {}),
     }, parentOrigin);
   }, true);
   const pendingIntents = new Map();

@@ -108,9 +108,10 @@ function createOrderDetailPage(transaction: TransactionDetail, basePath: string,
             totalLabel: amount(item.total_amount),
             ...(product?.uom?.symbol ? { unit: product.uom.symbol } : {}),
             ...(product?.images?.[0] ? { image: product.images[0], imageUrl: product.images[0] } : {}),
-            ...(invoice ? {
-              detailHref: `${basePath}/gathering/invoice/${encodeURIComponent(invoice.registration_id)}`,
-            } : {}),
+            ...(invoice
+              ? { detailHref: `${basePath}/gathering/invoice/${encodeURIComponent(invoice.registration_id)}` }
+              // Non-gathering: detail & progres pesanan (tampilan Bagdja di halaman yang sama).
+              : { detailHref: `${basePath}/order/${encodeURIComponent(transaction.id)}?view=progress` }),
           };
         }),
         ...(
@@ -157,6 +158,8 @@ interface TransactionSyncResult {
 
 interface TransactionPageProps {
   params: { website_slug: string; transaction_id: string };
+  /** `view=progress`: tampilan detail lengkap Bagdja (progres langkah pesanan, pelepasan dana, termin). */
+  searchParams?: { view?: string | string[] };
 }
 
 export async function generateMetadata({ params }: TransactionPageProps): Promise<Metadata> {
@@ -165,7 +168,7 @@ export async function generateMetadata({ params }: TransactionPageProps): Promis
   return { title: `Detail Transaksi — ${tenant.website.name}` };
 }
 
-export default async function TransactionPage({ params }: TransactionPageProps) {
+export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
@@ -248,7 +251,10 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   };
   // Template package yang menyatakan `order_detail` di manifest versi terpasang memiliki halaman ini.
   const orderRuntime = tenantRuntime(website);
-  if (orderRuntime && templateOwnsPage(website, 'order_detail')) {
+  // Ringkasan transaksi milik template; detail lengkap (progres langkah, isian pembeli, pelepasan dana per
+  // langkah) tetap tampilan Bagdja di `?view=progress` — ditautkan dari tiap item di halaman template.
+  const progressView = searchParams?.view === 'progress';
+  if (orderRuntime && !progressView && templateOwnsPage(website, 'order_detail')) {
     const session = await getSession();
     const orderDetail = createOrderDetailPage(result.data, basePath, createPageKeyFactory(session.user?.userId ?? 'anonymous'));
     const templatePage = await renderPinnedTenantTemplate({
