@@ -29,7 +29,12 @@ interface InlineTemplateWindow extends Window {
   __bagdjaTemplates?: Record<string, InlineTemplate>;
   /** Objek global bayangan per SHA selama browser.js dijalankan (lihat `runIsolatedBundle`). */
   __bagdjaTemplateTargets?: Record<string, Record<string, unknown>>;
-  __bagdjaTemplateClientState?: 'scheduled' | 'ran';
+  /**
+   * scheduled → loading (blob client.js sedang diunduh/dieksekusi) → ran | failed. `ran` baru diset SETELAH
+   * client.js selesai dieksekusi: di HP lambat, eksekusi bundle besar bisa memakan waktu, dan menganggapnya
+   * sudah jalan (tanpa mount) sebelum waktunya memicu reload berulang.
+   */
+  __bagdjaTemplateClientState?: 'scheduled' | 'loading' | 'ran' | 'failed';
   __bagdjaTemplateLinkGuard?: boolean;
   /** Tanda untuk client.js template: dirender langsung oleh Bagdja → daftarkan mount, jangan pasang ke dokumen. */
   __bagdjaTemplateHost?: 'inline';
@@ -115,6 +120,26 @@ export function loadInlineTemplate(ref: TemplateBrowserBundleRef): Promise<Inlin
   return pending;
 }
 
+const FRESH_DOCUMENT_RELOAD_KEY = 'bagdja:template-inline-reload-at';
+const FRESH_DOCUMENT_RELOAD_COOLDOWN_MS = 15_000;
+
+/**
+ * Muat ulang dokumen agar client.js lama (tanpa mount) mendapat DOM segar — paling banyak sekali per 15 detik.
+ * false = reload baru saja dilakukan (atau sessionStorage tak tersedia di sini): pemanggil melanjutkan tanpa
+ * reload, sehingga tidak pernah terjadi loop muat ulang.
+ */
+export function reloadForFreshTemplateDocument(): boolean {
+  try {
+    const last = Number(window.sessionStorage.getItem(FRESH_DOCUMENT_RELOAD_KEY) || 0);
+    if (Date.now() - last < FRESH_DOCUMENT_RELOAD_COOLDOWN_MS) return false;
+    window.sessionStorage.setItem(FRESH_DOCUMENT_RELOAD_KEY, String(Date.now()));
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 /** `client.js` sudah dijalankan di dokumen ini → DOM template baru butuh dokumen segar (muat ulang). */
 export function templateClientScriptRan(): boolean {
   return inlineWindow().__bagdjaTemplateClientState === 'ran';
@@ -162,17 +187,21 @@ export function scheduleTemplateClientScript(template: InlineTemplate): void {
   win.__bagdjaTemplateClientState = 'scheduled';
   win.__bagdjaTemplateHost = 'inline';
   window.setTimeout(() => {
-    win.__bagdjaTemplateClientState = 'ran';
-    if (typeof template.clientSource === 'string' && template.clientSource) {
-      void runBlobScript(template.clientSource)
-        .then(() => {
-          // Template SPA: pasang client.js ke semua root yang sudah ada (shell + isi pertama).
-          if (templateClientSupportsMount()) Array.from(mountedRoots.keys()).forEach(mountRoot);
-        })
-        .catch(() => {
-          console.warn('[template-inline] client.js template gagal dijalankan.');
-        });
+    if (typeof template.clientSource !== 'string' || !template.clientSource) {
+      win.__bagdjaTemplateClientState = 'ran';
+      return;
     }
+    win.__bagdjaTemplateClientState = 'loading';
+    void runBlobScript(template.clientSource)
+      .then(() => {
+        win.__bagdjaTemplateClientState = 'ran';
+        // Template SPA: pasang client.js ke semua root yang sudah ada (shell + isi yang terdaftar selama memuat).
+        if (templateClientSupportsMount()) Array.from(mountedRoots.keys()).forEach(mountRoot);
+      })
+      .catch(() => {
+        win.__bagdjaTemplateClientState = 'failed';
+        console.warn('[template-inline] client.js template gagal dijalankan.');
+      });
   }, 0);
 }
 
