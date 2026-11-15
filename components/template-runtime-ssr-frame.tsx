@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createTemplateRuntimeIntentBridge,
@@ -15,6 +15,7 @@ import {
   createTemplateRuntimeSsrDocument,
   isTemplateRuntimeNavigationMessage,
   isTemplateRuntimeNotificationAnchorMessage,
+  isTemplateRuntimePongMessage,
 } from '../lib/template-runtime-ssr-document';
 import {
   getAllowedTemplateNavigationUrl,
@@ -128,17 +129,11 @@ export function TemplateRuntimeSsrFrame({
 }: TemplateRuntimeSsrFrameProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
-  // Pengaman navigasi: dokumen diberi versi. Load kedua untuk VERSI YANG SAMA = template menavigasi
-  // frame-nya sendiri. Load terlambat dari dokumen lama (event `load` menunggu semua gambar, bisa
-  // beberapa detik di HP) tidak lagi dihitung sebagai navigasi saat dokumen baru menggantikannya.
-  const documentVersionRef = useRef(0);
-  const committedVersionRef = useRef(0);
-  const loadedVersionRef = useRef(-1);
-  const [frameState, setFrameState] = useState<{ document: string; version: number }>({ document: '', version: 0 });
-  const frameDocument = frameState.document;
-  useLayoutEffect(() => {
-    committedVersionRef.current = frameState.version;
-  }, [frameState.version]);
+  // Pengaman navigasi: setiap `load`, host bertanya ke isi frame (ping) apakah masih dokumen Bagdja.
+  // Menghitung jumlah `load` tidak andal (load dokumen lama/kosong bisa datang terlambat di HP).
+  // Hanya bila TIDAK ada jawaban sama sekali — isi frame sudah halaman lain — konten dihentikan.
+  const navigationCheckRef = useRef<{ requestId: string; retry: number; deadline: number } | null>(null);
+  const [frameDocument, setFrameDocument] = useState('');
   const [frameHeight, setFrameHeight] = useState(0);
   const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,9 +173,7 @@ export function TemplateRuntimeSsrFrame({
         .filter((url): url is string => url !== null),
     }).then((frameDocument) => {
       if (!active) return;
-      setFrameState((current) => (current.document === frameDocument
-        ? current
-        : { document: frameDocument, version: (documentVersionRef.current += 1) }));
+      setFrameDocument(frameDocument);
     }).catch((cause: unknown) => {
       if (active) {
         setError(cause instanceof Error ? cause.message : 'Template tidak dapat disiapkan.');
@@ -219,6 +212,15 @@ export function TemplateRuntimeSsrFrame({
             left: frameElement.offsetLeft + anchor.x,
             top: frameElement.offsetTop + anchor.y,
           });
+        }
+        return;
+      }
+      if (isTemplateRuntimePongMessage(event.data, stableIdentity)) {
+        if (navigationCheckRef.current?.requestId === event.data.requestId) {
+          const check = navigationCheckRef.current;
+          window.clearInterval(check.retry);
+          window.clearTimeout(check.deadline);
+          navigationCheckRef.current = null;
         }
         return;
       }
@@ -413,6 +415,15 @@ export function TemplateRuntimeSsrFrame({
     return () => window.removeEventListener('message', handleIntent);
   }, [intentContext, router, stableIdentity]);
 
+  // Batalkan pemeriksaan navigasi yang masih berjalan saat komponen dilepas.
+  useEffect(() => () => {
+    const check = navigationCheckRef.current;
+    if (check) {
+      window.clearInterval(check.retry);
+      window.clearTimeout(check.deadline);
+    }
+  }, []);
+
   // Refresh selesai tanpa dokumen baru (data tidak berubah) → hapus overlay.
   useEffect(() => {
     if (!refreshing || refreshPending) return;
@@ -430,6 +441,29 @@ export function TemplateRuntimeSsrFrame({
   }, [refreshPending, refreshing, stableIdentity]);
 
   if (error) return <p role="alert" className="p-6 text-sm text-red-700">{error}</p>;
+
+  const stopNavigationCheck = () => {
+    const check = navigationCheckRef.current;
+    if (!check) return;
+    window.clearInterval(check.retry);
+    window.clearTimeout(check.deadline);
+    navigationCheckRef.current = null;
+  };
+  const verifyFrameDocument = () => {
+    stopNavigationCheck();
+    const target = frameRef.current?.contentWindow;
+    if (!target) return;
+    const requestId = window.crypto.randomUUID();
+    const ping = () => target.postMessage({ protocol: 1, type: 'bagdja:template:ping', ...stableIdentity, requestId }, '*');
+    // Diulang: bootstrap dokumen baru mungkin belum memasang listener saat `load` (terlambat) tiba.
+    const retry = window.setInterval(ping, 500);
+    const deadline = window.setTimeout(() => {
+      stopNavigationCheck();
+      setError('Template mencoba menavigasi keluar dari frame terisolasi, sehingga konten dihentikan.');
+    }, 4000);
+    navigationCheckRef.current = { requestId, retry, deadline };
+    ping();
+  };
 
   const frame = (
     <iframe
@@ -455,12 +489,7 @@ export function TemplateRuntimeSsrFrame({
       srcDoc={frameDocument || '<!doctype html><html><body></body></html>'}
       onLoad={() => {
         if (!frameDocument) return;
-        const version = committedVersionRef.current;
-        if (loadedVersionRef.current === version && clientBundle !== null) {
-          setError('Template mencoba menavigasi keluar dari frame terisolasi, sehingga konten dihentikan.');
-          return;
-        }
-        loadedVersionRef.current = version;
+        if (clientBundle !== null) verifyFrameDocument();
         pendingRefreshRef.current = null;
         setRefreshing(false);
       }}
