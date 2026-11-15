@@ -34,6 +34,7 @@ import { TemplateRuntimeErrorView } from '../../../components/template-runtime-e
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
 import {
   getTemplateRuntimeTenantVersion,
+  getTemplateStudioPreviewBundle,
   renderTemplateThroughRuntime,
   sanitizeTemplateRuntimeProps,
   TemplateRuntimeError,
@@ -92,6 +93,29 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
         ...view.props,
         isPreview: true,
       });
+      const isHome = !pageSlug;
+      const previewPageSlug = view.tenant.page?.slug ?? target?.slug ?? '';
+      const draftFallbackSections = isHome ? resolveSections(null, view.tenant.website.template) : [];
+      // Versi dengan browser.js → render di browser (template-client-rendering-plan fase 3): tanpa runtime,
+      // perubahan draft dirender lokal seketika (juga di production). Versi lama → runtime seperti sebelumnya.
+      const previewBundle = getTemplateStudioPreviewBundle(view.templateSlug, runtimeVersion, runtime?.browserBundle);
+      if (previewBundle) {
+        return (
+          <TemplateRuntimePreview
+            html=""
+            templateSlug={view.templateSlug}
+            templateVersion={runtimeVersion}
+            digest={previewBundle.sha256}
+            pageSlug={previewPageSlug}
+            allowedOrigins={getAllowedAdminOrigins()}
+            allowDemoImageHost={process.env.NODE_ENV !== 'production'}
+            clientBundle={previewBundle}
+            initialProps={runtimeProps}
+            draftIsHome={isHome}
+            draftFallbackSections={draftFallbackSections}
+          />
+        );
+      }
       const rendered = await renderTemplateThroughRuntime({
         slug: view.templateSlug,
         version: runtimeVersion,
@@ -99,7 +123,6 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
       });
       // Pratinjau Studio inert: hanya HTML hasil render server. JavaScript browser template
       // (progressive enhancement) sengaja tidak dijalankan di editor.
-      const isHome = !pageSlug;
       return (
         <TemplateRuntimePreview
           html={rendered.html}

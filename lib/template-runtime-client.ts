@@ -275,6 +275,23 @@ export function isTemplateShellActive(
   );
 }
 
+/**
+ * Pratinjau editor Studio di browser (fase 3): cukup versi punya browser.js yang sah (https di production) dan
+ * JavaScript template diizinkan — tidak bergantung flag TEMPLATE_CLIENT_RENDER_ENABLED (yang mengatur pengunjung),
+ * agar pratinjau tidak lagi butuh runtime. HTML hasilnya tetap ditampilkan inert (tanpa skrip).
+ */
+export function getTemplateStudioPreviewBundle(
+  slug: string,
+  version: string,
+  bundle: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+): TemplateBrowserBundleRef | null {
+  if (!isTemplateBrowserBundleRef(bundle)) return null;
+  if (env.NODE_ENV === 'production' && !bundle.url.startsWith('https://')) return null;
+  if (!isTemplateRuntimeClientBundleApproved(slug, version, env)) return null;
+  return { url: bundle.url, sha256: bundle.sha256 };
+}
+
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {
   url: string;
   token: string;
