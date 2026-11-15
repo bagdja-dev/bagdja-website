@@ -37,6 +37,8 @@ export interface CatalogItem {
   websiteId?: string;
   type: string;
   category?: string;
+  /** Id kategori — dipakai filter section Daftar Produk (category_ids). */
+  categoryId?: string;
   name: string;
   slug: string;
   price?: number;
@@ -473,6 +475,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     websiteId: product.website_id,
     type: product.type,
     category: product.category ?? undefined,
+    categoryId: product.category_id ?? undefined,
     name: product.name,
     slug: product.slug,
     price: Number(product.price),

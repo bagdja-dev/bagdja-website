@@ -31,6 +31,7 @@ import {
   parseFeatureItems,
   type FeatureItem,
 } from '../../../lib/template-data';
+import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
@@ -1427,14 +1428,15 @@ export function StoreClassicView({
               }
               case 'services_grid':
               case 'products_grid': {
-                const filterType = typeof section.content.filter_type === 'string' ? section.content.filter_type : undefined;
+                const gridFilter = productGridFilter(section.content);
                 const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
                 const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
                 return (
                   <ProductGridSection
                     key={key}
                     title={heading}
-                    filterType={filterType}
+                    filterType={gridFilter.type}
+                    categoryIds={gridFilter.categoryIds}
                     initialProducts={topLevelProducts}
                     tenantSlug={tenantSlug}
                     websiteSlug={websiteSlug}

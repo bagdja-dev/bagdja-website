@@ -25,6 +25,7 @@ import {
   type NavPage,
   type SectionEntry,
 } from '../../../lib/template-data';
+import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import {
   getGoogleFontsUrl,
@@ -1230,14 +1231,15 @@ export function BarberClassicView({
               }
               case 'services_grid':
               case 'products_grid': {
-                const filterType = typeof section.content.filter_type === 'string' ? section.content.filter_type : undefined;
+                const gridFilter = productGridFilter(section.content);
                 const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
                 const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
                 return (
                   <CatalogGridSection
                     key={key}
                     title={heading}
-                    filterType={filterType}
+                    filterType={gridFilter.type}
+                    categoryIds={gridFilter.categoryIds}
                     initialProducts={topLevelProducts}
                     tenantSlug={tenantSlug}
                     websiteSlug={websiteSlug}

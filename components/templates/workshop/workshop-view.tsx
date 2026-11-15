@@ -27,6 +27,7 @@ import {
   type NavPage,
   type SectionEntry,
 } from '../../../lib/template-data';
+import { matchesProductGridFilter, productGridFilter } from '../../../lib/product-grid-filter';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
@@ -383,8 +384,8 @@ function WorkshopCategories({ categories, websiteSlug, content }: { categories: 
 }
 
 function WorkshopServices({ products, websiteSlug, content }: { products: CatalogItem[]; websiteSlug?: string; content: Record<string, unknown> }) {
-  const filterType = getString(content, 'filter_type') ?? 'service';
-  const services = products.filter((item) => item.type === filterType && !item.parentProductId);
+  const gridFilter = productGridFilter(content, 'service');
+  const services = products.filter((item) => !item.parentProductId && matchesProductGridFilter(item, gridFilter));
   if (!services.length) return null;
   return (
     <section id="layanan" className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
