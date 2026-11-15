@@ -65,7 +65,9 @@ export async function renderPinnedTenantTemplate({
   try {
     const version = getTemplateRuntimeTenantVersion(templateSlug, pinnedVersion);
     if (version === null) return null;
-    const notificationContext = props.hideHeader
+    const shell = isTemplateShellActive(templateSlug, version, browserBundle, pageOverrides);
+    // Shell (D8): bell notifikasi sudah ada di header shell → isi halaman tidak memasang bell kedua.
+    const notificationContext = props.hideHeader || shell
       ? undefined
       : getNotificationContext(templateSlug, tenantSlug, props);
 
@@ -78,7 +80,6 @@ export async function renderPinnedTenantTemplate({
       ? { tenantSlug, pageType: props.page.type, actions: pageActions }
       : undefined;
     const bridgeAvailable = Boolean(intentContext) || (orderActionContext?.actions.length ?? 0) > 0;
-    const shell = isTemplateShellActive(templateSlug, version, browserBundle, pageOverrides);
     const pageProps = shell ? { ...props, contentOnly: true } : props;
     const safeProps = sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...pageProps, bridgeVersion: 1 } : pageProps);
     const clientBundleRef = getTemplateClientRenderBundle(templateSlug, version, browserBundle);
