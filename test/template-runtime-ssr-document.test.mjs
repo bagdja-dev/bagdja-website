@@ -24,6 +24,7 @@ const {
   GOOGLE_MAPS_PATTERN_SOURCE,
   BOOTSTRAP_INTENTS,
   createTemplateRuntimeSsrDocument,
+  isTemplateRuntimePongMessage,
   isTemplateRuntimeResizeMessage,
   isTemplateRuntimeNotificationAnchorMessage,
 } = helperModule.exports;
@@ -167,6 +168,9 @@ test('builds a static, CSP-locked frame and strips executable or navigation mark
   assert.ok(bootstrap.includes("closest('[data-bagdja-refresh]')"));
   assert.ok(bootstrap.includes("type: 'bagdja:template:refresh', ...identity, requestId"));
   assert.ok(bootstrap.includes("message.type !== 'bagdja:template:refresh-result'"));
+  // Pengaman navigasi: bootstrap menjawab ping host dengan requestId yang sama.
+  assert.ok(bootstrap.includes("message.type !== 'bagdja:template:ping'"));
+  assert.ok(bootstrap.includes("type: 'bagdja:template:pong', ...identity, requestId: message.requestId"));
   assert.ok(document.includes('https://tenant.example.test/_next/static/css/site.css'));
   assert.ok(!document.includes('attacker.example.test'));
   assert.ok(!document.includes('window.pwned'));
@@ -623,4 +627,12 @@ test('templates can ask the host to reload page data (soft refresh) with a valid
   assert.equal(parseTemplateRuntimeRefreshMessage({ ...base, digest: 'b'.repeat(64) }, identity), null, 'identitas harus cocok');
   assert.equal(parseTemplateRuntimeRefreshMessage({ ...base, requestId: 'x' }, identity), null);
   assert.equal(parseTemplateRuntimeRefreshMessage({ ...base, type: 'bagdja:template:share' }, identity), null);
+});
+
+test('accepts only identity-bound pong replies for the navigation guard', () => {
+  const pong = { protocol: 1, type: 'bagdja:template:pong', ...identity, requestId: '123e4567-e89b-42d3-a456-426614174000' };
+  assert.equal(isTemplateRuntimePongMessage(pong, identity), true);
+  assert.equal(isTemplateRuntimePongMessage({ ...pong, digest: 'b'.repeat(64) }, identity), false);
+  assert.equal(isTemplateRuntimePongMessage({ ...pong, type: 'bagdja:template:ping' }, identity), false);
+  assert.equal(isTemplateRuntimePongMessage({ ...pong, requestId: 'x'.repeat(65) }, identity), false);
 });

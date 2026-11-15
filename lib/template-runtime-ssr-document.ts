@@ -107,6 +107,16 @@ function createNavigationBootstrap({
   return `(() => {
   const identity = ${scriptJson(identity)};
   const parentOrigin = ${scriptJson(parentOrigin)};
+  // Pengaman navigasi host: setiap \`load\` iframe, host bertanya apakah isi frame masih dokumen Bagdja.
+  // Halaman lain (template menavigasi frame-nya) tidak menjawab → host menghentikan konten.
+  window.addEventListener('message', (event) => {
+    const message = event.data;
+    if (event.source !== parent || event.origin !== parentOrigin || !message || message.protocol !== 1 ||
+        message.type !== 'bagdja:template:ping' || message.slug !== identity.slug ||
+        message.version !== identity.version || message.digest !== identity.digest ||
+        typeof message.requestId !== 'string' || message.requestId.length > 64) return;
+    parent.postMessage({ protocol: 1, type: 'bagdja:template:pong', ...identity, requestId: message.requestId }, parentOrigin);
+  });
   const tenantPathPrefix = ${scriptJson(tenantPathPrefix)};
   const isTenantPath = (pathname) => {
     const pathPrefix = tenantPathPrefix === '/' ? '/' : tenantPathPrefix.replace(/\\/$/, '');
@@ -772,6 +782,28 @@ export function isTemplateRuntimeNavigationMessage(
     typeof message.href === 'string' &&
     message.href.length > 0 &&
     message.href.length <= 2048;
+}
+
+export interface TemplateRuntimePongMessage extends TemplateRuntimeIdentity {
+  protocol: 1;
+  type: 'bagdja:template:pong';
+  requestId: string;
+}
+
+/** Jawaban bootstrap atas ping pengaman navigasi (dokumen di frame masih dokumen Bagdja). */
+export function isTemplateRuntimePongMessage(
+  value: unknown,
+  identity: TemplateRuntimeIdentity,
+): value is TemplateRuntimePongMessage {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const message = value as Partial<TemplateRuntimePongMessage>;
+  return message.protocol === 1 &&
+    message.type === 'bagdja:template:pong' &&
+    message.slug === identity.slug &&
+    message.version === identity.version &&
+    message.digest === identity.digest &&
+    typeof message.requestId === 'string' &&
+    message.requestId.length <= 64;
 }
 
 export function isTemplateRuntimeResizeMessage(
