@@ -80,6 +80,7 @@ async function shareOrCopy(mode: 'share' | 'copy', url: string, title?: string):
   return (await copyText(url)) ? 'copied' : 'failed';
 }
 import { NotificationBell } from './notification-bell';
+import { TenantPageLoading } from './tenant-page-loading';
 import { loadTemplateBrowserBundle, type TemplateBrowserBundleRef } from '../lib/template-browser-bundle';
 import type { ThemeColors } from '../lib/website-theme';
 
@@ -172,6 +173,8 @@ export function TemplateRuntimeSsrFrame({
   const isShell = inline && outlet !== undefined && !/\/__preview\/?$/.test(pathname ?? '');
   const [outletElement, setOutletElement] = useState<HTMLElement | null>(null);
   const inlineContainerRef = useRef<HTMLElement | null>(null);
+  // Render langsung: false sampai HTML template pertama terpasang (browser.js mungkin masih diunduh).
+  const [inlineReady, setInlineReady] = useState(false);
   // Pengaman navigasi: setiap `load`, host bertanya ke isi frame (ping) apakah masih dokumen Bagdja.
   // Menghitung jumlah `load` tidak andal (load dokumen lama/kosong bisa datang terlambat di HP).
   // Hanya bila TIDAK ada jawaban sama sekali — isi frame sudah halaman lain — konten dihentikan.
@@ -252,6 +255,7 @@ export function TemplateRuntimeSsrFrame({
           setOutletElement(outletNode);
         }
         container.dispatchEvent(new CustomEvent('bagdja:template:rendered'));
+        setInlineReady(true);
         unregister = registerTemplateRoot(container);
         scheduleTemplateClientScript(template);
       })
@@ -644,13 +648,14 @@ export function TemplateRuntimeSsrFrame({
       const requestId = pendingRefreshRef.current;
       pendingRefreshRef.current = null;
       if (requestId) {
-        frameRef.current?.contentWindow?.postMessage({
+        // Render langsung: bootstrap berada di jendela ini sendiri (bukan contentWindow iframe).
+        (inline ? window : frameRef.current?.contentWindow)?.postMessage({
           protocol: 1, type: TEMPLATE_RUNTIME_REFRESH_RESULT, ...stableIdentity, requestId, ok: true,
         }, '*');
       }
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [refreshPending, refreshing, stableIdentity]);
+  }, [inline, refreshPending, refreshing, stableIdentity]);
 
   if (error) {
     // Navigasi bawah bersifat tambahan: gagal = tidak ditampilkan (header & isi halaman tetap tampil).
@@ -771,6 +776,7 @@ export function TemplateRuntimeSsrFrame({
   if (isShell) {
     return (
       <div className="relative w-full" data-bagdja-shell="">
+        {inlineReady ? null : <TenantPageLoading />}
         {frame}
         {notification}
         {outletElement ? createPortal(outlet, outletElement) : null}
@@ -790,6 +796,7 @@ export function TemplateRuntimeSsrFrame({
 
   return (
     <div className="relative w-full">
+      {inline && !inlineReady ? <TenantPageLoading /> : null}
       {frame}
       {refreshOverlay}
       {notification}
