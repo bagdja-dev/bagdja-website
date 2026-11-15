@@ -65,7 +65,8 @@ export type FulfillmentStepFormFieldFilledBy = 'seller' | 'buyer';
 export interface FulfillmentStepFormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea' | 'select' | 'pdf' | 'foto' | 'video' | 'lokasi';
+  /** `tanggal` = `YYYY-MM-DD`; `tanggal_waktu` = `YYYY-MM-DDTHH:mm` (jam lokal bisnis). */
+  type: 'text' | 'number' | 'textarea' | 'select' | 'tanggal' | 'tanggal_waktu' | 'pdf' | 'foto' | 'video' | 'lokasi';
   required?: boolean;
   filled_by?: FulfillmentStepFormFieldFilledBy;
   options?: string[];

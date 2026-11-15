@@ -1,4 +1,5 @@
 import type { FulfillmentStepFormField } from './order-detail-content';
+import { formatFlowDateValue } from '../lib/flow-date-value';
 
 interface MediaValue {
   url: string;
@@ -25,6 +26,10 @@ export function FulfillmentFieldValue({
   field: FulfillmentStepFormField;
   value: unknown;
 }) {
+  if (field.type === 'tanggal' || field.type === 'tanggal_waktu') {
+    const formatted = formatFlowDateValue(field.type, value);
+    return formatted || typeof value === 'string' ? <span>{formatted ?? String(value)}</span> : null;
+  }
   const values = normalizeMediaValues(value);
   if (values.length === 0) return null;
   const text = values[0].url;

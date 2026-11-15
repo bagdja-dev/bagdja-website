@@ -78,6 +78,14 @@ export const BOOTSTRAP_INTENTS = [
   'gathering.invitation.verify_otp',
   'gathering.invitation.resend_otp',
   'gathering.invitation.pay',
+  'order.quantity.set',
+  'order.praorder.save',
+  'order.praorder.submit',
+  'order.praorder.upload',
+  'order.praorder.file.remove',
+  'order.draft.pay',
+  'order.draft.cancel',
+  'order.chat.open',
 ];
 
 function scriptJson(value: unknown): string {
@@ -521,6 +529,43 @@ function createNavigationBootstrap({
       if (action === 'gathering.invitation.add' && !intent.invitee?.email && !intent.invitee?.whatsapp) {
         showIntentMessage('Isi email atau nomor WhatsApp peserta.');
         return;
+      }
+    }
+    if (action.startsWith('order.praorder.') || action === 'order.quantity.set') {
+      // Draft pesanan: isian di [data-bagdja-scope] langkah (data-bagdja-field="praorder.<nama>").
+      const scope = element.closest('[data-bagdja-scope]') || document;
+      const step = element.getAttribute('data-bagdja-step');
+      if (step) intent.step = step;
+      const target = element.getAttribute('data-bagdja-target');
+      if (target) intent.target = target;
+      if (element.hasAttribute('data-bagdja-index')) intent.index = Number(element.getAttribute('data-bagdja-index'));
+      if (action === 'order.quantity.set') {
+        const quantityField = scope.querySelector('[data-bagdja-field="quantity"]');
+        intent.quantity = Number(element.getAttribute('data-bagdja-quantity') || (quantityField ? quantityField.value : ''));
+        if (!Number.isInteger(intent.quantity) || intent.quantity < 1) {
+          showIntentMessage('Jumlah minimal 1.');
+          return;
+        }
+      }
+      if (action === 'order.praorder.save' || action === 'order.praorder.submit') {
+        const values = {};
+        scope.querySelectorAll('[data-bagdja-field^="praorder."]').forEach((field) => {
+          const name = field.getAttribute('data-bagdja-field').slice(9);
+          if (field.disabled || name === 'file' || field.type === 'file') return;
+          if ((field.type === 'radio' || field.type === 'checkbox') && !field.checked) return;
+          values[name] = typeof field.value === 'string' ? field.value : '';
+        });
+        intent.values = values;
+      }
+      if (action === 'order.praorder.upload') {
+        const fileField = (target && scope.querySelector('input[type="file"][data-bagdja-field="praorder.file"][data-bagdja-target="' + target + '"]'))
+          || scope.querySelector('input[type="file"][data-bagdja-field="praorder.file"]');
+        const file = fileField && fileField.files && fileField.files[0];
+        if (!file) {
+          showIntentMessage('Pilih file yang akan diunggah.');
+          return;
+        }
+        intent.bannerFile = file;
       }
     }
     if (action === 'cart.set_quantity') intent.quantity = Number(element.getAttribute('data-bagdja-quantity'));

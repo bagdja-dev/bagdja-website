@@ -156,7 +156,13 @@ export function FulfillmentFieldInput({
         <textarea value={textValue} onChange={(event) => onChange(event.target.value)} rows={3} className="rounded-md border px-2 py-1.5 text-sm" style={{ borderColor: 'var(--brand-border)' }} />
       ) : (
         <input
-          type={field.type === 'number' ? 'number' : 'text'}
+          type={field.type === 'number'
+            ? 'number'
+            : field.type === 'tanggal'
+              ? 'date'
+              : field.type === 'tanggal_waktu'
+                ? 'datetime-local'
+                : 'text'}
           value={textValue}
           onChange={(event) => onChange(event.target.value)}
           placeholder={mediaType ? `Pilih ${mediaType} di bawah` : undefined}

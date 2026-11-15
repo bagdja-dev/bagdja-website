@@ -1354,6 +1354,12 @@ export interface TemplateIntentInput {
   rsvp?: { attendeeName?: string; contact?: string; whatsapp?: string; optionKeys?: string[] };
   /** gathering.invitation.verify_otp — kode 6 digit. */
   code?: string;
+  /** Draft pesanan: langkah praorder (`step.key` opaque). */
+  step?: string;
+  /** Draft pesanan: isian field non-file (nama field → nilai). */
+  values?: Record<string, string>;
+  /** Draft pesanan: urutan file yang dihapus. */
+  index?: number;
 }
 
 export interface TemplateIntentResult {
@@ -1391,6 +1397,14 @@ export const INTENT_PAGES: Record<string, readonly string[]> = {
   'gathering.invitation.resend_otp': ['gathering_invitation'],
   'gathering.invitation.pay': ['gathering_invitation'],
   'product.chat.open': ['product_detail'],
+  'order.quantity.set': ['draft_order'],
+  'order.praorder.save': ['draft_order'],
+  'order.praorder.submit': ['draft_order'],
+  'order.praorder.upload': ['draft_order'],
+  'order.praorder.file.remove': ['draft_order'],
+  'order.draft.pay': ['draft_order'],
+  'order.draft.cancel': ['draft_order'],
+  'order.chat.open': ['draft_order'],
 };
 
 function fail(status: number, message: string): TemplateIntentResult {
@@ -1439,6 +1453,8 @@ export interface IntentContext {
   invitationGuest?: InvitationGuestState;
   /** Fetch Website API tanpa sesi (endpoint publik undangan). */
   publicFetch?: IntentFetch;
+  /** Draft pesanan: id pesanan dari path halaman (`/cart/order/<id>`), diverifikasi terhadap key intent. */
+  draftOrderId?: string;
   /** Produk website (dari loader tenant) — dipetakan ulang dari key untuk aksi halaman detail produk. */
   products?: Array<Pick<ProductDetailInput, 'id' | 'type' | 'name' | 'slug' | 'priceLabel' | 'image' | 'images'>>;
 }
@@ -1649,6 +1665,9 @@ export async function executeTemplateIntent(
   }
   if (intent.action === 'gathering.plan.create' || intent.action === 'product.chat.open') {
     return executeProductIntent(intent, context);
+  }
+  if (context.pageType === 'draft_order') {
+    return executeDraftOrderIntent(intent, context);
   }
   if (intent.action.startsWith('gathering.invitation.') && INTENT_PAGES[intent.action]?.includes('gathering_invitation')) {
     return executeInvitationIntent(intent, context);
@@ -2082,3 +2101,317 @@ async function executeGatheringPlanIntent(
       return fail(400, 'Aksi tidak dikenal.');
   }
 }
+
+// ── Draft pesanan (praorder sebelum penawaran & checkout) ─────────────────
+
+const DRAFT_ORDER_KEY_KIND = 'draft_order';
+const DRAFT_STEP_KEY_KIND = 'praorder_step';
+const DRAFT_FIELD_TYPES = ['text', 'number', 'textarea', 'select', 'tanggal', 'tanggal_waktu', 'lokasi', 'foto', 'video', 'pdf'];
+const DRAFT_FILE_TYPES = ['foto', 'video', 'pdf'];
+/** Batas unggahan praorder per tipe (byte) & tipe file yang diterima. */
+export const DRAFT_UPLOAD_LIMITS: Record<string, { maxBytes: number; accept: (type: string) => boolean; label: string }> = {
+  foto: { maxBytes: 5 * 1024 * 1024, accept: (type) => /^image\/(jpeg|png|webp|gif)$/.test(type), label: 'Foto (JPG, PNG, WebP, GIF) maksimal 5 MB' },
+  video: { maxBytes: 15 * 1024 * 1024, accept: (type) => /^video\/(mp4|webm|quicktime)$/.test(type), label: 'Video (MP4, WebM, MOV) maksimal 15 MB' },
+  pdf: { maxBytes: 10 * 1024 * 1024, accept: (type) => type === 'application/pdf', label: 'PDF maksimal 10 MB' },
+};
+
+export interface DraftOrderFieldInput {
+  key: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  options?: string[];
+  max_files?: number;
+}
+
+export interface DraftOrderStepInput {
+  stepName: string;
+  filledBy: 'admin' | 'buyer';
+  description: string | null;
+  formSchema: DraftOrderFieldInput[] | null;
+  completed: boolean;
+  formData: Record<string, unknown> | null;
+}
+
+export interface DraftOrderInput {
+  id: string;
+  status: string;
+  quantity: number;
+  unit_price: number | string;
+  total_amount: number | string;
+  quoted_total_amount?: number | string | null;
+  payment_mode?: string | null;
+  created_at: string;
+  transaction_id?: string | null;
+  checkout_url?: string | null;
+  product?: {
+    id?: string | null;
+    name?: string | null;
+    slug?: string | null;
+    images?: string[] | null;
+    quotable?: boolean | null;
+    uom?: { symbol?: string | null } | null;
+  } | null;
+  praorderProgress?: { steps: DraftOrderStepInput[] } | null;
+  quoteTermins?: Array<{ sequence?: number; label: string; amount: number | string }> | null;
+}
+
+interface DraftFile { url: string; description: string }
+
+function draftFiles(value: unknown): DraftFile[] {
+  const list = Array.isArray(value) ? value : typeof value === 'string' && value ? [value] : [];
+  return list.flatMap((item): DraftFile[] => {
+    if (typeof item === 'string' && /^https?:\/\//.test(item)) return [{ url: item, description: '' }];
+    if (item && typeof item === 'object' && typeof (item as { url?: unknown }).url === 'string') {
+      const description = (item as { description?: unknown }).description;
+      return [{ url: (item as { url: string }).url, description: typeof description === 'string' ? description : '' }];
+    }
+    return [];
+  });
+}
+
+function draftValue(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function praorderSteps(order: DraftOrderInput): DraftOrderStepInput[] {
+  return Array.isArray(order.praorderProgress?.steps) ? order.praorderProgress!.steps : [];
+}
+
+function draftAwaitingQuote(order: DraftOrderInput): boolean {
+  return Boolean(order.product?.quotable) && (order.quoted_total_amount === null || order.quoted_total_amount === undefined);
+}
+
+function draftStatusLabel(order: DraftOrderInput): string {
+  if (order.status !== 'PENDING') {
+    return ({ PAID: 'Sudah dibayar', CANCELLED: 'Dibatalkan', EXPIRED: 'Kedaluwarsa', COMPLETED: 'Selesai' } as Record<string, string>)[order.status] ?? order.status;
+  }
+  if (praorderSteps(order).some((step) => step.filledBy === 'buyer' && !step.completed)) return 'Lengkapi data pesanan';
+  if (draftAwaitingQuote(order)) return 'Menunggu penawaran';
+  return 'Menunggu pembayaran';
+}
+
+/** Halaman draft pesanan untuk template (kontrak `draft_order`). */
+export function buildDraftOrderPage(
+  order: DraftOrderInput,
+  options: { basePath: string; key: PageKeyFactory },
+) {
+  const steps = praorderSteps(order);
+  const firstOpen = steps.findIndex((step) => !step.completed);
+  const awaitingQuote = draftAwaitingQuote(order);
+  const quoted = order.quoted_total_amount !== null && order.quoted_total_amount !== undefined;
+  const praorderDone = steps.every((step) => step.completed);
+  const pending = order.status === 'PENDING';
+  const termins = Array.isArray(order.quoteTermins) ? order.quoteTermins : [];
+  const productHref = order.product?.slug ? tenantPath(options.basePath, `/products/${encodeURIComponent(order.product.slug)}`) : undefined;
+  return {
+    ...base(),
+    type: 'draft_order' as const,
+    order: compact({
+      key: options.key(DRAFT_ORDER_KEY_KIND, order.id),
+      title: text(order.product?.name, 'Pesanan'),
+      imageUrl: order.product?.images?.[0] ?? undefined,
+      productHref,
+      quantity: Number(order.quantity) || 1,
+      quantityLocked: quoted || !pending,
+      uomSymbol: text(order.product?.uom?.symbol) || undefined,
+      status: order.status,
+      statusLabel: draftStatusLabel(order),
+      createdAt: toIsoDateTime(order.created_at),
+      paymentModeLabel: order.payment_mode === 'ESCROW' ? 'Escrow' : 'Checkout Bagdja',
+      quotable: Boolean(order.product?.quotable),
+      awaitingQuote,
+      totalAmount: awaitingQuote ? undefined : toMoney(quoted ? order.quoted_total_amount : order.total_amount),
+      unitPrice: toMoney(order.unit_price),
+    }),
+    steps: steps.map((step, index) => {
+      const state = step.completed ? 'done' as const : index === firstOpen ? 'current' as const : 'locked' as const;
+      const data = step.formData ?? {};
+      return compact({
+        key: options.key(DRAFT_STEP_KEY_KIND, `${order.id}:${step.stepName}`),
+        label: step.stepName,
+        description: text(step.description) || undefined,
+        state,
+        filledBy: step.filledBy === 'buyer' ? 'buyer' as const : 'seller' as const,
+        editable: pending && state === 'current' && step.filledBy === 'buyer',
+        fields: (step.formSchema ?? [])
+          .filter((field) => DRAFT_FIELD_TYPES.includes(field.type) && /^[A-Za-z0-9_.-]{1,100}$/.test(field.key))
+          .map((field) => {
+            const isFile = DRAFT_FILE_TYPES.includes(field.type);
+            return compact({
+              name: field.key,
+              label: text(field.label, field.key),
+              type: field.type,
+              required: Boolean(field.required),
+              options: field.type === 'select' && Array.isArray(field.options) ? field.options.filter((option) => typeof option === 'string') : undefined,
+              maxFiles: isFile ? Math.max(1, Math.min(20, Number(field.max_files) || 5)) : undefined,
+              value: isFile ? null : draftValue(data[field.key]),
+              files: isFile ? draftFiles(data[field.key]) : undefined,
+            });
+          }),
+      });
+    }),
+    quote: quoted
+      ? {
+        totalAmount: toMoney(order.quoted_total_amount),
+        unitPrice: toMoney(order.unit_price),
+        quantity: Number(order.quantity) || 1,
+        termins: termins.length > 1 ? termins.map((termin) => ({ label: text(termin.label, 'Termin'), amount: toMoney(termin.amount) })) : [],
+      }
+      : null,
+    canPay: pending && !awaitingQuote && praorderDone,
+    canCancel: pending,
+    ordersHref: tenantPath(options.basePath, '/orders') ?? '/orders',
+    actions: [
+      'order.quantity.set',
+      'order.praorder.save',
+      'order.praorder.submit',
+      'order.praorder.upload',
+      'order.praorder.file.remove',
+      'order.draft.pay',
+      'order.draft.cancel',
+      'order.chat.open',
+    ],
+  };
+}
+
+const DRAFT_VALUE_LIMITS: Record<string, number> = { textarea: 5000, text: 1000 };
+const DRAFT_LOCATION = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/;
+
+/** Isian template → nilai form_data; null = tidak valid (pesan untuk pembeli). */
+function draftFieldValue(field: DraftOrderFieldInput, raw: string): { value?: string; error?: string } {
+  const value = raw.trim();
+  if (!value) return {};
+  const limit = DRAFT_VALUE_LIMITS[field.type] ?? 500;
+  if (value.length > limit) return { error: `${field.label} maksimal ${limit} karakter.` };
+  if (field.type === 'number' && !/^-?\d+([.,]\d+)?$/.test(value)) return { error: `${field.label} harus berupa angka.` };
+  if (field.type === 'tanggal' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return { error: `${field.label} harus berupa tanggal.` };
+  if (field.type === 'tanggal_waktu' && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return { error: `${field.label} harus berupa tanggal dan jam.` };
+  if (field.type === 'lokasi' && !DRAFT_LOCATION.test(value)) return { error: `${field.label} harus berupa koordinat "latitude, longitude".` };
+  if (field.type === 'select' && Array.isArray(field.options) && !field.options.includes(value)) return { error: `${field.label}: pilihan tidak tersedia.` };
+  return { value };
+}
+
+async function executeDraftOrderIntent(intent: TemplateIntentInput, context: IntentContext): Promise<TemplateIntentResult> {
+  const orderId = context.draftOrderId;
+  if (!orderId || !intent.key || context.key(DRAFT_ORDER_KEY_KIND, orderId) !== intent.key) {
+    return fail(409, 'Pesanan tidak dikenali. Muat ulang halaman.');
+  }
+  const loaded = await context.fetch(`/api/orders/${encodeURIComponent(orderId)}`);
+  if (loaded.status === 401) return fail(401, 'Login diperlukan.');
+  if (loaded.status >= 400 || !loaded.data) return fail(loaded.status === 404 ? 404 : 502, messageOf(loaded.data, 'Pesanan belum dapat dimuat.', loaded.error));
+  const order = ((loaded.data as { data?: unknown }).data ?? loaded.data) as DraftOrderInput;
+  const orderPath = `/api/orders/${encodeURIComponent(order.id)}`;
+  const ok = { status: 200, body: { ok: true } } as TemplateIntentResult;
+
+  switch (intent.action) {
+    case 'order.quantity.set': {
+      if (order.status !== 'PENDING' || (order.quoted_total_amount !== null && order.quoted_total_amount !== undefined)) {
+        return fail(409, 'Jumlah tidak bisa diubah setelah ada penawaran.');
+      }
+      const updated = await context.fetch(orderPath, { method: 'PATCH', body: JSON.stringify({ quantity: intent.quantity }) });
+      return updated.status < 400 ? ok : fail(updated.status === 401 ? 401 : 422, messageOf(updated.data, 'Gagal mengubah jumlah.', updated.error));
+    }
+    case 'order.draft.cancel': {
+      if (order.status !== 'PENDING') return fail(409, 'Pesanan ini tidak bisa dibatalkan.');
+      const removed = await context.fetch(orderPath, { method: 'DELETE' });
+      if (removed.status >= 400) return fail(removed.status === 401 ? 401 : 422, messageOf(removed.data, 'Gagal membatalkan pesanan.', removed.error));
+      return { status: 200, body: { ok: true, redirect: tenantPath(context.basePath, '/orders') ?? `${context.basePath}/orders` } };
+    }
+    case 'order.draft.pay': {
+      const page = buildDraftOrderPage(order, { basePath: context.basePath, key: context.key });
+      if (!page.canPay) return fail(409, 'Pesanan belum bisa dibayar. Lengkapi data atau tunggu penawaran.');
+      if (order.transaction_id) {
+        const retried = await context.fetch(`/api/transactions/${encodeURIComponent(order.transaction_id)}/retry-checkout`, { method: 'POST' });
+        const url = checkoutUrlOf(retried.data);
+        if (retried.status >= 400 || !url) return fail(retried.status === 401 ? 401 : 422, messageOf(retried.data, 'Pembayaran belum dapat disiapkan.', retried.error));
+        return { status: 200, body: { ok: true, redirect: url } };
+      }
+      return { status: 200, body: { ok: true, redirect: `${context.basePath}/checkout?order_ids=${encodeURIComponent(order.id)}` } };
+    }
+    case 'order.chat.open': {
+      const title = text(order.product?.name, 'Pesanan');
+      const created = await context.fetch(`/api/chat/${encodeURIComponent(context.websiteId)}/customer-threads`, {
+        method: 'POST',
+        body: JSON.stringify({
+          channel_type: 'order',
+          channel_label: `Pesanan ${title}`,
+          order_id: order.id,
+          ...(order.product?.id ? { product_id: order.product.id } : {}),
+          initial_message: `Halo, saya ingin berdiskusi tentang pesanan ${title}.`,
+        }),
+      });
+      if (created.status === 401) return fail(401, 'Login diperlukan.');
+      if (created.status >= 400) return fail(created.status >= 500 ? 502 : 422, messageOf(created.data, 'Percakapan belum dapat dibuat.', created.error));
+      const thread = ((created.data as { data?: unknown } | null)?.data ?? created.data) as { id?: unknown } | null;
+      const href = tenantPath(context.basePath, typeof thread?.id === 'string' ? `/chat?thread=${encodeURIComponent(thread.id)}` : '/chat');
+      return href ? { status: 200, body: { ok: true, redirect: href } } : fail(422, 'Tautan chat tidak dapat dibuat.');
+    }
+    default:
+      break;
+  }
+
+  // Aksi langkah praorder.
+  if (order.status !== 'PENDING') return fail(409, 'Data pesanan tidak bisa diubah lagi.');
+  const steps = praorderSteps(order);
+  const step = steps.find((item) => context.key(DRAFT_STEP_KEY_KIND, `${order.id}:${item.stepName}`) === intent.step);
+  if (!step) return fail(409, 'Langkah tidak dikenali. Muat ulang halaman.');
+  const firstOpen = steps.find((item) => !item.completed);
+  if (step.completed || step !== firstOpen || step.filledBy !== 'buyer') return fail(409, 'Langkah ini tidak sedang menunggu isian Anda.');
+  const schema = (step.formSchema ?? []).filter((field) => DRAFT_FIELD_TYPES.includes(field.type));
+  const merged: Record<string, unknown> = { ...(step.formData ?? {}) };
+  const saveDraft = async (formData: Record<string, unknown>) => {
+    const saved = await context.fetch(`${orderPath}/steps/draft`, {
+      method: 'POST',
+      body: JSON.stringify({ step_name: step.stepName, form_data: formData }),
+    });
+    return saved.status < 400 ? ok : fail(saved.status === 401 ? 401 : 422, messageOf(saved.data, 'Gagal menyimpan data.', saved.error));
+  };
+
+  if (intent.action === 'order.praorder.upload' || intent.action === 'order.praorder.file.remove') {
+    const field = schema.find((item) => item.key === intent.target && DRAFT_FILE_TYPES.includes(item.type));
+    if (!field) return fail(409, 'Kolom file tidak dikenali. Muat ulang halaman.');
+    const files = draftFiles(merged[field.key]);
+    if (intent.action === 'order.praorder.file.remove') {
+      if (intent.index === undefined || intent.index < 0 || intent.index >= files.length) return fail(409, 'File tidak ditemukan. Muat ulang halaman.');
+      merged[field.key] = files.filter((_, index) => index !== intent.index);
+      return saveDraft(merged);
+    }
+    const file = intent.bannerFile;
+    const limit = DRAFT_UPLOAD_LIMITS[field.type];
+    if (!file || !context.upload || !limit) return fail(400, 'File wajib dipilih.');
+    if (!limit.accept(file.type) || file.size > limit.maxBytes) return fail(422, `${field.label}: ${limit.label}.`);
+    const maxFiles = Math.max(1, Math.min(20, Number(field.max_files) || 5));
+    if (files.length >= maxFiles) return fail(422, `${field.label} maksimal ${maxFiles} file.`);
+    const form = new FormData();
+    form.append('file', file, file instanceof File ? file.name : `${field.type}-${Date.now()}`);
+    const uploaded = await context.upload(`${orderPath}/fulfillment-assets`, form);
+    const url = (uploaded.data as { url?: unknown } | null)?.url;
+    if (uploaded.status >= 400 || typeof url !== 'string') return fail(uploaded.status === 401 ? 401 : 422, messageOf(uploaded.data, 'Unggah file gagal.', uploaded.error));
+    merged[field.key] = [...files, { url, description: '' }];
+    return saveDraft(merged);
+  }
+
+  // order.praorder.save / order.praorder.submit — isian non-file (file sudah tersimpan lewat upload).
+  for (const field of schema) {
+    if (DRAFT_FILE_TYPES.includes(field.type) || !intent.values || !(field.key in intent.values)) continue;
+    const parsed = draftFieldValue(field, intent.values[field.key]);
+    if (parsed.error) return fail(422, parsed.error);
+    if (parsed.value === undefined) delete merged[field.key];
+    else merged[field.key] = parsed.value;
+  }
+  if (intent.action === 'order.praorder.save') return saveDraft(merged);
+
+  const missing = schema.find((field) => {
+    const value = merged[field.key];
+    return field.required && (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0));
+  });
+  if (missing) return fail(422, `${missing.label} wajib diisi.`);
+  const completed = await context.fetch(`${orderPath}/steps/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ step_name: step.stepName, form_data: merged }),
+  });
+  return completed.status < 400 ? ok : fail(completed.status === 401 ? 401 : 422, messageOf(completed.data, 'Gagal mengirim data.', completed.error));
+}
+
