@@ -35,11 +35,14 @@ interface Slide {
  */
 export function StoreClassicProductGallery({
   images,
+  imageDetails,
   videoUrl,
   videoUrls,
   model3dUrl,
 }: {
   images: string[];
+  /** Alt & keterangan per foto (URL → isi) dari editor produk Studio. */
+  imageDetails?: Record<string, { alt?: string; caption?: string }>;
   videoUrl?: string;
   /** Semua video (urut tampil); bila kosong pakai `videoUrl`. */
   videoUrls?: string[];
@@ -60,6 +63,8 @@ export function StoreClassicProductGallery({
 
   const count = slides.length;
   const current = slides[index];
+  const currentDetails = current?.type === 'image' ? imageDetails?.[current.url] : undefined;
+  const currentCaption = currentDetails?.caption;
   const goTo = (next: number) => setIndex(((next % count) + count) % count);
   const goPrev = () => goTo(index - 1);
   const goNext = () => goTo(index + 1);
@@ -148,7 +153,7 @@ export function StoreClassicProductGallery({
               )}
               {slide.type === 'image' && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={slide.url} alt="" className="h-16 w-16 object-cover sm:h-20 sm:w-20" />
+                <img src={slide.url} alt={imageDetails?.[slide.url]?.alt ?? ""} className="h-16 w-16 object-cover sm:h-20 sm:w-20" />
               )}
             </button>
           ))}
@@ -194,7 +199,7 @@ export function StoreClassicProductGallery({
         {current.type === 'image' && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={current.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={current.url} alt={currentDetails?.alt ?? currentCaption ?? ""} className="absolute inset-0 h-full w-full object-cover" />
             <div
               aria-hidden
               className={`pointer-events-none absolute inset-0 transition-opacity duration-150 ${
@@ -306,8 +311,17 @@ export function StoreClassicProductGallery({
               </div>
             )}
             {current.type === 'image' && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={current.url} alt="" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+              <figure className="flex max-h-full max-w-full flex-col items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={current.url}
+                  alt={currentDetails?.alt ?? currentCaption ?? ''}
+                  className={`${currentCaption ? 'max-h-[75vh]' : 'max-h-[85vh]'} max-w-full rounded-lg object-contain`}
+                />
+                {currentCaption ? (
+                  <figcaption className="max-w-2xl px-2 text-center text-sm leading-relaxed text-white/90">{currentCaption}</figcaption>
+                ) : null}
+              </figure>
             )}
 
             {count > 1 && (
