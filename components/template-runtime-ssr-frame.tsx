@@ -494,14 +494,15 @@ export function TemplateRuntimeSsrFrame({
       messageOrigin,
       identity: stableIdentity,
       allowedActions: orderActionContext.actions,
-      onAction: async (action) => {
+      onAction: async (action, options) => {
         const confirmations: Partial<Record<TemplateRuntimeOrderAction, string>> = {
           'order.cancel': 'Pesanan ini akan dibatalkan dan tidak bisa diurungkan. Lanjutkan?',
           'order.complete': 'Dana akan langsung dicairkan ke penjual dan tidak bisa dibatalkan. Konfirmasi barang telah diterima?',
           'order.dispute': 'Dana akan ditahan sementara sampai komplain diselesaikan. Ajukan komplain?',
         };
         const confirmation = confirmations[action];
-        if (confirmation && !window.confirm(confirmation)) {
+        // Template boleh menampilkan popup konfirmasinya sendiri (data-bagdja-confirmed, divalidasi bootstrap).
+        if (confirmation && !options?.confirmed && !window.confirm(confirmation)) {
           throw new TemplateRuntimeActionError('action_cancelled', 'Aksi dibatalkan.');
         }
 
