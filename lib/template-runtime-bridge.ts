@@ -361,17 +361,20 @@ export function getAllowedTemplateNavigationUrl(
 
 export function createTemplateRuntimeActionBridge({
   frame,
+  messageOrigin = 'null',
   identity,
   onAction,
 }: {
   frame: Pick<Window, 'postMessage'>;
+  /** Origin pengirim yang diharapkan: 'null' untuk iframe sandbox, origin tenant untuk render langsung (D7). */
+  messageOrigin?: string;
   identity: TemplateRuntimeIdentity;
   onAction: TemplateRuntimeActionHandler;
 }): (event: MessageEvent<unknown>) => Promise<void> {
   const seenRequests = new Set<string>();
 
   return async (event) => {
-    if (event.source !== frame || event.origin !== 'null') return;
+    if (event.source !== frame || event.origin !== messageOrigin) return;
 
     const message = parseTemplateRuntimeActionMessage(event.data);
     if (
@@ -420,11 +423,14 @@ export function createTemplateRuntimeActionBridge({
 
 export function createTemplateRuntimeOrderActionBridge({
   frame,
+  messageOrigin = 'null',
   identity,
   allowedActions,
   onAction,
 }: {
   frame: Pick<Window, 'postMessage'>;
+  /** Origin pengirim yang diharapkan: 'null' untuk iframe sandbox, origin tenant untuk render langsung (D7). */
+  messageOrigin?: string;
   identity: TemplateRuntimeIdentity;
   allowedActions: readonly TemplateRuntimeOrderAction[];
   onAction: TemplateRuntimeOrderActionHandler;
@@ -433,7 +439,7 @@ export function createTemplateRuntimeOrderActionBridge({
   const seenRequests = new Set<string>();
 
   return async (event) => {
-    if (event.source !== frame || event.origin !== 'null') return;
+    if (event.source !== frame || event.origin !== messageOrigin) return;
     const message = parseTemplateRuntimeOrderActionMessage(event.data);
     if (
       !message ||
@@ -881,11 +887,14 @@ export function parseTemplateRuntimeIntentMessage(value: unknown): TemplateRunti
  */
 export function createTemplateRuntimeIntentBridge({
   frame,
+  messageOrigin = 'null',
   identity,
   allowedActions,
   onIntent,
 }: {
   frame: Pick<Window, 'postMessage'>;
+  /** Origin pengirim yang diharapkan: 'null' untuk iframe sandbox, origin tenant untuk render langsung (D7). */
+  messageOrigin?: string;
   identity: TemplateRuntimeIdentity;
   allowedActions: readonly string[];
   onIntent: TemplateRuntimeIntentHandler;
@@ -894,7 +903,7 @@ export function createTemplateRuntimeIntentBridge({
   const seenRequests = new Set<string>();
 
   return async (event) => {
-    if (event.source !== frame || event.origin !== 'null') return;
+    if (event.source !== frame || event.origin !== messageOrigin) return;
     const message = parseTemplateRuntimeIntentMessage(event.data);
     if (
       !message ||

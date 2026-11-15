@@ -23,6 +23,7 @@ new Function('exports', 'module', 'require', transpiled)(
 const {
   GOOGLE_MAPS_PATTERN_SOURCE,
   BOOTSTRAP_INTENTS,
+  createTemplateInlineBootstrap,
   createTemplateRuntimeSsrDocument,
   isTemplateRuntimePongMessage,
   isTemplateRuntimeResizeMessage,
@@ -774,4 +775,88 @@ test('client mode is chosen only with the flag, a valid bundle, https in product
     getTemplateClientRenderBundle('kumpul', '1.3.42', bundle, { ...on, TEMPLATE_RUNTIME_CLIENT_BUNDLE_ENABLED: 'false' }),
     null,
   );
+});
+
+
+// ── D7: render langsung tanpa iframe ──────────────────────────────────────────
+
+const inlineRuntimeModule = { exports: {} };
+new Function('exports', 'module', 'require', ts.transpileModule(
+  await readFile(join(projectRoot, 'lib/template-inline-runtime.ts'), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
+).outputText)(inlineRuntimeModule.exports, inlineRuntimeModule, (specifier) =>
+  specifier.endsWith('template-browser-bundle') ? browserBundleModule.exports : require(specifier));
+const { startInlineBootstrap, isTemplateInlineRenderEnabled } = {
+  ...inlineRuntimeModule.exports,
+  isTemplateInlineRenderEnabled: runtimeClientModule.exports.isTemplateInlineRenderEnabled,
+};
+
+test('inline bootstrap waits for the host render event and trusts the template confirm popup', () => {
+  const bootstrap = createTemplateInlineBootstrap({
+    identity, parentOrigin: 'https://tenant.example.test', tenantPathPrefix: '/store',
+  });
+  assert.doesNotThrow(() => new Function('document', bootstrap));
+  assert.match(bootstrap, /'bagdja:template:rendered'/);
+  assert.doesNotMatch(bootstrap, /'DOMContentLoaded'/);
+  assert.match(bootstrap, /event\.isTrusted \|\| true/);
+  assert.doesNotMatch(bootstrap, /ResizeObserver\(reportHeight\)/, 'no frame height reporting without an iframe');
+});
+
+test('inline bootstrap listens and searches only inside its own template root', () => {
+  const calls = [];
+  const root = {
+    addEventListener: (type) => calls.push(`root.listen:${type}`),
+    removeEventListener() {},
+    dispatchEvent: () => calls.push('root.dispatch'),
+    querySelector: (selector) => { calls.push(`root.query:${selector}`); return null; },
+    querySelectorAll: () => [],
+  };
+  globalThis.document = {
+    addEventListener: (type) => calls.push(`document.listen:${type}`),
+    createElement: (tag) => { calls.push(`document.create:${tag}`); return {}; },
+    title: 'Toko',
+  };
+  try {
+    startInlineBootstrap(root, `
+      document.addEventListener('click', () => {});
+      document.querySelector('.kumpul-brand-copy');
+      document.createElement('div');
+      document.dispatchEvent({ type: 'x' });
+      if (document.title !== 'Toko') throw new Error('other properties come from the real document');
+    `);
+  } finally {
+    delete globalThis.document;
+  }
+  assert.deepEqual(calls, [
+    'root.listen:click',
+    'root.query:.kumpul-brand-copy',
+    'document.create:div',
+    'root.dispatch',
+  ]);
+});
+
+test('inline bridges accept messages from the tenant window itself, never from other origins', async () => {
+  const posted = [];
+  const page = { postMessage: (message) => posted.push(message) };
+  const handled = [];
+  const bridge = createTemplateRuntimeIntentBridge({
+    frame: page,
+    messageOrigin: 'https://tenant.example.test',
+    identity,
+    allowedActions: ['cart.remove'],
+    onIntent: async (intent) => { handled.push(intent.action); },
+  });
+  const message = (requestId) => ({
+    protocol: 1, type: 'bagdja:template:intent', ...identity, requestId, intent: { action: 'cart.remove', key: 'kCartKey000000001' },
+  });
+  await bridge({ source: page, origin: 'null', data: message('123e4567-e89b-42d3-a456-426614174101') });
+  await bridge({ source: page, origin: 'https://evil.example.test', data: message('123e4567-e89b-42d3-a456-426614174102') });
+  await bridge({ source: page, origin: 'https://tenant.example.test', data: message('123e4567-e89b-42d3-a456-426614174103') });
+  assert.deepEqual(handled, ['cart.remove']);
+  assert.equal(posted.length, 1);
+});
+
+test('inline render is opt-in through TEMPLATE_INLINE_RENDER_ENABLED', () => {
+  assert.equal(isTemplateInlineRenderEnabled({}), false);
+  assert.equal(isTemplateInlineRenderEnabled({ TEMPLATE_INLINE_RENDER_ENABLED: 'true' }), true);
 });

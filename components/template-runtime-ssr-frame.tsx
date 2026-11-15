@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createTemplateRuntimeIntentBridge,
@@ -16,7 +16,16 @@ import {
   isTemplateRuntimeNavigationMessage,
   isTemplateRuntimeNotificationAnchorMessage,
   isTemplateRuntimePongMessage,
+  createTemplateInlineBootstrap,
+  sanitizeTemplateHtml,
 } from '../lib/template-runtime-ssr-document';
+import {
+  installTemplateDocumentNavigation,
+  loadInlineTemplate,
+  scheduleTemplateClientScript,
+  startInlineBootstrap,
+  templateClientScriptRan,
+} from '../lib/template-inline-runtime';
 import {
   getAllowedTemplateNavigationUrl,
   getAllowedTemplateShareUrl,
@@ -84,6 +93,11 @@ interface TemplateRuntimeSsrFrameProps {
    * (diambil & diverifikasi halaman induk). `html` diabaikan (kosong).
    */
   clientRender?: { props: Record<string, unknown>; bundle: TemplateBrowserBundleRef } | null;
+  /**
+   * Render LANGSUNG di halaman tanpa iframe (D7). Hanya berlaku bersama `clientRender`.
+   * Bridge aksi sama (postMessage ke jendela ini), client.js sekali per dokumen.
+   */
+  inline?: boolean;
   resizeToContent?: boolean;
   /**
    * `bottom` = navigasi bawah template (menempel di bawah layar, tinggi 0 bila template
@@ -130,6 +144,7 @@ export function TemplateRuntimeSsrFrame({
   clientBundle = null,
   clientBundleSha256 = null,
   clientRender = null,
+  inline: inlineRequested = false,
   resizeToContent = false,
   placement = 'top',
   reserveBottomSpace = true,
@@ -139,6 +154,9 @@ export function TemplateRuntimeSsrFrame({
 }: TemplateRuntimeSsrFrameProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const inline = inlineRequested && clientRender !== null;
+  const inlineRootRef = useRef<HTMLDivElement>(null);
+  const instanceId = useId();
   // Pengaman navigasi: setiap `load`, host bertanya ke isi frame (ping) apakah masih dokumen Bagdja.
   // Menghitung jumlah `load` tidak andal (load dokumen lama/kosong bisa datang terlambat di HP).
   // Hanya bila TIDAK ada jawaban sama sekali — isi frame sudah halaman lain — konten dihentikan.
@@ -158,10 +176,24 @@ export function TemplateRuntimeSsrFrame({
   // Permintaan "Muat ulang" dari template: dibalas saat refresh selesai tanpa dokumen baru.
   const pendingRefreshRef = useRef<string | null>(null);
   const lastManualRefreshRef = useRef(0);
-  const stableIdentity = useMemo(
-    () => ({ slug: identity.slug, version: identity.version, digest: identity.digest }),
-    [identity.digest, identity.slug, identity.version],
-  );
+  const stableIdentity = useMemo(() => {
+    if (!inline) return { slug: identity.slug, version: identity.version, digest: identity.digest };
+    // Render langsung: header, isi, & navigasi bawah berbagi jendela → digest unik per bagian agar pesan bridge
+    // tidak ditangani bagian lain (deterministik dari useId, sama di server & browser).
+    const idHex = Array.from(instanceId, (character) => character.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    return { slug: identity.slug, version: identity.version, digest: `${idHex}${identity.digest}`.slice(0, 64) };
+  }, [identity.digest, identity.slug, identity.version, inline, instanceId]);
+  // Iframe: pesan dari dokumen sandbox (origin 'null'). Render langsung: jendela ini sendiri.
+  const messageOrigin = inline ? (typeof window === 'undefined' ? '' : window.location.origin) : 'null';
+  const bridgeTarget = (): Window | null => (inline ? window : frameRef.current?.contentWindow ?? null);
+  // Render langsung: data baru = dokumen baru (client.js template dijalankan sekali per dokumen).
+  const reloadData = () => {
+    if (inline) window.location.reload();
+    else {
+      setRefreshing(true);
+      startRefresh(() => router.refresh());
+    }
+  };
 
   // Props mode client dibandingkan per isi (bukan referensi objek) agar dokumen hanya dibuat ulang bila data berubah.
   const clientRenderProps = clientRender ? JSON.stringify(clientRender.props) : null;
@@ -169,7 +201,69 @@ export function TemplateRuntimeSsrFrame({
   const clientRenderSha256 = clientRender?.bundle.sha256 ?? null;
   const scriptsInFrame = clientBundle !== null || clientRender !== null;
 
+  // Render langsung (D7): browser.js sekali per dokumen → render ke root → bootstrap bridge → client.js sekali.
   useEffect(() => {
+    if (!inline || !clientRenderUrl || !clientRenderSha256 || clientRenderProps === null) return;
+    const root = inlineRootRef.current;
+    if (!root) return;
+    if (templateClientScriptRan()) {
+      // client.js sudah memasang listener untuk DOM lama di dokumen ini → perlu dokumen segar.
+      window.location.reload();
+      return;
+    }
+    let active = true;
+    installTemplateDocumentNavigation();
+    loadInlineTemplate({ url: clientRenderUrl, sha256: clientRenderSha256 })
+      .then((template) => {
+        if (!active) return;
+        const rendered = template.render(JSON.parse(clientRenderProps) as Record<string, unknown>);
+        if (typeof rendered !== 'string') throw new Error('Template tidak menghasilkan HTML.');
+        root.innerHTML = sanitizeTemplateHtml(rendered, window.location.origin).html;
+        startInlineBootstrap(root, createTemplateInlineBootstrap({
+          identity: stableIdentity,
+          parentOrigin: window.location.origin,
+          tenantPathPrefix,
+        }));
+        root.dispatchEvent(new CustomEvent('bagdja:template:rendered'));
+        scheduleTemplateClientScript(template);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : 'Template tidak dapat ditampilkan.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [clientRenderProps, clientRenderSha256, clientRenderUrl, inline, stableIdentity, tenantPathPrefix]);
+
+  // Navigasi bawah render langsung: tinggi = elemen template di root (biasanya position:fixed).
+  useEffect(() => {
+    if (!inline || placement !== 'bottom') return;
+    const root = inlineRootRef.current;
+    if (!root) return;
+    const measure = () => {
+      const height = Array.from(root.children).reduce(
+        (max, child) => Math.max(max, Math.round(child.getBoundingClientRect().height)),
+        0,
+      );
+      setFrameHeight(height);
+    };
+    measure();
+    if (typeof ResizeObserver !== 'function') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    const children = new MutationObserver(() => {
+      Array.from(root.children).forEach((child) => observer.observe(child));
+      measure();
+    });
+    children.observe(root, { childList: true });
+    return () => {
+      observer.disconnect();
+      children.disconnect();
+    };
+  }, [inline, placement]);
+
+  useEffect(() => {
+    if (inline) return;
     let active = true;
     // Dokumen lama dibiarkan tampil sampai dokumen baru siap (tanpa layar kosong saat refresh).
     setError(null);
@@ -214,6 +308,7 @@ export function TemplateRuntimeSsrFrame({
   }, [
     clientBundle,
     clientBundleSha256,
+    inline,
     clientRenderProps,
     clientRenderSha256,
     clientRenderUrl,
@@ -236,21 +331,25 @@ export function TemplateRuntimeSsrFrame({
   }, [frameHeight, placement]);
 
   useEffect(() => {
-    const frameElement = frameRef.current;
-    const frame = frameElement?.contentWindow;
+    const frameElement: HTMLElement | null = inline ? inlineRootRef.current : frameRef.current;
+    const frame = inline ? window : frameRef.current?.contentWindow;
     if (!frameElement || !frame) return;
     const handleMessage = (event: MessageEvent<unknown>) => {
-      if (event.source !== frame || event.origin !== 'null') return;
+      if (event.source !== frame || event.origin !== messageOrigin) return;
       if (stableIdentity.slug === 'kumpul' && isTemplateRuntimeNotificationAnchorMessage(event.data, stableIdentity)) {
         const anchor = event.data;
+        // Iframe: koordinat relatif dokumen frame. Render langsung: koordinat halaman → relatif root.
+        const rootRect = inline ? frameElement.getBoundingClientRect() : null;
+        const x = rootRect ? anchor.x - (rootRect.left + window.scrollX) : anchor.x;
+        const y = rootRect ? anchor.y - (rootRect.top + window.scrollY) : anchor.y;
         if (
-          anchor.x <= frameElement.clientWidth &&
-          anchor.y >= 0 &&
-          anchor.y <= 160
+          x <= frameElement.clientWidth &&
+          y >= 0 &&
+          y <= 160
         ) {
           setNotificationAnchor({
-            left: frameElement.offsetLeft + anchor.x,
-            top: frameElement.offsetTop + anchor.y,
+            left: (inline ? 0 : frameElement.offsetLeft) + x,
+            top: (inline ? 0 : frameElement.offsetTop) + y,
           });
         }
         return;
@@ -279,8 +378,7 @@ export function TemplateRuntimeSsrFrame({
         }
         lastManualRefreshRef.current = now;
         pendingRefreshRef.current = refresh.requestId;
-        setRefreshing(true);
-        startRefresh(() => router.refresh());
+        reloadData();
         return;
       }
       const share = parseTemplateRuntimeShareMessage(event.data, stableIdentity);
@@ -310,13 +408,15 @@ export function TemplateRuntimeSsrFrame({
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
     // frameNonce: iframe dipasang ulang → contentWindow baru harus didengarkan.
-  }, [frameNonce, resizeToContent, router, stableIdentity, tenantPathPrefix]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloadData hanya bergantung pada inline/router
+  }, [frameNonce, inline, messageOrigin, resizeToContent, router, stableIdentity, tenantPathPrefix]);
 
   useEffect(() => {
-    const frame = frameRef.current?.contentWindow;
+    const frame = bridgeTarget();
     if (!frame || !orderActionContext) return;
     const handleOrderAction = createTemplateRuntimeOrderActionBridge({
       frame,
+      messageOrigin,
       identity: stableIdentity,
       allowedActions: orderActionContext.actions,
       onAction: async (action) => {
@@ -381,18 +481,21 @@ export function TemplateRuntimeSsrFrame({
           window.location.assign(checkoutUrl.href);
           return;
         }
-        router.refresh();
+        if (inline) window.location.reload();
+        else router.refresh();
       },
     });
     window.addEventListener('message', handleOrderAction);
     return () => window.removeEventListener('message', handleOrderAction);
-  }, [orderActionContext, router, stableIdentity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bridgeTarget hanya bergantung pada inline
+  }, [inline, messageOrigin, orderActionContext, router, stableIdentity]);
 
   useEffect(() => {
-    const frame = frameRef.current?.contentWindow;
+    const frame = bridgeTarget();
     if (!frame || !intentContext || intentContext.actions.length === 0) return;
     const handleIntent = createTemplateRuntimeIntentBridge({
       frame,
+      messageOrigin,
       identity: stableIdentity,
       allowedActions: intentContext.actions,
       onIntent: async (intent) => {
@@ -449,13 +552,14 @@ export function TemplateRuntimeSsrFrame({
           return;
         }
         // Refresh lembut: data server dimuat ulang tanpa reload halaman; iframe diganti saat dokumen baru siap.
-        setRefreshing(true);
-        startRefresh(() => router.refresh());
+        // Render langsung: muat ulang halaman (client.js template butuh dokumen segar).
+        reloadData();
       },
     });
     window.addEventListener('message', handleIntent);
     return () => window.removeEventListener('message', handleIntent);
-  }, [intentContext, router, stableIdentity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bridgeTarget/reloadData hanya bergantung pada inline
+  }, [inline, intentContext, messageOrigin, router, stableIdentity]);
 
   // Batalkan pemeriksaan navigasi yang masih berjalan saat komponen dilepas.
   useEffect(() => () => {
@@ -518,7 +622,10 @@ export function TemplateRuntimeSsrFrame({
     ping();
   };
 
-  const frame = (
+  const frame = inline ? (
+    // Render langsung (D7): HTML template dipasang ke root ini oleh effect di atas.
+    <div ref={inlineRootRef} data-bagdja-template-root="" className="w-full" />
+  ) : (
     <iframe
       key={frameNonce}
       ref={frameRef}
@@ -586,7 +693,7 @@ export function TemplateRuntimeSsrFrame({
 
   if (resizeToContent) {
     return (
-      <div className="relative z-20 w-full" style={{ height: frameHeight }}>
+      <div className="relative z-20 w-full" style={inline ? undefined : { height: frameHeight }}>
         {frame}
         {refreshOverlay}
         {notification}

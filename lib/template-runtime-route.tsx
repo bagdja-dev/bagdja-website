@@ -3,6 +3,7 @@ import type { TemplateRenderProps } from './template-registry';
 import { resolveTenantLinkBase } from './tenant-link-base';
 import {
   getTemplateClientRenderBundle,
+  isTemplateInlineRenderEnabled,
   getTemplateRuntimeTenantVersion,
   isTemplateRuntimeClientBundleApproved,
   renderTemplateThroughRuntime,
@@ -84,6 +85,7 @@ export async function renderPinnedTenantTemplate({
             identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
             tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
             clientRender={{ props: safeProps, bundle: clientBundleRef }}
+            inline={isTemplateInlineRenderEnabled()}
             orderActionContext={orderActionContext}
             intentContext={intentContext}
             notificationContext={notificationContext}
@@ -193,6 +195,7 @@ export async function renderPinnedTenantHeader({
               identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
               tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
               clientRender={{ props: { ...chromeProps, headerOnly: true }, bundle: clientBundleRef }}
+              inline={isTemplateInlineRenderEnabled()}
               resizeToContent
               notificationContext={notificationContext}
             />
@@ -291,6 +294,7 @@ async function renderPinnedTenantBottomNav({
           identity={{ slug: templateSlug, version, digest: clientBundleRef.sha256 }}
           tenantPathPrefix={resolveTenantLinkBase(tenantSlug) || '/'}
           clientRender={{ props: { ...chromeProps, bottomNavOnly: true }, bundle: clientBundleRef }}
+          inline={isTemplateInlineRenderEnabled()}
           resizeToContent
           placement="bottom"
           reserveBottomSpace={reserveBottomSpace}
