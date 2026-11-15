@@ -2,8 +2,6 @@ node_modules/
 .next/
 out/
 build/
-.env
-.env.local
 .DS_Store
 *.log
 next-env.d.ts
@@ -11,3 +9,4 @@ next-env.d.ts
 
 # graphify knowledge graph — dibangun lokal (`graphify update .`), tidak di-commit
 graphify-out/
+config.bat
