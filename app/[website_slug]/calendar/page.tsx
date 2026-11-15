@@ -77,6 +77,7 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         tenantSlug: website.slug,
         props: { ...props, sections: [], page: loaded.page },
       });
@@ -89,6 +90,7 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

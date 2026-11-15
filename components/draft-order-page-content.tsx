@@ -83,6 +83,8 @@ export default async function DraftOrderPageContent({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         tenantSlug: website.slug,
         props: { ...buildSystemPageProps(tenant, { basePath, auth, sections: [] }), page: loaded.page },
       });
@@ -124,6 +126,8 @@ export default async function DraftOrderPageContent({
         templateSlug: runtime.slug,
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

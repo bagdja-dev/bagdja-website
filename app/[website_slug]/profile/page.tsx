@@ -95,6 +95,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

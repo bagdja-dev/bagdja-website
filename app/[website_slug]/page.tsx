@@ -36,6 +36,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       pinnedVersion: runtime.version,
       candidateDigest: runtime.candidateDigest,
       browserBundle: runtime.browserBundle,
+      pageOverrides: runtime.pageOverrides,
       tenantSlug: params.website_slug,
       props: view.props,
     });

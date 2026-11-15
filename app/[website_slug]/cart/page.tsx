@@ -98,6 +98,7 @@ export default async function CartPage({ params }: CartPageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         tenantSlug: website.slug,
         props: { ...props, sections: [], page: loaded.page },
       });
@@ -110,6 +111,7 @@ export default async function CartPage({ params }: CartPageProps) {
         pinnedVersion: runtime.version,
         candidateDigest: runtime.candidateDigest,
         browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
         bottomNav: templateOwnsPage(website, 'bottom_nav'),
         tenantSlug: website.slug,
         props,

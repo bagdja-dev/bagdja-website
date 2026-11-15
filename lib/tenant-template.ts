@@ -14,6 +14,8 @@ import { extractTemplateTheme, sanitizeWebsiteTheme, type WebsiteTheme } from '.
 export const HOST_FALLBACK_TEMPLATE_SLUG = 'store-classic';
 
 export type TemplateSystemPage =
+  /** Shell persisten (D8): header/menu/footer/navigasi bawah sekali, isi berganti di `[data-bagdja-outlet]`. */
+  | 'shell'
   | 'header'
   /** Navigasi bawah (HP) di halaman yang isinya dikelola Bagdja. */
   | 'bottom_nav'

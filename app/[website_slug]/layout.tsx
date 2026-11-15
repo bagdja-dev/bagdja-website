@@ -2,6 +2,13 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { getWebsiteBySlug } from '../../lib/api-client';
+import { getAuthViewState } from '../../lib/auth-view';
+import { toNavPage } from '../../lib/template-data';
+import { renderTemplateShell } from '../../lib/template-runtime-route';
+import { applyViewerTemplateTrial } from '../../lib/template-trial';
+import { tenantRuntime, tenantTemplateTheme } from '../../lib/tenant-template';
+import { resolveTenantLinkBase } from '../../lib/tenant-link-base';
+import { sanitizeWebsiteTheme } from '../../lib/website-theme';
 
 interface TenantLayoutProps {
   params: { website_slug: string };
@@ -28,6 +35,48 @@ export async function generateMetadata({ params }: TenantLayoutProps): Promise<M
   };
 }
 
-export default function TenantLayout({ children }: TenantLayoutProps) {
-  return children;
+/**
+ * Shell persisten template (template-client-rendering-plan D8): bila template menyatakan `shell` dan render
+ * langsung aktif, header/menu/footer/navigasi bawah template dirender di sini SEKALI — layout App Router tidak
+ * dipasang ulang saat berpindah halaman, jadi hanya isi di outlet yang berganti (tanpa glitch).
+ */
+export default async function TenantLayout({ params, children }: TenantLayoutProps) {
+  const publicWebsite = await getWebsiteBySlug(params.website_slug);
+  if (!publicWebsite?.template_runtime && !publicWebsite?.template_trial_active) return children;
+  const website = await applyViewerTemplateTrial(publicWebsite);
+  const runtime = tenantRuntime(website);
+  if (!runtime?.pageOverrides.includes('shell')) return children;
+
+  const linkBase = resolveTenantLinkBase(website.slug);
+  // Shell tetap terpasang lintas halaman → login/logout kembali ke beranda tenant (bukan halaman saat shell dibuat).
+  const auth = await getAuthViewState(linkBase || '/', linkBase);
+  const shell = renderTemplateShell({
+    runtime,
+    tenantSlug: website.slug,
+    props: {
+      isPreview: false,
+      profile: {
+        name: website.name,
+        tagline: website.tagline ?? undefined,
+        logoUrl: website.logo_url ?? undefined,
+        whatsapp: website.whatsapp ?? undefined,
+        phone: website.phone ?? undefined,
+        socialLinks: website.social_links,
+        footerSettings: website.footer_settings,
+      },
+      templateTheme: tenantTemplateTheme(website),
+      websiteTheme: sanitizeWebsiteTheme(website.theme),
+      sections: [],
+      products: [],
+      locations: [],
+      faqs: [],
+      websiteSlug: linkBase,
+      websiteId: website.id,
+      tenantSlug: website.slug,
+      pages: website.pages.map(toNavPage),
+      auth: runtime.slug === 'kumpul' ? { ...auth, profileLogoutHref: auth.logoutHref } : auth,
+    },
+    children,
+  });
+  return shell ?? children;
 }

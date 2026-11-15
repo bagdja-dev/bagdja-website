@@ -256,6 +256,25 @@ export function isTemplateInlineRenderEnabled(env: NodeJS.ProcessEnv = process.e
   return env.TEMPLATE_INLINE_RENDER_ENABLED === 'true';
 }
 
+/**
+ * Shell persisten + SPA (D8): template menyatakan `shell` di pageOverrides, versi punya browser.js, dan render
+ * langsung aktif. Halaman lalu hanya merender isi (`contentOnly`); header/menu/footer dari shell di layout.
+ */
+export function isTemplateShellActive(
+  slug: string,
+  version: string | null | undefined,
+  bundle: unknown,
+  pageOverrides: readonly string[] | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean(
+    version &&
+    pageOverrides?.includes('shell') &&
+    isTemplateInlineRenderEnabled(env) &&
+    getTemplateClientRenderBundle(slug, version, bundle, env),
+  );
+}
+
 export function getTemplateRuntimeClientConfig(env: NodeJS.ProcessEnv = process.env): {
   url: string;
   token: string;
