@@ -493,10 +493,12 @@ function AboutSection({
   title,
   body,
   imageUrl,
+  imageAlt,
 }: {
   title?: string;
   body: string;
   imageUrl?: string;
+  imageAlt?: string;
 }) {
   if (!body.trim() && !imageUrl) return null;
   return (
@@ -505,7 +507,7 @@ function AboutSection({
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || 'Tentang Kami'} className="h-full w-full object-cover" loading="lazy" />
           </div>
         )}
         <div>
@@ -680,7 +682,7 @@ function BlogPostCard({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?:
       {post.coverImage ? (
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-black/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={post.coverImage} alt={post.title} className="h-full w-full object-cover" loading="lazy" />
         </div>
       ) : null}
       <div className="p-5">
@@ -783,7 +785,7 @@ function BlogArticleSection({ post, websiteSlug }: { post: BlogPostItem; website
       {post.coverImage && (
         <div className="mt-8 overflow-hidden rounded-2xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+          <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
         </div>
       )}
       <div
@@ -1302,7 +1304,9 @@ export function BarberClassicView({
                 const body = typeof section.content.body === 'string' ? section.content.body : '';
                 const imageUrl =
                   typeof section.content.image_url === 'string' ? section.content.image_url : undefined;
-                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} />;
+                const imageAlt =
+                  typeof section.content.image_url_alt === 'string' ? section.content.image_url_alt : undefined;
+                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} imageAlt={imageAlt} />;
               }
               case 'gallery': {
                 const heading =

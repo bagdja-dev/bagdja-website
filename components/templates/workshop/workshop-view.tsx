@@ -146,7 +146,7 @@ function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websi
         >
           {post.coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+            <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
           ) : <div className="aspect-[16/9] bg-[var(--brand-accent)]/10" />}
           <div className="p-4 sm:p-5">
             {post.publishedAtLabel && <p className="text-[10px] font-semibold uppercase text-[var(--brand-muted)]">{post.publishedAtLabel}</p>}
@@ -186,7 +186,7 @@ function WorkshopBlogArticle({ post, websiteSlug }: { post: BlogPostItem; websit
       {post.coverImage && (
         <div className="mt-7 overflow-hidden border" style={{ borderColor: 'var(--brand-border)' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+          <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
         </div>
       )}
       <div
@@ -234,6 +234,7 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
     : Array.isArray(content.images)
       ? parseGalleryImages(content.images)[0]?.url
       : undefined;
+  const heroImageAlt = getString(content, 'image_url_alt')?.trim() || headline;
   const stats = Array.isArray(content.stats)
     ? content.stats.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
     : [];
@@ -274,7 +275,7 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
           {heroImage ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={heroImage} alt={headline} className="h-full w-full object-cover" />
+              <img src={heroImage} alt={heroImageAlt} className="h-full w-full object-cover" />
               <div className="absolute inset-0 bg-black/20" />
             </>
           ) : (

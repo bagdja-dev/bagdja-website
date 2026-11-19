@@ -20,6 +20,7 @@ export interface ApiWebsite {
   name: string;
   slug: string;
   domain: string | null;
+  domain_verified_at?: string | null;
   template_id: string | null;
   /** Salinan versi package terpasang; null untuk template bawaan. Gunakan `template_runtime`. */
   template_runtime_version: string | null;
@@ -78,6 +79,10 @@ export interface ApiWebsitePage {
   website_id: string;
   title: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   content: Record<string, unknown>;
   is_home: boolean;
   placement: ApiPagePlacement;
@@ -112,6 +117,10 @@ export interface ApiWebsiteProduct {
   website_id: string;
   name: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   type: string;
   category: string | null;
   parent_product_id: string | null;
@@ -130,6 +139,7 @@ export interface ApiWebsiteProduct {
   video_urls?: string[] | null;
   model3d_url?: string | null;
   metadata: Record<string, unknown>;
+  is_active?: boolean;
   gathering_options?: Array<{
     id: string;
     option_group_key: string;
@@ -238,6 +248,10 @@ export interface ApiWebsiteBlogPost {
   website_id: string;
   title: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   excerpt: string | null;
   content: string | null;
   cover_image: string | null;
@@ -251,6 +265,7 @@ export interface ApiWebsiteBlogPost {
   is_published: boolean;
   published_at: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 /**

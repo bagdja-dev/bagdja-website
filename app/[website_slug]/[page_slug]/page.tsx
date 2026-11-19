@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getWebsiteBySlug } from '../../../lib/api-client';
+import { getPageBySlug, getWebsiteBySlug } from '../../../lib/api-client';
 import { CartProvider } from '../../../lib/cart';
+import { contentMetadata } from '../../../lib/content-seo';
 import { loadTenantPageView } from '../../../lib/tenant-page-view';
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
 import { getTemplateRenderer } from '../../../lib/template-registry';
@@ -15,14 +16,21 @@ interface TenantSubPageProps {
 }
 
 export async function generateMetadata({ params }: TenantSubPageProps): Promise<Metadata> {
-  const website = await getWebsiteBySlug(params.website_slug);
-  if (!website) return {};
+  const [website, page] = await Promise.all([
+    getWebsiteBySlug(params.website_slug),
+    getPageBySlug(params.website_slug, params.page_slug),
+  ]);
+  if (!website || !page) return { robots: { index: false, follow: false } };
 
-  const page = website.pages.find((p) => p.slug === params.page_slug);
-  return {
-    title: page ? `${page.title} · ${website.name}` : website.name,
-    description: website.tagline ?? undefined,
-  };
+  return contentMetadata({
+    slug: params.website_slug,
+    path: `/${page.slug}`,
+    title: page.seo_title?.trim() || `${page.title} · ${website.name}`,
+    description: page.seo_description?.trim() || website.tagline,
+    image: page.seo_image?.trim() || website.logo_url,
+    noIndex: page.seo_no_index,
+    website,
+  });
 }
 
 export default async function TenantSubPage({ params }: TenantSubPageProps) {

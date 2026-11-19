@@ -133,6 +133,7 @@ function HeroSection({
   tagline,
   subtitle,
   imageUrl,
+  imageAlt,
   waHref,
   chatHref,
   showWhatsappCta,
@@ -141,6 +142,7 @@ function HeroSection({
   tagline: string;
   subtitle?: string;
   imageUrl?: string;
+  imageAlt?: string;
   waHref?: string;
   chatHref?: string;
   showWhatsappCta: boolean;
@@ -182,7 +184,7 @@ function HeroSection({
         {imageUrl && (
           <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: 'var(--brand-surface)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" className="aspect-[4/3] w-full object-cover" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title} className="aspect-[4/3] w-full object-cover" />
           </div>
         )}
       </div>
@@ -635,7 +637,7 @@ function TextBlockSection({ title, body, align }: { title?: string; body: string
   );
 }
 
-function AboutSection({ title, body, imageUrl }: { title?: string; body: string; imageUrl?: string }) {
+function AboutSection({ title, body, imageUrl, imageAlt }: { title?: string; body: string; imageUrl?: string; imageAlt?: string }) {
   if (!body.trim() && !imageUrl) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -643,7 +645,7 @@ function AboutSection({ title, body, imageUrl }: { title?: string; body: string;
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || 'Tentang Kami'} className="h-full w-full object-cover" loading="lazy" />
           </div>
         )}
         <div>
@@ -752,7 +754,7 @@ function BlogPostCard({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?:
       {post.coverImage ? (
         <div className="relative aspect-[16/9] w-full overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={post.coverImage} alt={post.title} className="h-full w-full object-cover" loading="lazy" />
         </div>
       ) : null}
       <div className="p-5">
@@ -830,7 +832,7 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
           {post.coverImage && (
             <div className="mt-8 overflow-hidden rounded-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+              <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
             </div>
           )}
           <div
@@ -1264,6 +1266,7 @@ export function StoreClassicView({
   const heroContent = sections.find((s) => s.type === 'hero')?.content ?? {};
   const heroSubtitle = typeof heroContent.subtitle === 'string' ? heroContent.subtitle : undefined;
   const heroImageUrl = typeof heroContent.image_url === 'string' ? heroContent.image_url : undefined;
+  const heroImageAlt = typeof heroContent.image_url_alt === 'string' ? heroContent.image_url_alt : undefined;
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
   const categoryListingContent = sections.find((s) => s.type === 'category_listing')?.content;
@@ -1371,6 +1374,7 @@ export function StoreClassicView({
               tagline={tagline}
               subtitle={heroSubtitle}
               imageUrl={heroImageUrl}
+              imageAlt={heroImageAlt}
               waHref={waHref}
               chatHref={chatHref}
               showWhatsappCta={showWhatsappCta}
@@ -1488,7 +1492,8 @@ export function StoreClassicView({
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 const body = typeof section.content.body === 'string' ? section.content.body : '';
                 const imageUrl = typeof section.content.image_url === 'string' ? section.content.image_url : undefined;
-                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} />;
+                const imageAlt = typeof section.content.image_url_alt === 'string' ? section.content.image_url_alt : undefined;
+                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} imageAlt={imageAlt} />;
               }
               case 'gallery': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
