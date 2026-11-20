@@ -268,6 +268,8 @@ export interface GalleryImageItem {
 
 export interface FeatureItem {
   icon: string;
+  image: string;
+  imageAlt: string;
   title: string;
   desc: string;
 }
@@ -278,6 +280,8 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
       .map((item) => ({
         icon: typeof item.icon === 'string' ? item.icon : '',
+        image: typeof item.image === 'string' ? item.image : '',
+        imageAlt: typeof item.image_alt === 'string' ? item.image_alt : '',
         title: typeof item.title === 'string' ? item.title : '',
         desc: typeof item.desc === 'string' ? item.desc : '',
       }));
@@ -285,6 +289,8 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
 
   return [1, 2, 3, 4].map((index) => ({
     icon: typeof content[`feature_${index}_icon`] === 'string' ? content[`feature_${index}_icon`] as string : '',
+    image: '',
+    imageAlt: '',
     title: typeof content[`feature_${index}_title`] === 'string' ? content[`feature_${index}_title`] as string : '',
     desc: typeof content[`feature_${index}_desc`] === 'string' ? content[`feature_${index}_desc`] as string : '',
   }));

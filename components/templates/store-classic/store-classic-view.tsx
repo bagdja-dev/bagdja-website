@@ -225,7 +225,7 @@ function PageHeroBanner({ label, imageUrl }: { label: string; imageUrl?: string 
   );
 }
 
-function FeaturesGridSection({ title, features }: { title?: string; features: FeatureItem[] }) {
+function FeaturesGridSection({ title, features, visualMode }: { title?: string; features: FeatureItem[]; visualMode: 'icon' | 'image' }) {
   const items = features.filter((f) => f.title.trim());
   if (!items.length) return null;
   return (
@@ -234,7 +234,12 @@ function FeaturesGridSection({ title, features }: { title?: string; features: Fe
       <div className={`grid gap-6 ${items.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         {items.map((item, i) => (
           <div key={i} className="rounded-xl p-6 text-center" style={{ backgroundColor: 'var(--brand-surface)' }}>
-            <span className="text-3xl">{item.icon || '⭐'}</span>
+            {visualMode === 'image' && item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="mx-auto h-12 w-12 object-contain" />
+            ) : (
+              <span className="text-3xl">{item.icon || '⭐'}</span>
+            )}
             <p className="mt-3 font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
               {item.title}
             </p>
@@ -1397,7 +1402,8 @@ export function StoreClassicView({
               case 'features_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 const features = parseFeatureItems(section.content);
-                return <FeaturesGridSection key={key} title={heading} features={features} />;
+                const visualMode = section.content.visual_mode === 'image' ? 'image' : 'icon';
+                return <FeaturesGridSection key={key} title={heading} features={features} visualMode={visualMode} />;
               }
               case 'featured_product': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
