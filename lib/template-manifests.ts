@@ -80,6 +80,7 @@ export const BUILT_TEMPLATE_MANIFESTS = {
       'products_grid',
       'category_grid',
       'featured_product',
+      'portfolio_projects',
       'cta',
       'contact',
       'locations_list',

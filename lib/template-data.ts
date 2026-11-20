@@ -7,6 +7,8 @@ import type {
   ApiWebsiteLocation,
   ApiWebsitePage,
   ApiWebsiteProduct,
+  ApiWebsitePortfolioCategory,
+  ApiWebsitePortfolioProject,
   ApiWebsiteTemplate,
 } from './api-client';
 import { richTextHtml, richTextToPlainText } from './rich-text';
@@ -83,6 +85,60 @@ export interface CategoryItem {
   images: string[];
   specifications?: Record<string, string>;
   estimation?: Array<{ label: string; price: number | string }>;
+}
+
+export interface PortfolioCategoryItem {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  sortOrder: number;
+}
+
+export interface PortfolioProjectItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt?: string;
+  image?: string;
+  tags: string[];
+  year?: number;
+  createdAt: string;
+  projectUrl?: string;
+  clientName?: string;
+  categories: PortfolioCategoryItem[];
+}
+
+export function toPortfolioCategoryItem(category: ApiWebsitePortfolioCategory): PortfolioCategoryItem {
+  return {
+    id: category.id,
+    slug: category.slug,
+    name: category.name,
+    description: category.description ?? undefined,
+    sortOrder: category.sort_order,
+  };
+}
+
+export function toPortfolioProjectItem(project: ApiWebsitePortfolioProject): PortfolioProjectItem {
+  return {
+    id: project.id,
+    slug: project.translation?.slug ?? project.slug,
+    title: project.translation?.title ?? project.name,
+    excerpt: project.translation?.excerpt ?? undefined,
+    image: project.cover_image ?? project.photos?.[0]?.url ?? undefined,
+    tags: project.tags ?? [],
+    year: project.year ?? undefined,
+    createdAt: project.created_at,
+    projectUrl: project.project_url ?? undefined,
+    clientName: project.client?.name ?? undefined,
+    categories: (project.categories ?? []).map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      description: category.description ?? undefined,
+      sortOrder: category.sort_order,
+    })),
+  };
 }
 
 function normalizeCategorySpecifications(raw: unknown): Record<string, string> | undefined {

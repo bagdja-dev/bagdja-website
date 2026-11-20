@@ -19,7 +19,7 @@ export default async function sitemap({ params }: SitemapProps): Promise<Metadat
       ? [{ url: tenantCanonicalUrl(slug, '/', website) }]
       : []),
     ...website.pages
-      .filter((page) => !page.is_home && page.placement === 'regular' && !page.seo_no_index)
+      .filter((page) => !page.is_home && !page.seo_no_index)
       .map((page) => ({
         url: tenantCanonicalUrl(slug, `/${page.slug}`, website),
       })),

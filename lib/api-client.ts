@@ -72,7 +72,7 @@ export interface ApiWebsiteSection {
   order: number;
 }
 
-export type ApiPagePlacement = 'regular' | 'header' | 'footer';
+export type ApiPagePlacement = 'regular' | 'header' | 'footer' | 'hidden';
 
 export interface ApiWebsitePage {
   id: string;
@@ -234,6 +234,35 @@ export interface ApiWebsiteLocation {
   shipping_enabled: boolean;
 }
 
+export interface ApiWebsitePortfolioCategory {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface ApiWebsitePortfolioProject {
+  id: string;
+  slug: string;
+  name: string;
+  tags: string[];
+  cover_image: string | null;
+  photos: Array<{ url: string; alt: string; caption: string }>;
+  project_url: string | null;
+  project_type: string | null;
+  year: number | null;
+  created_at: string;
+  categories: ApiWebsitePortfolioCategory[];
+  client: { id: string; name: string; logo_url: string | null } | null;
+  translation: {
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    detail: string | null;
+  } | null;
+}
+
 export interface ApiWebsiteFaq {
   id: string;
   website_id: string;
@@ -351,6 +380,22 @@ export async function getProducts(
 export async function getCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsiteCategory[]> {
   const result = await fetchPublic<ApiWebsiteCategory[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/categories`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getPortfolioProjects(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioProject[]> {
+  const result = await fetchPublic<ApiWebsitePortfolioProject[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/portfolio-projects`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getPortfolioCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioCategory[]> {
+  const result = await fetchPublic<ApiWebsitePortfolioCategory[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/portfolio-categories`,
     options,
   );
   return result ?? [];

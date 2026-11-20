@@ -8,6 +8,8 @@ import {
   getHomePage,
   getLocations,
   getPageBySlug,
+  getPortfolioCategories,
+  getPortfolioProjects,
   getProducts,
   getWebsiteBySlug,
   type PublicFetchOptions,
@@ -18,6 +20,8 @@ import {
   type ApiWebsiteLocation,
   type ApiWebsitePage,
   type ApiWebsiteProduct,
+  type ApiWebsitePortfolioCategory,
+  type ApiWebsitePortfolioProject,
 } from './api-client';
 import { applyViewerTemplateTrial } from './template-trial';
 
@@ -29,6 +33,8 @@ export interface TenantData {
   locations: ApiWebsiteLocation[];
   faqs: ApiWebsiteFaq[];
   blogPosts: ApiWebsiteBlogPost[];
+  portfolioProjects: ApiWebsitePortfolioProject[];
+  portfolioCategories: ApiWebsitePortfolioCategory[];
   /** Fase 5 paywall: true kalau subscription owner tidak aktif. */
   subscription_inactive: boolean;
 }
@@ -55,6 +61,11 @@ export async function loadTenant(
     getFaqs(slug, undefined, options),
     getBlogPosts(slug, options),
   ]);
+
+  const hasPortfolioSection = page?.sections?.some((section) => section.type === 'portfolio_projects') ?? false;
+  const [portfolioProjects, portfolioCategories] = hasPortfolioSection
+    ? await Promise.all([getPortfolioProjects(slug, options), getPortfolioCategories(slug, options)])
+    : [[], []];
 
   if (page?.sections) {
     await Promise.all(
@@ -91,6 +102,8 @@ export async function loadTenant(
     locations,
     faqs,
     blogPosts,
+    portfolioProjects,
+    portfolioCategories,
     subscription_inactive: website.subscription_inactive ?? false,
   };
 }
