@@ -303,8 +303,27 @@ function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
   const features = parseFeatureItems(content)
     .map((item) => ({ ...item, icon: item.icon || '⭐' }))
     .filter((item) => item.title.trim());
+  const visualMode = content.visual_mode === 'image' ? 'image' : 'icon';
   if (!features.length) return null;
-  return <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6"><SectionHeading title={title} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{features.map((item) => <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}><span className="font-mono text-sm font-bold text-[var(--brand-accent)]">{item.icon}</span><h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>{item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}</article>)}</div></section>;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+      <SectionHeading title={title} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {features.map((item) => (
+          <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+            {visualMode === 'image' && item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="h-12 w-12 object-contain" />
+            ) : (
+              <span className="font-mono text-sm font-bold text-[var(--brand-accent)]">{item.icon}</span>
+            )}
+            <h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>
+            {item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function WorkshopCta({ content, cta }: { content: Record<string, unknown>; cta: CtaHref | null }) {
