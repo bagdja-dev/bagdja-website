@@ -11,6 +11,8 @@ import type {
   FaqItem,
   LocationItem,
   NavPage,
+  PortfolioCategoryItem,
+  PortfolioProjectItem,
   SectionEntry,
 } from './template-data';
 import type { TemplateRuntimeOrderAction } from './template-runtime-bridge';
@@ -55,6 +57,8 @@ export interface TemplateRenderProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  portfolioProjects?: PortfolioProjectItem[];
+  portfolioCategories?: PortfolioCategoryItem[];
   /**
    * Data halaman sistem untuk template package (`props.page`, kontrak
    * bagdja-website-template-runtime/contract/page-contract.d.ts). Divalidasi

@@ -30,6 +30,8 @@ import {
   normalizeFooterBlocks,
   parseFeatureItems,
   type FeatureItem,
+  type PortfolioCategoryItem,
+  type PortfolioProjectItem,
 } from '../../../lib/template-data';
 import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
@@ -65,6 +67,7 @@ import { PurchaseControls } from '../../purchase-controls';
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
+import { StoreClassicPortfolio } from './store-classic-portfolio';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -93,6 +96,8 @@ export interface StoreClassicViewProps {
   tenantSlug?: string;
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
+  portfolioProjects?: PortfolioProjectItem[];
+  portfolioCategories?: PortfolioCategoryItem[];
   hideHeader?: boolean;
   cartDesign?: 'store-classic';
   checkoutDesign?: 'store-classic';
@@ -1244,6 +1249,8 @@ export function StoreClassicView({
   websiteId,
   pages = [],
   blogPosts = [],
+  portfolioProjects = [],
+  portfolioCategories = [],
   auth,
   hideHeader = false,
   cartDesign,
@@ -1414,6 +1421,15 @@ export function StoreClassicView({
                 const logos = parseGalleryImages(section.content.logos);
                 return <LogoWallSection key={key} title={heading} layout={layout} logos={logos} />;
               }
+              case 'portfolio_projects':
+                return (
+                  <StoreClassicPortfolio
+                    key={key}
+                    content={section.content}
+                    projects={portfolioProjects}
+                    categories={portfolioCategories}
+                  />
+                );
               case 'category_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : 'Kategori Pilihan';
                 return (
