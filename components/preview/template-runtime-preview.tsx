@@ -24,8 +24,6 @@ interface TemplateRuntimePreviewProps {
    */
   clientBundle?: TemplateBrowserBundleRef;
   initialProps?: Record<string, unknown>;
-  draftIsHome?: boolean;
-  draftFallbackSections?: Array<{ id?: string; type: string; content: Record<string, unknown> }>;
 }
 
 function escapeAttribute(value: string): string {
@@ -87,8 +85,6 @@ export function TemplateRuntimePreview({
   draftEndpoint,
   clientBundle,
   initialProps,
-  draftIsHome = false,
-  draftFallbackSections = [],
 }: TemplateRuntimePreviewProps) {
   const [renderedHtml, setRenderedHtml] = useState(html);
   const [renderedDigest, setRenderedDigest] = useState(digest);
@@ -251,9 +247,7 @@ export function TemplateRuntimePreview({
       if (message.pageSlug !== pageSlug) return;
       const props = {
         ...initialProps,
-        sections: message.sections.length === 0 && draftIsHome
-          ? draftFallbackSections
-          : message.sections,
+        sections: message.sections,
         ...(message.theme ? { websiteTheme: message.theme } : {}),
       };
       const generation = ++draftGeneration.current;
@@ -282,8 +276,6 @@ export function TemplateRuntimePreview({
   }, [
     allowedOrigins,
     draftEndpoint,
-    draftFallbackSections,
-    draftIsHome,
     initialProps,
     isClientPreview,
     pageSlug,

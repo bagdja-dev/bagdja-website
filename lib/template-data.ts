@@ -830,18 +830,17 @@ const DEFAULT_SECTIONS: SectionEntry[] = [
 /**
  * Urutan & konfigurasi section untuk sebuah halaman.
  * `allowTemplateFallback` (default true, dipakai untuk halaman home) fallback ke
- * `template.structure.sections` (lalu default hardcoded) supaya renderer tetap
- * tampil wajar meski website belum punya home page/sections (seharusnya jarang
- * terjadi karena WebsitesService.create() auto-seed). Untuk halaman non-home,
- * caller mengirim `false` — halaman baru yang belum diisi section memang wajar
- * tampil kosong, bukan ikut-ikutan tampilan default template (hero+grid home).
+ * `template.structure.sections` (lalu default hardcoded) hanya saat halaman home
+ * belum ditemukan atau responsnya tidak menyertakan daftar sections. Daftar
+ * sections kosong pada halaman yang ada adalah konfigurasi eksplisit dan harus
+ * tetap kosong. Untuk halaman non-home, caller mengirim `false`.
  */
 export function resolveSections(
   page: ApiWebsitePage | null,
   template: ApiWebsiteTemplate | null | undefined,
   allowTemplateFallback = true,
 ): SectionEntry[] {
-  if (page?.sections?.length) {
+  if (page && Array.isArray(page.sections)) {
     return [...page.sections]
       .sort((a, b) => a.order - b.order)
       .map((s) => ({ id: s.id, type: s.type, content: s.content ?? {} }));

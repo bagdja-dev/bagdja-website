@@ -1067,7 +1067,7 @@ export function WorkshopView({
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
             <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
-        ) : utilityPage || isCategoryListingPage ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
+        ) : utilityPage || isCategoryListingPage || !heroSection ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection.content} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map(withSectionFrame((section, index) => {
           const key = `${section.type}-${index}`;
           switch (section.type) {

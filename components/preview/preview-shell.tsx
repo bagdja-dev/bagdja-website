@@ -37,10 +37,7 @@ export interface PreviewShellProps {
   templateSlug: string;
   /** Slug halaman yang dirender — draft untuk halaman lain diabaikan. */
   pageSlug: string;
-  isHome: boolean;
   viewProps: TemplateRenderProps;
-  /** Fallback section template untuk home bila draft kosong (sama dengan route publik). */
-  fallbackSections: SectionEntry[];
   /** `flow_id` → `flow_steps` hasil suntikan tenant-loader, dipakai ulang untuk draft. */
   flowStepsByFlowId: Record<string, unknown>;
   allowedOrigins: string[];
@@ -87,9 +84,7 @@ function sameBox(a: Box | null, b: Box | null): boolean {
 export function PreviewShell({
   templateSlug,
   pageSlug,
-  isHome,
   viewProps,
-  fallbackSections,
   flowStepsByFlowId,
   allowedOrigins,
 }: PreviewShellProps) {
@@ -118,7 +113,6 @@ export function PreviewShell({
 
   const toEntries = useCallback(
     (draft: PreviewDraftSection[]): SectionEntry[] => {
-      if (draft.length === 0) return isHome ? fallbackSections : [];
       return draft.map((section) => {
         const flowId = section.content.flow_id;
         if (
@@ -132,7 +126,7 @@ export function PreviewShell({
         return { id: section.id, type: section.type, content: section.content };
       });
     },
-    [fallbackSections, flowStepsByFlowId, isHome],
+    [flowStepsByFlowId],
   );
 
   // Pesan masuk — handler terbaru disimpan di ref supaya listener & `ready` cukup sekali per mount.
