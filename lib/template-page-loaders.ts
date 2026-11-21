@@ -18,6 +18,7 @@ import {
   buildInvoiceDetailPage,
   buildOrdersPage,
   buildTagihanPage,
+  buyerServiceScheduleRange,
   createPageKeyFactory,
   decodeInvitationGuestState,
   invitationCookieName,
@@ -33,6 +34,7 @@ import {
   type CartOrderInput,
   type CartPlanInput,
   type CalendarPlanInput,
+  type ServiceScheduleInput,
   type GatheringInvoiceInput,
   type TerminRowInput,
   type TransactionRowInput,
@@ -97,17 +99,25 @@ export async function loadCalendarTemplatePage(websiteId: string, basePath: stri
   const key = await keyFactory();
   if (!key) return { unauthenticated: true };
   const query = encodeURIComponent(websiteId);
-  const loaded = await loadAll([
-    `/api/gathering/plans?website_id=${query}`,
-    `/api/gathering/invitations/mine?website_id=${query}`,
+  const range = buyerServiceScheduleRange();
+  const [loaded, services] = await Promise.all([
+    loadAll([
+      `/api/gathering/plans?website_id=${query}`,
+      `/api/gathering/invitations/mine?website_id=${query}`,
+    ]),
+    // Jadwal jasa opsional: bila gagal (mis. API belum mendukung), kalender gathering tetap tampil.
+    backendFetch<unknown>(
+      `/api/orders/schedule?website_id=${query}&from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+    ),
   ]);
   if (!loaded) return null;
   if ('unauthenticated' in loaded) return { unauthenticated: true };
+  if (services.status >= 400) console.error(`[template-page] service schedule failed (${services.status}) ${services.error ?? ''}`);
   return {
     page: buildCalendarPage(
       rowsOf<CalendarPlanInput>(loaded.data[0]),
       rowsOf<CalendarInvitationInput>(loaded.data[1]),
-      { basePath, key },
+      { basePath, key, services: services.status < 400 ? rowsOf<ServiceScheduleInput>(services.data) : [] },
     ),
   };
 }

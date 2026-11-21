@@ -106,7 +106,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
             pageSlug={previewPageSlug}
             allowedOrigins={getAllowedAdminOrigins()}
             allowDemoImageHost={process.env.NODE_ENV !== 'production'}
-            clientBundle={previewBundle}
+            renderBundle={previewBundle}
             initialProps={runtimeProps}
           />
         );

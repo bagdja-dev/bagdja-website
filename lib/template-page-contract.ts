@@ -20,6 +20,7 @@ export const TEMPLATE_SYSTEM_PAGES = [
   'gathering_plan',
   'product_detail',
   'gathering_invitation',
+  'draft_order',
 ];
 
 /** page.type → field wajib (selain field PageBase). */
@@ -29,10 +30,11 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   order_detail: ['transaction', 'actions'],
   tagihan: ['invoices', 'actions'],
   invoice_detail: ['invoice', 'canPay', 'loginRequired', 'actions'],
-  calendar: ['initialMonth', 'plans', 'invitations', 'actions'],
+  calendar: ['initialMonth', 'plans', 'invitations', 'services', 'actions'],
   gathering_plan: ['plan', 'invitees', 'invitations', 'registrations', 'viewerRole', 'actions'],
   product_detail: ['product', 'related', 'loggedIn', 'actions'],
   gathering_invitation: ['invitation', 'optionGroups', 'viewer', 'loginHref', 'actions'],
+  draft_order: ['order', 'steps', 'quote', 'canPay', 'canCancel', 'ordersHref', 'actions'],
 };
 
 /** Versi kontrak per halaman (v2 = superset v1). */
@@ -56,6 +58,23 @@ export const GATHERING_PLAN_ACTIONS = [
   'gathering.cancel',
 ];
 
+/** Draft pesanan (praorder sebelum penawaran/checkout). */
+export const DRAFT_ORDER_ACTIONS = [
+  'order.quantity.set',
+  'order.praorder.save',
+  'order.praorder.submit',
+  'order.praorder.upload',
+  'order.praorder.file.remove',
+  'order.draft.pay',
+  'order.draft.cancel',
+  'order.chat.open',
+];
+
+/** Tipe field langkah praorder (sama dengan form_schema flow di Website API). */
+export const DRAFT_ORDER_FIELD_TYPES = [
+  'text', 'number', 'textarea', 'select', 'tanggal', 'tanggal_waktu', 'lokasi', 'foto', 'video', 'pdf',
+];
+
 const ALLOWED_ACTIONS: Record<string, string[]> = {
   cart: ['cart.set_quantity', 'cart.remove', 'cart.checkout'],
   orders: ['transaction.chat.open'],
@@ -71,6 +90,7 @@ const ALLOWED_ACTIONS: Record<string, string[]> = {
     'gathering.invitation.resend_otp',
     'gathering.invitation.pay',
   ],
+  draft_order: DRAFT_ORDER_ACTIONS,
 };
 
 const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -81,6 +101,9 @@ const GOOGLE_MAPS_URL = /^https:\/\/(?:maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps
 /** Pertahanan lapis kedua untuk field `*Html` (sanitasi utama di Website API). */
 const UNSAFE_HTML = /<\s*(script|style|iframe|object|embed)\b|\son[a-z]+\s*=|javascript:/i;
 const FORBIDDEN_KEY = /(^|_)(email|token|password|secret)$|email|accessToken|refreshToken/i;
+
+/** Tahap jasa di kalender: praorder | menunggu bayar | sudah dibayar (DP) | selesai & lunas. */
+export const CALENDAR_SERVICE_STATUSES = ['planning', 'payment', 'confirmed', 'completed'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -152,6 +175,29 @@ export function validateTemplatePage(page: unknown): string[] {
   }
   if (page.type === 'calendar' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(page.initialMonth))) {
     issues.push('page.initialMonth: format YYYY-MM');
+  }
+  if (page.type === 'calendar') {
+    if (!Array.isArray(page.services)) issues.push('page.services: harus array');
+    else (page.services as Array<Record<string, unknown>>).forEach((service, index) => {
+      if (!CALENDAR_SERVICE_STATUSES.includes(String(service?.status))) {
+        issues.push(`page.services[${index}].status: ${CALENDAR_SERVICE_STATUSES.join(' | ')}`);
+      }
+      if (typeof service?.allDay !== 'boolean') issues.push(`page.services[${index}].allDay: harus boolean`);
+      if (service?.endAt !== undefined && service?.startAt === undefined) issues.push(`page.services[${index}].endAt: butuh startAt`);
+    });
+  }
+  if (page.type === 'draft_order' && Array.isArray(page.steps)) {
+    (page.steps as Array<Record<string, unknown>>).forEach((step, stepIndex) => {
+      if (!['done', 'current', 'locked'].includes(String(step?.state))) issues.push(`page.steps[${stepIndex}].state: done | current | locked`);
+      (Array.isArray(step?.fields) ? step.fields as Array<Record<string, unknown>> : []).forEach((field, fieldIndex) => {
+        if (!DRAFT_ORDER_FIELD_TYPES.includes(String(field?.type))) {
+          issues.push(`page.steps[${stepIndex}].fields[${fieldIndex}].type: tidak dikenal (${String(field?.type)})`);
+        }
+        if (typeof field?.name !== 'string' || !/^[A-Za-z0-9_.-]{1,100}$/.test(field.name)) {
+          issues.push(`page.steps[${stepIndex}].fields[${fieldIndex}].name: 1–100 karakter [A-Za-z0-9_.-]`);
+        }
+      });
+    });
   }
   walk(page, 'page', issues);
   return issues;

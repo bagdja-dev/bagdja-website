@@ -34,6 +34,7 @@ import {
   type PortfolioClientItem,
   type PortfolioProjectItem,
 } from '../../../lib/template-data';
+import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { ProductDescription } from '../shared/product-description';
@@ -921,7 +922,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
     <>
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="grid gap-10 sm:grid-cols-2">
-          <StoreClassicProductGallery images={images} videoUrl={item.videoUrl} videoUrls={item.videoUrls} model3dUrl={item.model3dUrl} />
+          <StoreClassicProductGallery images={images} imageDetails={item.imageDetails} videoUrl={item.videoUrl} videoUrls={item.videoUrls} model3dUrl={item.model3dUrl} />
           <div id={PRODUCT_CTA_ID}>
             <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
               {item.name}
@@ -1483,14 +1484,15 @@ export function StoreClassicView({
               }
               case 'services_grid':
               case 'products_grid': {
-                const filterType = typeof section.content.filter_type === 'string' ? section.content.filter_type : undefined;
+                const gridFilter = productGridFilter(section.content);
                 const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
                 const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
                 return (
                   <ProductGridSection
                     key={key}
                     title={heading}
-                    filterType={filterType}
+                    filterType={gridFilter.type}
+                    categoryIds={gridFilter.categoryIds}
                     initialProducts={topLevelProducts}
                     tenantSlug={tenantSlug}
                     websiteSlug={websiteSlug}

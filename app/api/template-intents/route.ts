@@ -21,13 +21,17 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const MAX_BODY_BYTES = 16 * 1024;
-/** Multipart (banner undangan): payload JSON + satu file gambar. */
-const MAX_MULTIPART_BYTES = INVITATION_BANNER_MAX_BYTES + MAX_BODY_BYTES;
+/** Multipart: banner undangan (gambar ≤ 5 MB) atau file praorder draft pesanan (≤ 15 MB, per tipe dicek executor). */
+const PRAORDER_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+const MAX_MULTIPART_BYTES = PRAORDER_UPLOAD_MAX_BYTES + MAX_BODY_BYTES;
+const FILE_INTENTS = new Set(['gathering.invitation.content.save', 'gathering.invitations.submit', 'order.praorder.upload']);
 const TENANT_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const SYSTEM_PAGES: readonly TemplateSystemPage[] = [
   'cart', 'orders', 'order_detail', 'tagihan', 'invoice_detail', 'calendar', 'gathering_plan', 'product_detail',
-  'gathering_invitation',
+  'gathering_invitation', 'draft_order',
 ];
+/** Draft pesanan: id pesanan dari path halaman (key intent diverifikasi terhadapnya oleh executor). */
+const DRAFT_ORDER_PATH = /\/cart\/order\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 /** Undangan terbuka: RSVP & OTP tanpa login (status tamu di cookie httpOnly). */
 const ANONYMOUS_INTENTS = new Set(['gathering.invitation.rsvp', 'gathering.invitation.verify_otp', 'gathering.invitation.resend_otp']);
 const INVITATION_PATH = /\/gathering\/invite\/(?:id\/)?([^/?#]{1,200})\/?$/;
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
     if (multipart) {
       const declaredLength = Number(request.headers.get('content-length'));
       if (Number.isFinite(declaredLength) && declaredLength > MAX_MULTIPART_BYTES) {
-        return respond({ ok: false, message: 'Ukuran banner maksimal 5 MB.' }, 413);
+        return respond({ ok: false, message: 'Ukuran file maksimal 15 MB.' }, 413);
       }
       const form = await request.formData();
       const payload = form.get('payload');
@@ -85,8 +89,12 @@ export async function POST(request: Request) {
       if (typeof payload !== 'string' || Buffer.byteLength(payload, 'utf8') > MAX_BODY_BYTES || !(banner instanceof File)) {
         return respond({ ok: false, message: 'Permintaan tidak valid.' }, 400);
       }
-      if (banner.size > INVITATION_BANNER_MAX_BYTES) return respond({ ok: false, message: 'Ukuran banner maksimal 5 MB.' }, 413);
       body = JSON.parse(payload);
+      const fileAction = (body as { intent?: { action?: unknown } } | null)?.intent?.action;
+      const fileLimit = fileAction === 'order.praorder.upload' ? PRAORDER_UPLOAD_MAX_BYTES : INVITATION_BANNER_MAX_BYTES;
+      if (banner.size > fileLimit) {
+        return respond({ ok: false, message: `Ukuran file maksimal ${Math.round(fileLimit / 1024 / 1024)} MB.` }, 413);
+      }
       bannerFile = banner;
     } else {
       const raw = await request.text();
@@ -105,8 +113,15 @@ export async function POST(request: Request) {
   if (!TENANT_SLUG_PATTERN.test(tenantSlug) || !pageType || !intent) {
     return respond({ ok: false, message: 'Permintaan tidak valid.' }, 400);
   }
-  if (bannerFile && intent.action !== 'gathering.invitation.content.save' && intent.action !== 'gathering.invitations.submit') {
+  if (bannerFile && !FILE_INTENTS.has(intent.action)) {
     return respond({ ok: false, message: 'Permintaan tidak valid.' }, 400);
+  }
+
+  let draftOrderId: string | undefined;
+  if (pageType === 'draft_order') {
+    const pagePath = typeof record.pagePath === 'string' && record.pagePath.length <= 512 ? record.pagePath : '';
+    draftOrderId = DRAFT_ORDER_PATH.exec(pagePath)?.[1]?.toLowerCase();
+    if (!draftOrderId) return respond({ ok: false, message: 'Permintaan tidak valid.' }, 400);
   }
 
   // Halaman undangan: token dari path halaman (key intent diverifikasi terhadapnya oleh executor).
@@ -148,6 +163,7 @@ export async function POST(request: Request) {
     upload: (path, form) => backendFetchFormData(path, form),
     products: tenant.products.map(toCatalogItem),
     publicKey: createPageKeyFactory(PUBLIC_PAGE_KEY_SCOPE),
+    ...(draftOrderId ? { draftOrderId } : {}),
     ...(invitationToken
       ? {
         invitationToken,

@@ -40,6 +40,8 @@ export interface CatalogItem {
   websiteId?: string;
   type: string;
   category?: string;
+  /** Id kategori — dipakai filter section Daftar Produk (category_ids). */
+  categoryId?: string;
   name: string;
   slug: string;
   price?: number;
@@ -64,6 +66,8 @@ export interface CatalogItem {
   uomSymbol?: string;
   image?: string;
   images?: string[];
+  /** Teks alternatif & keterangan per foto (URL → isi), dari `metadata.gallery_images` produk (Studio). */
+  imageDetails?: Record<string, { alt?: string; caption?: string }>;
   /** Video produk pertama (opsional), diupload lewat bagdja-storage-service. */
   videoUrl?: string;
   /** Semua video produk (urut tampil); `videoUrl` = elemen pertama. */
@@ -555,6 +559,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     websiteId: product.website_id,
     type: product.type,
     category: product.category ?? undefined,
+    categoryId: product.category_id ?? undefined,
     name: product.name,
     slug: product.slug,
     price: Number(product.price),
@@ -571,6 +576,7 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     uomSymbol: product.uom?.symbol,
     image: product.images?.[0],
     images: product.images,
+    imageDetails: parseGalleryImageDetails(product.metadata?.gallery_images),
     videoUrl: product.video_urls?.[0] ?? product.video_url ?? undefined,
     videoUrls: product.video_urls?.length ? product.video_urls : product.video_url ? [product.video_url] : [],
     model3dUrl: product.model3d_url ?? undefined,
@@ -579,6 +585,21 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     variantAttributes: parseVariantAttributes(product.metadata?.variant_attributes),
     stock: parseStock(product.metadata?.stock),
   };
+}
+
+/** `metadata.gallery_images` ([{url, alt, caption}] dari editor produk Studio) → peta URL → alt/keterangan. */
+export function parseGalleryImageDetails(value: unknown): Record<string, { alt?: string; caption?: string }> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const details: Record<string, { alt?: string; caption?: string }> = {};
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { url, alt, caption } = entry as Record<string, unknown>;
+    if (typeof url !== 'string' || !url) continue;
+    const altText = typeof alt === 'string' ? alt.trim() : '';
+    const captionText = typeof caption === 'string' ? caption.trim() : '';
+    if (altText || captionText) details[url] = { ...(altText ? { alt: altText } : {}), ...(captionText ? { caption: captionText } : {}) };
+  }
+  return Object.keys(details).length ? details : undefined;
 }
 
 /** Ambil nilai stok dari metadata.stock — return undefined kalau bukan angka non-negatif. */

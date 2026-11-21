@@ -31,9 +31,17 @@ const contractModule = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } },
 ).outputText;
 const contractUrl = `data:text/javascript;base64,${Buffer.from(contractModule).toString('base64')}`;
+// template-runtime-client juga mengimpor template-browser-bundle (mode client) — dimuat dengan cara yang sama.
+const browserBundleModule = ts.transpileModule(
+  await readFile(new URL('../lib/template-browser-bundle.ts', import.meta.url), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } },
+).outputText;
+const browserBundleUrl = `data:text/javascript;base64,${Buffer.from(browserBundleModule).toString('base64')}`;
 const runtimeModule = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-}).outputText.replace("from './template-page-contract'", `from '${contractUrl}'`);
+}).outputText
+  .replace("from './template-page-contract'", `from '${contractUrl}'`)
+  .replace("from './template-browser-bundle'", `from '${browserBundleUrl}'`);
 const runtimeClient = await import(`data:text/javascript;base64,${Buffer.from(runtimeModule).toString('base64')}`);
 const approvedEnv = {
   TEMPLATE_RUNTIME_ENABLED: 'true',
@@ -374,6 +382,11 @@ assert(
   'Tenant previews must only use the runtime for a pinned package template.',
 );
 assert(!previewSource.includes('clientBundle={'), 'Studio preview stays inert: template browser JavaScript is never executed in the editor.');
+// Pratinjau mode client hanya menjalankan render(props) dari browser.js untuk membuat HTML; client.js template
+// (clientSource) tidak pernah dijalankan dan hasilnya tetap di iframe tanpa skrip.
+const previewComponentSource = await readFile(new URL('../components/preview/template-runtime-preview.tsx', import.meta.url), 'utf8');
+assert(!previewComponentSource.includes('clientSource'), 'Studio preview must never run the template client.js.');
+assert(previewComponentSource.includes('sandbox=""'), 'Studio preview output stays in a script-less sandboxed iframe.');
 assert(previewSource.includes('TemplateRuntimeErrorView'), 'Preview route must display a fail-closed runtime error.');
 const studioDraftRoute = await readFile(
   path.join(process.cwd(), 'app/api/template-runtime/studio-preview/route.ts'),
@@ -427,7 +440,7 @@ for (const route of ['cart', 'orders', 'tagihan', 'calendar', 'chat', 'checkout'
 const tenantRuntimeRoute = await readFile(path.join(process.cwd(), 'lib/template-runtime-route.tsx'), 'utf8');
 assert(tenantRuntimeRoute.includes('getTemplateRuntimeTenantVersion'), 'Tenant routes must select only pinned or explicitly allowlisted development runtime versions.');
 assert(
-  tenantRuntimeRoute.includes('sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...props, bridgeVersion: 1 } : props)'),
+  tenantRuntimeRoute.includes('sanitizeTemplateRuntimeProps(bridgeAvailable ? { ...pageProps, bridgeVersion: 1 } : pageProps)'),
   'Tenant runtime must sanitize props (no auth PII) before rendering, including the bridge flag.',
 );
 const intentRoute = await readFile(path.join(process.cwd(), 'app/api/template-intents/route.ts'), 'utf8');

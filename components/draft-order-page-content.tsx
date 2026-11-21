@@ -19,6 +19,8 @@ import { sanitizeWebsiteTheme } from '../lib/website-theme';
 import { renderPinnedTenantHeader, renderPinnedTenantTemplate } from '../lib/template-runtime-route';
 import { buildSystemPageProps } from '../lib/system-page-props';
 import { loadGatheringPlanTemplatePage } from '../lib/template-page-loaders';
+import { buildDraftOrderPage, createPageKeyFactory, type DraftOrderInput } from '../lib/template-pages';
+import { getSession } from '../lib/session';
 import { hostRendererSlug, templateOwnsPage, tenantRuntime, tenantTemplateTheme } from '../lib/tenant-template';
 import type { GatheringPlanDetail, OrderDetail } from './order-detail-content';
 import WebsiteInactiveNotice from './website-inactive-notice';
@@ -87,6 +89,27 @@ export default async function DraftOrderPageContent({
         pageOverrides: runtime.pageOverrides,
         tenantSlug: website.slug,
         props: { ...buildSystemPageProps(tenant, { basePath, auth, sections: [] }), page: loaded.page },
+      });
+      if (templatePage) return <>{templatePage}</>;
+    }
+  }
+
+  // Draft pesanan milik template package bila manifest menyatakan `draft_order` (praorder + penawaran).
+  if (!gatheringPlan && runtime && templateOwnsPage(website, 'draft_order')) {
+    const { user } = await getSession();
+    if (user?.userId) {
+      const page = buildDraftOrderPage(result.data as unknown as DraftOrderInput, {
+        basePath,
+        key: createPageKeyFactory(user.userId),
+      });
+      const templatePage = await renderPinnedTenantTemplate({
+        templateSlug: runtime.slug,
+        pinnedVersion: runtime.version,
+        candidateDigest: runtime.candidateDigest,
+        browserBundle: runtime.browserBundle,
+        pageOverrides: runtime.pageOverrides,
+        tenantSlug: website.slug,
+        props: { ...buildSystemPageProps(tenant, { basePath, auth, sections: [] }), page },
       });
       if (templatePage) return <>{templatePage}</>;
     }
