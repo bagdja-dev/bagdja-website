@@ -8,6 +8,10 @@
 
 html {
   scroll-behavior: smooth;
+  /* Tanpa double-tap zoom di HP (pinch & auto-zoom fokus diatur viewport + DisablePinchZoom). */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {

@@ -22,7 +22,7 @@ interface TemplateRuntimePreviewProps {
    * Render di browser dari browser.js (fase 3): HTML awal & setiap draft dirender lokal — tanpa runtime dan
    * tanpa draftEndpoint. `html` diabaikan (kosong). Hasil tetap ditampilkan di iframe inert (tanpa skrip).
    */
-  clientBundle?: TemplateBrowserBundleRef;
+  renderBundle?: TemplateBrowserBundleRef;
   initialProps?: Record<string, unknown>;
 }
 
@@ -83,7 +83,7 @@ export function TemplateRuntimePreview({
   allowedOrigins,
   allowDemoImageHost = false,
   draftEndpoint,
-  clientBundle,
+  renderBundle,
   initialProps,
 }: TemplateRuntimePreviewProps) {
   const [renderedHtml, setRenderedHtml] = useState(html);
@@ -97,9 +97,9 @@ export function TemplateRuntimePreview({
   const pendingDraft = useRef<{ props: Record<string, unknown>; generation: number } | null>(null);
   const draftGeneration = useRef(0);
   const clientTemplateRef = useRef<InlineTemplate | null>(null);
-  const clientBundleUrl = clientBundle?.url ?? null;
-  const clientBundleSha256 = clientBundle?.sha256 ?? null;
-  const isClientPreview = Boolean(clientBundleUrl && clientBundleSha256);
+  const renderBundleUrl = renderBundle?.url ?? null;
+  const renderBundleSha256 = renderBundle?.sha256 ?? null;
+  const isClientPreview = Boolean(renderBundleUrl && renderBundleSha256);
 
   /** Mode client: render props → HTML di browser (sinkron setelah browser.js termuat). */
   const renderLocally = (props: Record<string, unknown>) => {
@@ -129,9 +129,9 @@ export function TemplateRuntimePreview({
 
   // Mode client: muat browser.js (SHA-256 diverifikasi, cache) lalu render props awal.
   useEffect(() => {
-    if (!clientBundleUrl || !clientBundleSha256 || !initialProps) return;
+    if (!renderBundleUrl || !renderBundleSha256 || !initialProps) return;
     let active = true;
-    loadInlineTemplate({ url: clientBundleUrl, sha256: clientBundleSha256 })
+    loadInlineTemplate({ url: renderBundleUrl, sha256: renderBundleSha256 })
       .then((template) => {
         if (!active) return;
         clientTemplateRef.current = template;
@@ -144,7 +144,7 @@ export function TemplateRuntimePreview({
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- renderLocally hanya memakai ref & setter state
-  }, [clientBundleSha256, clientBundleUrl, initialProps]);
+  }, [renderBundleSha256, renderBundleUrl, initialProps]);
 
   useEffect(() => {
     setStylesheetUrls(Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'))

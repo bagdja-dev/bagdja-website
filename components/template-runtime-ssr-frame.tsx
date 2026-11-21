@@ -25,6 +25,7 @@ import {
   loadInlineTemplate,
   markActiveShellNav,
   registerTemplateRoot,
+  reloadForFreshTemplateDocument,
   scheduleTemplateClientScript,
   startInlineBootstrap,
   templateClientScriptRan,
@@ -187,6 +188,9 @@ export function TemplateRuntimeSsrFrame({
   const [frameDocument, setFrameDocument] = useState('');
   const [frameHeight, setFrameHeight] = useState(0);
   const [notificationAnchor, setNotificationAnchor] = useState<{ left: number; top: number } | null>(null);
+  // Render langsung: lonceng dipasang DI DALAM header template (header Kumpul sticky) agar ikut menempel saat
+  // halaman di-scroll; koordinat `notificationAnchor` lalu relatif ke header itu, bukan ke root.
+  const [notificationHost, setNotificationHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Refresh lembut setelah intent: dokumen lama tetap tampil (dengan overlay) sampai dokumen baru siap.
   const [refreshing, setRefreshing] = useState(false);
@@ -206,8 +210,9 @@ export function TemplateRuntimeSsrFrame({
   const bridgeTarget = (): Window | null => (inline ? window : frameRef.current?.contentWindow ?? null);
   // Render langsung: data baru = dokumen baru (client.js template dijalankan sekali per dokumen).
   const reloadData = () => {
-    if (inline && !templateClientSupportsMount()) window.location.reload();
-    else {
+    // Reload hanya bila client.js lama (tanpa mount) benar-benar sudah jalan; selagi dimuat cukup refresh data.
+    if (inline && templateClientScriptRan() && !templateClientSupportsMount() && reloadForFreshTemplateDocument()) return;
+    {
       setRefreshing(true);
       startRefresh(() => router.refresh());
     }
@@ -224,9 +229,8 @@ export function TemplateRuntimeSsrFrame({
     if (!inline || !clientRenderUrl || !clientRenderSha256 || clientRenderProps === null) return;
     const root = inlineRootRef.current;
     if (!root) return;
-    if (templateClientScriptRan() && !templateClientSupportsMount()) {
+    if (templateClientScriptRan() && !templateClientSupportsMount() && reloadForFreshTemplateDocument()) {
       // client.js lama (tanpa mount) sudah memasang listener untuk DOM lama di dokumen ini → dokumen segar.
-      window.location.reload();
       return;
     }
     let active = true;
@@ -404,6 +408,8 @@ export function TemplateRuntimeSsrFrame({
     const handleMessage = (event: MessageEvent<unknown>) => {
       if (event.source !== frame || event.origin !== messageOrigin) return;
       if (stableIdentity.slug === 'kumpul' && isTemplateRuntimeNotificationAnchorMessage(event.data, stableIdentity)) {
+        // Render langsung: posisi dihitung langsung dari header (efek di bawah), bukan dari pesan.
+        if (inline) return;
         const anchor = event.data;
         // Iframe: koordinat relatif dokumen frame. Render langsung: koordinat halaman → relatif root.
         const rootRect = inline ? frameElement.getBoundingClientRect() : null;
@@ -489,14 +495,15 @@ export function TemplateRuntimeSsrFrame({
       messageOrigin,
       identity: stableIdentity,
       allowedActions: orderActionContext.actions,
-      onAction: async (action) => {
+      onAction: async (action, options) => {
         const confirmations: Partial<Record<TemplateRuntimeOrderAction, string>> = {
           'order.cancel': 'Pesanan ini akan dibatalkan dan tidak bisa diurungkan. Lanjutkan?',
           'order.complete': 'Dana akan langsung dicairkan ke penjual dan tidak bisa dibatalkan. Konfirmasi barang telah diterima?',
           'order.dispute': 'Dana akan ditahan sementara sampai komplain diselesaikan. Ajukan komplain?',
         };
         const confirmation = confirmations[action];
-        if (confirmation && !window.confirm(confirmation)) {
+        // Template boleh menampilkan popup konfirmasinya sendiri (data-bagdja-confirmed, divalidasi bootstrap).
+        if (confirmation && !options?.confirmed && !window.confirm(confirmation)) {
           throw new TemplateRuntimeActionError('action_cancelled', 'Aksi dibatalkan.');
         }
 
@@ -551,8 +558,7 @@ export function TemplateRuntimeSsrFrame({
           window.location.assign(checkoutUrl.href);
           return;
         }
-        if (inline) window.location.reload();
-        else router.refresh();
+        reloadData();
       },
     });
     window.addEventListener('message', handleOrderAction);
@@ -630,6 +636,48 @@ export function TemplateRuntimeSsrFrame({
     return () => window.removeEventListener('message', handleIntent);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bridgeTarget/reloadData hanya bergantung pada inline
   }, [inline, intentContext, messageOrigin, router, stableIdentity]);
+
+  // Render langsung: cari header template yang memuat merek (.kumpul-brand-copy), pasang lonceng di dalamnya.
+  // Diperbarui saat isi root diganti (render ulang) dan saat ukuran merek berubah.
+  useEffect(() => {
+    if (!inline || !inlineReady || !notificationContext?.isLoggedIn || stableIdentity.slug !== 'kumpul') return;
+    const root = inlineRootRef.current;
+    if (!root) return;
+    let brandObserver: ResizeObserver | null = null;
+    let observedBrand: HTMLElement | null = null;
+    const update = () => {
+      const brand = root.querySelector<HTMLElement>('.kumpul-brand-copy');
+      const header = brand?.closest<HTMLElement>('header') ?? null;
+      if (!brand || !header) {
+        setNotificationHost(null);
+        return;
+      }
+      // Header harus jadi containing block (sticky/relative) agar posisi absolut lonceng relatif ke header.
+      if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
+      const headerRect = header.getBoundingClientRect();
+      const brandRect = brand.getBoundingClientRect();
+      setNotificationHost(header);
+      setNotificationAnchor({
+        left: brandRect.right - headerRect.left + 12,
+        top: brandRect.top - headerRect.top + brandRect.height / 2,
+      });
+      if (observedBrand !== brand && typeof ResizeObserver === 'function') {
+        brandObserver?.disconnect();
+        brandObserver = new ResizeObserver(update);
+        brandObserver.observe(brand);
+        observedBrand = brand;
+      }
+    };
+    update();
+    const rootObserver = new MutationObserver(update);
+    rootObserver.observe(root, { childList: true });
+    window.addEventListener('resize', update);
+    return () => {
+      rootObserver.disconnect();
+      brandObserver?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [inline, inlineReady, notificationContext?.isLoggedIn, stableIdentity.slug]);
 
   // Batalkan pemeriksaan navigasi yang masih berjalan saat komponen dilepas.
   useEffect(() => () => {
@@ -745,7 +793,7 @@ export function TemplateRuntimeSsrFrame({
       <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-zinc-300 border-t-zinc-700" />
     </div>
   ) : null;
-  const notification = notificationContext?.isLoggedIn ? (
+  const notificationBell = notificationContext?.isLoggedIn ? (
     <div
       className="absolute z-50 max-[620px]:!left-auto max-[620px]:!right-3 max-[620px]:!top-3 max-[620px]:!translate-y-0"
       style={notificationAnchor
@@ -761,6 +809,9 @@ export function TemplateRuntimeSsrFrame({
       />
     </div>
   ) : null;
+  const notification = notificationBell && inline && notificationHost?.isConnected
+    ? createPortal(notificationBell, notificationHost)
+    : notificationBell;
 
   if (placement === 'bottom') {
     return (

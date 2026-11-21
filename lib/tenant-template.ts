@@ -29,7 +29,9 @@ export type TemplateSystemPage =
   /** Detail produk gathering (contractVersion 1); produk lain tetap tampilan Bagdja. */
   | 'product_detail'
   /** Halaman undangan gathering (RSVP, OTP, voting opsi, bayar kursi). */
-  | 'gathering_invitation';
+  | 'gathering_invitation'
+  /** Draft pesanan jasa: langkah praorder (isian pembeli) + penawaran sebelum checkout. */
+  | 'draft_order';
 
 type WebsiteTemplateFields = Pick<ApiWebsite, 'template' | 'template_runtime'>;
 

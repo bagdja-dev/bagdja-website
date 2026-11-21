@@ -65,7 +65,7 @@ export type FulfillmentStepFormFieldFilledBy = 'seller' | 'buyer';
 export interface FulfillmentStepFormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea' | 'select' | 'pdf' | 'archive' | 'foto' | 'video' | 'lokasi';
+  type: 'text' | 'number' | 'textarea' | 'select' | 'pdf' | 'archive' | 'foto' | 'video' | 'lokasi' | 'archive' |;
   required?: boolean;
   filled_by?: FulfillmentStepFormFieldFilledBy;
   options?: string[];
