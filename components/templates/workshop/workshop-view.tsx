@@ -63,6 +63,7 @@ import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { BlogRelatedProducts } from '../../blog-related-products';
 import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { useTemplateText } from '../shared/template-locale';
 
 export interface WorkshopViewProps {
   isPreview: boolean;
@@ -146,6 +147,7 @@ function WorkshopProductBanner({ label, imageUrl }: { label: string; imageUrl?: 
 }
 
 function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websiteSlug?: string }) {
+  const t = useTemplateText();
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {posts.map((post) => (
@@ -163,7 +165,7 @@ function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websi
             {post.publishedAtLabel && <p className="text-[10px] font-semibold uppercase text-[var(--brand-muted)]">{post.publishedAtLabel}</p>}
             <h3 className="mt-2 line-clamp-2 text-lg font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{post.title}</h3>
             {post.excerpt && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[var(--brand-muted)]">{post.excerpt}</p>}
-            <span className="mt-4 inline-block text-xs font-bold uppercase text-[var(--brand-accent)]">Baca artikel →</span>
+            <span className="mt-4 inline-block text-xs font-bold uppercase text-[var(--brand-accent)]">{t('readArticle')} →</span>
           </div>
         </a>
       ))}
@@ -172,13 +174,14 @@ function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websi
 }
 
 function WorkshopBlogCards({ title, posts, websiteSlug }: { title: string; posts: BlogPostItem[]; websiteSlug?: string }) {
+  const t = useTemplateText();
   if (posts.length === 0) return null;
   return (
     <section className="border-y py-12 sm:py-16" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mb-7 flex items-end justify-between gap-4">
           <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{title}</h2>
-          <span className="text-xs font-semibold uppercase text-[var(--brand-muted)]">{String(posts.length).padStart(2, '0')} artikel</span>
+          <span className="text-xs font-semibold uppercase text-[var(--brand-muted)]">{String(posts.length).padStart(2, '0')} {t('articles')}</span>
         </div>
         <WorkshopBlogGrid posts={posts} websiteSlug={websiteSlug} />
       </div>
@@ -211,6 +214,7 @@ function WorkshopBlogArticle({ post, websiteSlug }: { post: BlogPostItem; websit
 }
 
 function WorkshopBlogSearch({ title, posts, websiteSlug }: { title?: string; posts: BlogPostItem[]; websiteSlug?: string }) {
+  const t = useTemplateText();
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const filteredPosts = normalizedQuery
@@ -220,25 +224,26 @@ function WorkshopBlogSearch({ title, posts, websiteSlug }: { title?: string; pos
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>{title ?? 'Cari Artikel'}</h2>
+        <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>{title ?? t('searchBlogTitle')}</h2>
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Cari artikel..."
-          aria-label="Cari artikel"
+          placeholder={t('searchArticles')}
+          aria-label={t('searchArticles')}
           className="w-full border bg-[var(--brand-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--brand-accent)] sm:max-w-sm"
           style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
         />
       </div>
-      {filteredPosts.length ? <WorkshopBlogGrid posts={filteredPosts} websiteSlug={websiteSlug} /> : <p className="border-y py-8 text-sm text-[var(--brand-muted)]" style={{ borderColor: 'var(--brand-border)' }}>Tidak ada artikel yang cocok.</p>}
+      {filteredPosts.length ? <WorkshopBlogGrid posts={filteredPosts} websiteSlug={websiteSlug} /> : <p className="border-y py-8 text-sm text-[var(--brand-muted)]" style={{ borderColor: 'var(--brand-border)' }}>{t('noMatchingArticles')}</p>}
     </section>
   );
 }
 
 function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string; content: Record<string, unknown>; waHref?: string; chatHref?: string }) {
-  const subtitle = getString(content, 'subtitle') ?? 'KONSTRUKSI BAJA · WELDING · ALUMINIUM';
-  const headline = getString(content, 'headline') ?? 'Dibangun untuk bertahan.';
+  const t = useTemplateText();
+  const subtitle = getString(content, 'subtitle') ?? t('workshopSubtitle');
+  const headline = getString(content, 'headline') ?? t('workshopHeadline');
   const lede = getString(content, 'lede') ?? tagline;
   const backgroundColor = isHexColor(content.background_color) ? content.background_color : undefined;
   const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : 'var(--brand-bg)';
@@ -278,14 +283,14 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
               className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]"
               style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)' }}
             >
-              Hubungi Kami
+              {t('contactUs')}
             </a>
             <a
               href="#layanan"
               className="border-2 px-5 py-3 text-center text-sm font-bold hover:border-white"
               style={{ borderColor: subtleBorderColor, color: textColor }}
             >
-              Lihat Layanan
+              {t('seeServices')}
             </a>
           </div>
           {stats.length > 0 ? (
@@ -361,6 +366,7 @@ function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
 }
 
 function WorkshopCta({ content, cta }: { content: Record<string, unknown>; cta: CtaHref | null }) {
+  const t = useTemplateText();
   const title = getString(content, 'title');
   const subtitle = getString(content, 'subtitle');
   if (!title && !subtitle && !cta) return null;
@@ -376,7 +382,7 @@ function WorkshopCta({ content, cta }: { content: Record<string, unknown>; cta: 
             {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className="inline-flex w-full justify-center rounded-full bg-[var(--brand-accent)] px-6 py-3 text-center text-sm font-bold uppercase tracking-wide text-[var(--brand-on-accent)] md:w-auto"
           >
-            {getString(content, 'button_text')?.trim() || 'Hubungi Kami'} →
+            {getString(content, 'button_text')?.trim() || t('contactUs')} →
           </a>
         ) : null}
       </div>
@@ -397,6 +403,7 @@ function pickCategoryImage(category: CategoryItem): string | undefined {
 }
 
 function WorkshopCategories({ categories, websiteSlug, content }: { categories: CategoryItem[]; websiteSlug?: string; content: Record<string, unknown> }) {
+  const t = useTemplateText();
   if (!categories.length) return null;
   const title = getString(content, 'title');
   return (
@@ -425,7 +432,7 @@ function WorkshopCategories({ categories, websiteSlug, content }: { categories: 
                 ) : null}
                 <div className="p-5">
                   <h3 className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{category.label}</h3>
-                  <span className="mt-3 block font-mono text-xs font-normal opacity-60">LIHAT KATEGORI →</span>
+                  <span className="mt-3 block font-mono text-xs font-normal opacity-60">{t('viewCategory')}</span>
                 </div>
               </a>
             );
@@ -437,6 +444,7 @@ function WorkshopCategories({ categories, websiteSlug, content }: { categories: 
 }
 
 function WorkshopServices({ products, websiteSlug, content }: { products: CatalogItem[]; websiteSlug?: string; content: Record<string, unknown> }) {
+  const t = useTemplateText();
   const gridFilter = productGridFilter(content, 'service');
   const services = products.filter((item) => !item.parentProductId && matchesProductGridFilter(item, gridFilter));
   if (!services.length) return null;
@@ -467,7 +475,7 @@ function WorkshopServices({ products, websiteSlug, content }: { products: Catalo
                     ) : null}
                     <h3 className="mt-2 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.name}</h3>
                   </div>
-                  <span className="font-mono text-xs text-[var(--brand-accent)]">{item.priceLabel || 'KONSULTASI'}</span>
+                  <span className="font-mono text-xs text-[var(--brand-accent)]">{item.priceLabel || t('consultant')}</span>
                 </div>
                 {item.description || item.descriptionHtml ? (
                   <ProductDescription
@@ -476,7 +484,7 @@ function WorkshopServices({ products, websiteSlug, content }: { products: Catalo
                     className="mt-3 text-sm text-[var(--brand-muted)] [&_p]:mb-2 [&_p:last-child]:mb-0"
                   />
                 ) : null}
-                <span className="mt-5 block font-mono text-xs text-[var(--brand-accent)] opacity-0 transition-opacity group-hover:opacity-100">DETAIL LAYANAN →</span>
+                <span className="mt-5 block font-mono text-xs text-[var(--brand-accent)] opacity-0 transition-opacity group-hover:opacity-100">{t('serviceDetails')}</span>
               </div>
             </a>
           );
@@ -497,6 +505,7 @@ function WorkshopCategoryListing({
   products: CatalogItem[];
   websiteSlug?: string;
 }) {
+  const t = useTemplateText();
   const description = category?.description?.trim();
   const categoryImage = category ? pickCategoryImage(category) : undefined;
   const specificationEntries = Object.entries(category?.specifications ?? {}).filter(
@@ -512,7 +521,7 @@ function WorkshopCategoryListing({
         <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
           <div className="px-5 py-7 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--brand-accent)] sm:text-xs">
-              {label.toUpperCase()} • KATEGORI
+              {label.toUpperCase()} • {t('category').toUpperCase()}
             </p>
 
             <h1
@@ -523,7 +532,7 @@ function WorkshopCategoryListing({
             </h1>
 
             {!description ? (
-              <p className="mt-4 text-base text-white/75 sm:text-lg">Jasa kanopi dan atap Indonesia.</p>
+              <p className="mt-4 text-base text-white/75 sm:text-lg">{t('workshopLead')}</p>
             ) : null}
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -531,13 +540,13 @@ function WorkshopCategoryListing({
                 href={websiteSlug !== undefined ? buildProductHref(websiteSlug, label.toLowerCase().replace(/\s+/g, '-')) : '#layanan'}
                 className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-accent)] px-6 py-4 text-center text-base font-bold text-white shadow-lg shadow-[var(--brand-accent)]/30 transition-transform hover:-translate-y-0.5"
               >
-                Mulai Konsultasi
+                {t('startConsultation')}
               </a>
               <a
                 href="#layanan"
                 className="inline-flex items-center justify-center rounded-xl border border-white/35 bg-transparent px-6 py-4 text-center text-base font-bold text-white transition-colors hover:border-white/60 hover:bg-white/5"
               >
-                Lihat Layanan
+                {t('seeServices')}
               </a>
             </div>
           </div>
@@ -566,14 +575,14 @@ function WorkshopCategoryListing({
         >
           {description ? (
             <>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">DESKRIPSI</p>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">{t('description')}</p>
               <p className="text-base leading-relaxed text-[var(--brand-muted)] sm:text-lg">{description}</p>
             </>
           ) : null}
 
           {!description && specificationEntries.length > 0 ? (
             <>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">SPESIFIKASI</p>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">{t('specificationsUpper')}</p>
               <dl className="space-y-3 text-sm">
                 {specificationEntries.map(([key, value]) => (
                   <div key={key} className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: 'var(--brand-border)' }}>
@@ -587,7 +596,7 @@ function WorkshopCategoryListing({
 
           {description && specificationEntries.length > 0 ? (
             <div className="mt-8">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">SPESIFIKASI</p>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">{t('specificationsUpper')}</p>
               <dl className="space-y-3 text-sm">
                 {specificationEntries.map(([key, value]) => (
                   <div key={key} className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: 'var(--brand-border)' }}>
@@ -601,7 +610,7 @@ function WorkshopCategoryListing({
 
           {estimationEntries.length > 0 && (
             <div className="mt-8">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">ESTIMASI HARGA</p>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">{t('estimatePrice')}</p>
               <div className="space-y-2 text-sm">
                 {estimationEntries.map((entry, index) => {
                   const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
@@ -618,17 +627,17 @@ function WorkshopCategoryListing({
         </div>
 
         <div className="rounded-[1.25rem] border p-4 sm:p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(255,255,255,0.04)' }}>
-          <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">PRODUK &amp; LAYANAN</p>
+          <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--brand-accent)]">{t('productAndServices')}</p>
 
           {products.length === 0 ? (
             <div className="mt-6 flex min-h-[180px] items-center justify-center rounded-[1.2rem] border border-dashed" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-              <p className="text-sm text-[var(--brand-muted)]">Belum ada item di kategori ini.</p>
+              <p className="text-sm text-[var(--brand-muted)]">{t('noItemsInCategory')}</p>
             </div>
           ) : (
             <div className="mt-6 space-y-3">
               {products.slice(0, 4).map((item) => {
                 const imageUrl = item.images?.[0] ?? item.image;
-                const shortDescription = item.description?.trim() || 'Layanan dengan spesifikasi yang sesuai kebutuhan proyek Anda.';
+                const shortDescription = item.description?.trim() || t('serviceDescription');
 
                 return (
                   <a
@@ -656,7 +665,7 @@ function WorkshopCategoryListing({
                       </ProductDescription>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span className="text-xs font-semibold text-[var(--brand-accent)]">{item.priceLabel || 'Konsultasi'}</span>
-                        <span className="font-mono text-[10px] uppercase tracking-wide opacity-60">Detail →</span>
+                        <span className="font-mono text-[10px] uppercase tracking-wide opacity-60">{t('detail')} →</span>
                       </div>
                     </div>
                   </a>
@@ -671,6 +680,7 @@ function WorkshopCategoryListing({
 }
 
 function WorkshopProcess({ content }: { content: Record<string, unknown> }) {
+  const t = useTemplateText();
   const raw = Array.isArray(content.flow_steps)
     ? content.flow_steps
     : Array.isArray(content.preview_steps)
@@ -678,7 +688,7 @@ function WorkshopProcess({ content }: { content: Record<string, unknown> }) {
       : [];
   const steps = raw.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
   if (!steps.length) return null;
-  return <section className="bg-[var(--brand-text)] py-14 text-[var(--brand-bg)]"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} /><div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{steps.map((step, index) => <article key={index} className="border-t border-white/20 pt-4"><span className="font-mono text-sm text-[var(--brand-warning)]">{getString(step, 'number') ?? `0${index + 1}`}</span><h3 className="mt-5 font-bold">{getString(step, 'title') ?? 'Langkah proyek'}</h3><p className="mt-2 text-sm text-white/60">{getString(step, 'body')}</p></article>)}</div></div></section>;
+  return <section className="bg-[var(--brand-text)] py-14 text-[var(--brand-bg)]"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} /><div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{steps.map((step, index) => <article key={index} className="border-t border-white/20 pt-4"><span className="font-mono text-sm text-[var(--brand-warning)]">{getString(step, 'number') ?? `0${index + 1}`}</span><h3 className="mt-5 font-bold">{getString(step, 'title') ?? t('projectSteps')}</h3><p className="mt-2 text-sm text-white/60">{getString(step, 'body')}</p></article>)}</div></div></section>;
 }
 
 function WorkshopGallery({ content }: { content: Record<string, unknown> }) {
@@ -751,11 +761,13 @@ function WorkshopRichText({ content }: { content: Record<string, unknown> }) {
 }
 
 function WorkshopContact({ content, chatHref, locations }: { content: Record<string, unknown>; chatHref?: string; locations: LocationItem[] }) {
+  const t = useTemplateText();
   const location = locations.find((item) => item.isPrimary) ?? locations[0];
-  return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{chatHref ? <a href={chatHref} className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">KIRIM KEBUTUHAN PROYEK →</a> : null}</div></section>;
+  return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{chatHref ? <a href={chatHref} className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">{t('sendProjectRequirements')}</a> : null}</div></section>;
 }
 
   function WorkshopProductDetail({ item, allProducts, locations, websiteSlug, tenantSlug, websiteId, waHref, auth }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; websiteSlug?: string; tenantSlug?: string; websiteId?: string; waHref?: string; auth?: WorkshopViewProps['auth'] }) {
+    const t = useTemplateText();
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((product) => product.id === familyId || product.parentProductId === familyId);
@@ -799,7 +811,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                       <track kind="captions" />
                     </video>
                     <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                      Fullscreen
+                      {t('fullscreen')}
                     </button>
                   </div>
                 ) : (
@@ -811,18 +823,18 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                       autoRotate
                     />
                     <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                      Fullscreen
+                      {t('fullscreen')}
                     </button>
                   </div>
                 )
-              ) : <div className="flex min-h-[320px] flex-1 items-center justify-center font-mono text-sm text-[var(--brand-muted)]">NO IMAGE</div>}
+              ) : <div className="flex min-h-[320px] flex-1 items-center justify-center font-mono text-sm text-[var(--brand-muted)]">{t('noImage')}</div>}
 
               {slides.length > 1 ? (
                 <>
-                  <button type="button" onClick={() => goToSlide(selectedSlideIndex - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/80 bg-black/40 p-2 text-white shadow-lg backdrop-blur-sm" aria-label="Gambar sebelumnya">
+                  <button type="button" onClick={() => goToSlide(selectedSlideIndex - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/80 bg-black/40 p-2 text-white shadow-lg backdrop-blur-sm" aria-label={t('previousImage')}>
                     ‹
                   </button>
-                  <button type="button" onClick={() => goToSlide(selectedSlideIndex + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/80 bg-black/40 p-2 text-white shadow-lg backdrop-blur-sm" aria-label="Gambar berikutnya">
+                  <button type="button" onClick={() => goToSlide(selectedSlideIndex + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/80 bg-black/40 p-2 text-white shadow-lg backdrop-blur-sm" aria-label={t('nextImage')}>
                     ›
                   </button>
                 </>
@@ -840,7 +852,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                       borderColor: selectedSlideIndex === index ? 'var(--brand-accent)' : 'var(--brand-border)',
                       opacity: selectedSlideIndex === index ? 1 : 0.75,
                     }}
-                    aria-label={slide.type === 'video' ? 'Putar video' : slide.type === 'model' ? 'Lihat model 3D' : `Lihat gambar ${index + 1}`}
+                    aria-label={slide.type === 'video' ? t('playVideo') : slide.type === 'model' ? t('view3dModel') : `${t('viewImage')} ${index + 1}`}
                   >
                     {slide.type === 'video' ? (
                       <div className="relative">
@@ -868,7 +880,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 
           <div className="space-y-5">
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brand-accent)]">{item.category ?? 'LAYANAN WORKSHOP'}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brand-accent)]">{item.category ?? t('workshopServiceUpper')}</p>
               <h1 className="mt-3 text-3xl font-bold sm:text-5xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{item.name}</h1>
               {item.priceLabel ? <p className="mt-5 text-xl font-bold text-[var(--brand-accent)]">{item.priceLabel}</p> : null}
               {item.description || item.descriptionHtml ? (
@@ -883,53 +895,53 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
             {item.type === 'gathering' && item.gatheringMeta && (
               <div className="rounded border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-bold">Detail Gathering</h2>
-                  <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>Sebelum RSVP</span>
+                  <h2 className="text-lg font-bold">{t('detailGathering')}</h2>
+                  <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>{t('beforeRsvp')}</span>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   {item.gatheringMeta.depositAmountPerSeat != null && (
                     <div className="rounded border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">DP booking per peserta</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('bookDepositPerAttendee')}</p>
                       <p className="mt-1 font-semibold text-[var(--brand-accent)]">{formatIDR(item.gatheringMeta.depositAmountPerSeat)}</p>
-                      <p className="mt-1 text-xs text-[var(--brand-muted)]">Nominal total DP menyesuaikan jumlah peserta.</p>
+                      <p className="mt-1 text-xs text-[var(--brand-muted)]">{t('totalDepositNote')}</p>
                     </div>
                   )}
                   {item.gatheringMeta.eventDate && (
                     <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Jadwal</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('schedule')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
                     </div>
                   )}
                   {item.gatheringMeta.eventTime && (
                     <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Waktu</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('time')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
                     </div>
                   )}
                   {item.gatheringMeta.location && (
                     <div className="rounded border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Lokasi</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('location')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
                     </div>
                   )}
                   {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
                     <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Minimum</p>
-                      <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} peserta</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('minimum')}</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} {t('numberOfAttendees')}</p>
                     </div>
                   )}
                   {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
                     <div className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Maksimum</p>
-                      <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} kapasitas</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('maxCapacity')}</p>
+                      <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} {t('capacity')}</p>
                     </div>
                   )}
                 </div>
 
                 {item.gatheringMeta.optionGroups?.length ? (
                   <div className="mt-4 rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Pilihan yang tersedia</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('availableOptions')}</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
                       {item.gatheringMeta.optionGroups.map((group) => (
                         <li key={group.key}>
@@ -944,7 +956,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                                       // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
                                       <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-14 w-14 rounded object-cover" />
                                     ))}
-                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} foto</span> : null}
+                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} {t('photoCount')}</span> : null}
                                   </span>
                                 ) : null}
                               </li>
@@ -958,31 +970,31 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 
                 {item.gatheringMeta.cancellationPolicy && (
                   <div className="mt-4 rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">Kebijakan cancel & refund</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-muted)]">{t('cancellationRefundPolicy')}</p>
                     <p className="mt-1 text-sm leading-relaxed">{item.gatheringMeta.cancellationPolicy}</p>
                   </div>
                 )}
               </div>
             )}
 
-            {family.length > 1 ? <div><p className="text-xs font-bold uppercase tracking-wide">Pilihan varian</p><div className="mt-3 flex flex-wrap gap-2">{family.map((variant) => <a key={variant.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, variant.slug) : '#'} className={`border px-3 py-2 text-xs ${variant.id === item.id ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : ''}`} style={variant.id === item.id ? undefined : { borderColor: 'var(--brand-border)' }}>{variant.name}</a>)}</div></div> : null}
+            {family.length > 1 ? <div><p className="text-xs font-bold uppercase tracking-wide">{t('availableVariant')}</p><div className="mt-3 flex flex-wrap gap-2">{family.map((variant) => <a key={variant.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, variant.slug) : '#'} className={`border px-3 py-2 text-xs ${variant.id === item.id ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : ''}`} style={variant.id === item.id ? undefined : { borderColor: 'var(--brand-border)' }}>{variant.name}</a>)}</div></div> : null}
 
             {item.type !== 'gathering' && tenantSlug && internalPaymentMode && item.websiteId ? <PurchaseControls slug={tenantSlug} basePath={websiteSlug} isLoggedIn={auth?.isLoggedIn} loginHref={auth?.loginHref} websiteId={item.websiteId} product={{ id: item.id, slug: item.slug, name: item.name, price: Number(item.priceLabel.replace(/[^\d]/g, '')) || 0, quotable: item.quotable, image: item.image, stock: item.stock }} productType={item.type} locationIds={item.locationIds} locations={locations} /> : null}
             {item.type === 'gathering' ? (
               <div className="mt-4 flex w-full flex-col gap-3">
                 {websiteId ? <GatheringPlanButton websiteId={websiteId} productId={item.id} basePath={websiteSlug} loginHref={auth?.loginHref} className="flex w-full flex-1 justify-center rounded-full bg-[var(--brand-accent)] px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]">
-                  Rencanakan Gathering
+                  {t('bookingGathering')}
                 </GatheringPlanButton> : null}
-                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>Konsultasi via WhatsApp</a> : null}
+                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}>{t('consultationViaWhatsApp')}</a> : null}
                 {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
-                  Tanya Produk
+                  {t('askProduct')}
                 </ChatReferenceButton> : null}
               </div>
             ) : (
               <>
-                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>Konsultasi via WhatsApp</a> : null}
+                {waHref ? <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>{t('consultationViaWhatsApp')}</a> : null}
                 {websiteId ? <ChatReferenceButton websiteId={websiteId} basePath={websiteSlug} loginHref={auth?.loginHref} productId={item.id} reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }} className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold" style={{}}>
-                  Tanya Produk
+                  {t('askProduct')}
                 </ChatReferenceButton> : null}
               </>
             )}
@@ -992,16 +1004,16 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
         <div className="mt-10 grid gap-6 lg:grid-cols-[1.5fr_0.9fr]">
           <div className="space-y-6">
             <div className="rounded border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-              <h2 className="mb-4 text-lg font-bold">Detail Produk</h2>
+              <h2 className="mb-4 text-lg font-bold">{t('detailProduct')}</h2>
               {item.detail ? (
                 <div className="text-sm leading-relaxed text-[var(--brand-muted)] [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-3" dangerouslySetInnerHTML={{ __html: item.detail }} />
               ) : (
-                <p className="text-sm text-[var(--brand-muted)]">Belum ada detail produk.</p>
+                <p className="text-sm text-[var(--brand-muted)]">{t('noProductDetails')}</p>
               )}
 
               {specificationEntries.length > 0 ? (
                 <div className="mt-6">
-                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">Spesifikasi</h3>
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">{t('specifications')}</h3>
                   <dl className="grid gap-3 sm:grid-cols-2">
                     {specificationEntries.map(([key, value]) => (
                       <div key={key} className="rounded border p-3" style={{ borderColor: 'var(--brand-border)' }}>
@@ -1016,7 +1028,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 
             {estimationEntries.length > 0 ? (
               <div className="rounded border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-                <h2 className="mb-4 text-lg font-bold">Estimasi Harga</h2>
+                <h2 className="mb-4 text-lg font-bold">{t('priceEstimate')}</h2>
                 <div className="space-y-2">
                   {estimationEntries.map((entry, index) => {
                     const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
@@ -1034,7 +1046,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 
           {family.length > 1 ? (
             <div className="rounded border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
-              <h2 className="mb-4 text-lg font-bold">List Produk</h2>
+              <h2 className="mb-4 text-lg font-bold">{t('listProducts')}</h2>
               <div className="space-y-3">
                 {family.map((variant) => (
                   <a
@@ -1058,7 +1070,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setIsPreviewOpen(false)}>
           <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
             <button type="button" onClick={() => setIsPreviewOpen(false)} className="absolute -top-10 right-0 rounded-full border border-white/80 bg-black/40 px-3 py-1 text-sm text-white">
-              Tutup
+              {t('close')}
             </button>
             {activeSlide.type === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1081,7 +1093,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
           </div>
         </div>
       ) : null}
-      {related.length ? <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title="Layanan lainnya" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{related.map((product) => <a key={product.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, product.slug) : '#'} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}><h3 className="font-bold">{product.name}</h3><p className="mt-2 text-xs text-[var(--brand-muted)]">{product.priceLabel || 'KONSULTASI'}</p></a>)}</div></div></section> : null}
+      {related.length ? <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title={t('servicesElsewhere')} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{related.map((product) => <a key={product.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, product.slug) : '#'} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}><h3 className="font-bold">{product.name}</h3><p className="mt-2 text-xs text-[var(--brand-muted)]">{product.priceLabel || t('consultant')}</p></a>)}</div></div></section> : null}
     </>
   );
 }
@@ -1106,8 +1118,9 @@ export function WorkshopView({
   portfolioClients = [],
   auth,
 }: WorkshopViewProps) {
-  const name = profile.name?.trim() || 'Workshop Anda';
-  const tagline = profile.tagline?.trim() || 'Solusi konstruksi dan fabrikasi custom.';
+  const t = useTemplateText();
+  const name = profile.name?.trim() || t('workshopName');
+  const tagline = profile.tagline?.trim() || t('workshopTagline');
   const resolved = resolveTheme(templateTheme, websiteTheme);
   const cssVars = themeToCssVariables(resolved);
   const fontsUrl = getGoogleFontsUrl(resolved.typography);
@@ -1116,7 +1129,7 @@ export function WorkshopView({
   const productPageTitle = resolvePageHeadingLabel({
     productName: isCatalogItem(productDetailItem) ? productDetailItem.name : undefined,
     platformName: name,
-    fallbackTitle: 'Produk',
+    fallbackTitle: t('products'),
   });
   const utilityPage = sections.some((section) => ['cart', 'checkout', 'orders', 'profile', 'order_detail', 'chat'].includes(section.type));
   const isCategoryListingPage = sections.some((section) => section.type === 'category_listing');
@@ -1162,7 +1175,7 @@ export function WorkshopView({
           websiteId={websiteId ?? ''}
           cartHref={auth?.cartHref}
           chatHref={auth?.chatHref}
-          cartLabel="Pesanan"
+          cartLabel={t('cartOrders')}
         />
         {isCatalogItem(productDetailItem) ? (
           <>
@@ -1195,13 +1208,13 @@ export function WorkshopView({
             case 'text_block': return <WorkshopTextBlock key={key} content={section.content} />;
             case 'rich_text': return <WorkshopRichText key={key} content={section.content} />;
             case 'blog_list': {
-              const title = getString(section.content, 'title') ?? 'Artikel Terbaru';
+              const title = getString(section.content, 'title') ?? t('latestArticles');
               const limit = Number(section.content.limit);
               const posts = Number.isFinite(limit) && limit > 0 ? blogPosts.slice(0, limit) : blogPosts;
               return <WorkshopBlogCards key={key} title={title} posts={posts} websiteSlug={websiteSlug} />;
             }
             case 'blog_collection': {
-              const title = getString(section.content, 'title') ?? 'Artikel Pilihan';
+              const title = getString(section.content, 'title') ?? t('featuredArticles');
               const postIds = Array.isArray(section.content.post_ids)
                 ? (section.content.post_ids as unknown[]).filter((id): id is string => typeof id === 'string')
                 : [];

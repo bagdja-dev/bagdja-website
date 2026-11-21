@@ -57,6 +57,7 @@ import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { useTemplateText } from '../shared/template-locale';
 
 export interface BarberClassicProfile {
   name?: string;
@@ -173,6 +174,7 @@ function CategoryTile({
   className?: string;
   href: string;
 }) {
+  const t = useTemplateText();
   return (
     <a
       href={href}
@@ -195,7 +197,7 @@ function CategoryTile({
         >
           {category}
         </p>
-        {featured && <p className="mt-1 text-sm text-white/70">{entry.count} item</p>}
+        {featured && <p className="mt-1 text-sm text-white/70">{entry.count} {t('itemCount')}</p>}
       </div>
     </a>
   );
@@ -306,6 +308,7 @@ function CategoryGridSection({
 }
 
 function LocationCard({ location }: { location: LocationItem }) {
+  const t = useTemplateText();
   const waHref = buildWhatsAppHref(location.whatsapp);
   return (
     <div
@@ -319,7 +322,7 @@ function LocationCard({ location }: { location: LocationItem }) {
             className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
           >
-            Utama
+            {t('primaryLocation')}
           </span>
         )}
       </p>
@@ -355,7 +358,7 @@ function LocationCard({ location }: { location: LocationItem }) {
             className="underline"
             style={{ color: 'var(--brand-accent-muted)' }}
           >
-            Lihat Peta
+            {t('browseMap')}
           </a>
         )}
       </div>
@@ -511,6 +514,7 @@ function AboutSection({
   imageUrl?: string;
   imageAlt?: string;
 }) {
+  const t = useTemplateText();
   if (!body.trim() && !imageUrl) return null;
   return (
     <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
@@ -518,7 +522,7 @@ function AboutSection({
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || 'Tentang Kami'} className="h-full w-full object-cover" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || t('aboutUs')} className="h-full w-full object-cover" loading="lazy" />
           </div>
         )}
         <div>
@@ -605,6 +609,7 @@ function CtaSection({
   buttonText?: string;
   cta: CtaHref | null;
 }) {
+  const t = useTemplateText();
   if (!title && !subtitle && !cta) return null;
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6">
@@ -628,7 +633,7 @@ function CtaSection({
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
         >
-          {buttonText?.trim() || 'Hubungi Kami'}
+          {buttonText?.trim() || t('contactUs')}
         </a>
       )}
     </section>
@@ -825,6 +830,7 @@ function ProductDetailSection({
   websiteId?: string;
   loginHref?: string;
 }) {
+  const t = useTemplateText();
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
   const familyId = item.parentProductId ?? item.id;
   const family = allProducts.filter((p) => p.id === familyId || p.parentProductId === familyId);
@@ -868,56 +874,56 @@ function ProductDetailSection({
         <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
-              Detail Gathering
+              {t('detailGathering')}
             </h2>
             <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-              Sebelum RSVP
+              {t('beforeRsvp')}
             </span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {item.gatheringMeta.depositAmountPerSeat != null && (
               <div className="rounded-xl border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>DP booking per peserta</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('bookDepositPerAttendee')}</p>
                 <p className="mt-1 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(item.gatheringMeta.depositAmountPerSeat)}</p>
-                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Nominal total DP menyesuaikan jumlah peserta.</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{t('totalDepositNote')}</p>
               </div>
             )}
             {item.gatheringMeta.eventDate && (
               <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Jadwal</p>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('schedule')}</p>
                 <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
               </div>
             )}
             {item.gatheringMeta.eventTime && (
               <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Waktu</p>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('time')}</p>
                 <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
               </div>
             )}
             {item.gatheringMeta.location && (
               <div className="rounded-xl border p-3 sm:col-span-2" style={{ borderColor: 'var(--brand-border)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Lokasi</p>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('location')}</p>
                 <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
               </div>
             )}
             {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
               <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Minimum</p>
-                <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} peserta</p>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('minimum')}</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees} {t('numberOfAttendees')}</p>
               </div>
             )}
             {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
               <div className="rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Maksimum</p>
-                <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} kapasitas</p>
+                <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('maxCapacity')}</p>
+                <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees} {t('capacity')}</p>
               </div>
             )}
           </div>
 
           {item.gatheringMeta.optionGroups?.length ? (
             <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Pilihan yang tersedia</p>
+              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('availableOptions')}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
                       {item.gatheringMeta.optionGroups.map((group) => (
                         <li key={group.key}>
@@ -932,7 +938,7 @@ function ProductDetailSection({
                                       // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
                                       <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-14 w-14 rounded object-cover" />
                                     ))}
-                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} foto</span> : null}
+                                    {option.images.length > 3 ? <span className="self-center text-xs text-[var(--brand-muted)]">+{option.images.length - 3} {t('photoCount')}</span> : null}
                                   </span>
                                 ) : null}
                               </li>
@@ -946,7 +952,7 @@ function ProductDetailSection({
 
           {item.gatheringMeta.cancellationPolicy && (
             <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--brand-border)' }}>
-              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>Kebijakan cancel & refund</p>
+              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--brand-muted)' }}>{t('cancellationRefundPolicy')}</p>
               <p className="mt-1 text-sm leading-relaxed">{item.gatheringMeta.cancellationPolicy}</p>
             </div>
           )}
@@ -958,7 +964,7 @@ function ProductDetailSection({
       {specificationEntries.length > 0 && (
         <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
           <h2 className="mb-4 text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
-            Spesifikasi
+            {t('specifications')}
           </h2>
           <dl className="grid gap-3 sm:grid-cols-2">
             {specificationEntries.map(([key, value]) => (
@@ -976,7 +982,7 @@ function ProductDetailSection({
       {estimationEntries.length > 0 && (
         <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
           <h2 className="mb-4 text-lg font-semibold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
-            Estimasi Harga
+            {t('priceEstimate')}
           </h2>
           <div className="space-y-2">
             {estimationEntries.map((entry, index) => {
@@ -1009,7 +1015,7 @@ function ProductDetailSection({
               loginHref={loginHref}
               className="inline-flex rounded-full bg-[var(--brand-accent)] px-6 py-3 text-sm font-medium text-[var(--brand-on-accent)] transition-transform hover:scale-105 active:scale-95"
             >
-              Rencanakan Gathering
+              {t('bookingGathering')}
             </GatheringPlanButton>
           )}
           {waHref && (
@@ -1020,7 +1026,7 @@ function ProductDetailSection({
               className="inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
               style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
             >
-              Konsultasi via WhatsApp
+              {t('consultationViaWhatsApp')}
             </a>
           )}
           {websiteId && (
@@ -1032,7 +1038,7 @@ function ProductDetailSection({
               reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
               className="inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
             >
-              Tanya Produk
+              {t('askProduct')}
             </ChatReferenceButton>
           )}
         </div>
@@ -1050,7 +1056,7 @@ function ProductDetailSection({
                   color: 'var(--brand-on-accent)',
                 }}
               >
-                Booking via WhatsApp
+                {t('bookViaWhatsApp')}
               </a>
             </div>
           )}
@@ -1063,7 +1069,7 @@ function ProductDetailSection({
               reference={{ type: 'product', id: item.id, title: item.name, imageUrl: item.image ?? item.images?.[0], meta: item.priceLabel, href: websiteSlug !== undefined ? buildChatReferenceHref('product', websiteSlug, { productSlug: item.slug }) : undefined }}
               className="mt-3 inline-flex rounded-full border px-6 py-3 text-sm font-medium transition-transform hover:scale-105 active:scale-95"
             >
-              Tanya Produk
+              {t('askProduct')}
             </ChatReferenceButton>
           )}
         </>
@@ -1092,10 +1098,11 @@ export function BarberClassicView({
   portfolioClients = [],
   auth,
 }: BarberClassicViewProps) {
-  const title = profile.name?.trim() || 'Nama Barbershop Anda';
+  const t = useTemplateText();
+  const title = profile.name?.trim() || t('defaultBarbershopName');
   const tagline =
     profile.tagline?.trim() ||
-    'Barbershop terpercaya dengan layanan potong rambut, cukur, dan grooming premium.';
+    t('defaultBarbershopTagline');
   const waHref = buildWhatsAppHref(profile.whatsapp);
   const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
 
@@ -1116,17 +1123,17 @@ export function BarberClassicView({
   const profileSection = sections.find((s) => s.type === 'profile');
   const chatSection = sections.find((s) => s.type === 'chat');
   const pageHeroLabel = checkoutSection
-    ? 'Checkout'
+    ? t('cartCheckout')
     : cartSection
-      ? 'Keranjang'
+      ? t('cart')
       : ordersSection
-        ? 'Daftar Transaksi'
+        ? t('myTransactions')
         : orderDetailSection
-          ? 'Status Pesanan'
+          ? t('resultsOrderStatus')
           : profileSection
-            ? 'Profil Saya'
+            ? t('accountProfile')
             : chatSection
-              ? 'Chat Pelanggan'
+              ? t('customerChat')
               : undefined;
   const categoryListingLabel =
     typeof categoryListingContent?.category_label === 'string' ? categoryListingContent.category_label : undefined;
@@ -1219,7 +1226,7 @@ export function BarberClassicView({
                   color: 'var(--brand-on-accent)',
                 }}
               >
-                Hubungi Kami
+                {t('contactUs')}
               </a>
             </div>
           )}
@@ -1254,7 +1261,7 @@ export function BarberClassicView({
               case 'services_grid':
               case 'products_grid': {
                 const gridFilter = productGridFilter(section.content);
-                const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
+                const defaultTitle = section.type === 'services_grid' ? t('services') : t('productsByCategory');
                 const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
                 return (
                   <CatalogGridSection
@@ -1294,7 +1301,7 @@ export function BarberClassicView({
                   : undefined;
                 const items = locations.filter((l) => !filterTypes || filterTypes.includes(l.type));
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Kunjungi Kami';
+                  typeof section.content.title === 'string' ? section.content.title : t('visitUs');
                 return <LocationsSection key={key} title={heading} items={items} />;
               }
               case 'faq_list': {
@@ -1304,7 +1311,7 @@ export function BarberClassicView({
                     : undefined;
                 const items = faqs.filter((f) => !category || f.category === category);
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Pertanyaan Umum';
+                  typeof section.content.title === 'string' ? section.content.title : t('faqs');
                 return <FaqSection key={key} title={heading} items={items} />;
               }
               case 'rich_text': {
@@ -1357,17 +1364,17 @@ export function BarberClassicView({
               }
               case 'testimonial': {
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Apa Kata Mereka';
+                  typeof section.content.title === 'string' ? section.content.title : t('testimonials');
                 return <TestimonialSection key={key} title={heading} />;
               }
               case 'contact': {
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Hubungi Kami';
+                  typeof section.content.title === 'string' ? section.content.title : t('contactUs');
                 return <ContactSection key={key} title={heading} profile={profile} />;
               }
               case 'blog_list': {
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Artikel Terbaru';
+                  typeof section.content.title === 'string' ? section.content.title : t('latestArticles');
                 const limitRaw = section.content.limit;
                 const limit =
                   typeof limitRaw === 'string' && limitRaw.trim() ? parseInt(limitRaw, 10) : undefined;
@@ -1383,7 +1390,7 @@ export function BarberClassicView({
               }
               case 'blog_collection': {
                 const heading =
-                  typeof section.content.title === 'string' ? section.content.title : 'Artikel Pilihan';
+                  typeof section.content.title === 'string' ? section.content.title : t('featuredArticles');
                 const postIds = Array.isArray(section.content.post_ids)
                   ? (section.content.post_ids as unknown[]).filter((id): id is string => typeof id === 'string')
                   : [];
@@ -1490,7 +1497,7 @@ export function BarberClassicView({
                 color: 'var(--brand-on-accent)',
               }}
             >
-              Hubungi Kami
+              {t('contactUs')}
             </a>
           </div>
         )}

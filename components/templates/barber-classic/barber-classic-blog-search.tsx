@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { buildBlogPostHref, type BlogPostItem } from '../../../lib/template-data';
+import { useTemplateText } from '../shared/template-locale';
 
 function SearchIcon() {
   return (
@@ -33,9 +34,10 @@ export function BarberClassicBlogSearch({
   posts,
   websiteSlug,
 }: BarberClassicBlogSearchProps) {
+  const t = useTemplateText();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const effectivePlaceholder = placeholder?.trim() || 'Cari artikel...';
+  const effectivePlaceholder = placeholder?.trim() || t('searchArticles');
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -72,7 +74,7 @@ export function BarberClassicBlogSearch({
 
       {open && (
         <div className="fixed inset-0 z-40 flex items-start justify-center px-4 pb-4 pt-20 sm:pt-24">
-          <button type="button" className="absolute inset-0 bg-black/60" aria-label="Tutup pencarian" onClick={close} />
+          <button type="button" className="absolute inset-0 bg-black/60" aria-label={t('closeSearch')} onClick={close} />
           <div
             className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-2xl shadow-2xl"
             style={{ backgroundColor: 'var(--brand-surface)' }}
@@ -88,7 +90,7 @@ export function BarberClassicBlogSearch({
                 className="flex-1 bg-transparent text-sm outline-none"
                 style={{ color: 'var(--brand-text)' }}
               />
-              <button type="button" onClick={close} aria-label="Tutup" style={{ color: 'var(--brand-muted)' }}>
+              <button type="button" onClick={close} aria-label={t('close')} style={{ color: 'var(--brand-muted)' }}>
                 <CloseIcon />
               </button>
             </div>
@@ -96,11 +98,11 @@ export function BarberClassicBlogSearch({
             <div className="max-h-80 overflow-y-auto p-2">
               {query.trim() === '' ? (
                 <p className="p-4 text-center text-sm" style={{ color: 'var(--brand-muted)' }}>
-                  Ketik untuk mencari artikel…
+                  {t('searchHint')}
                 </p>
               ) : results.length === 0 ? (
                 <p className="p-4 text-center text-sm" style={{ color: 'var(--brand-muted)' }}>
-                  Tidak ada artikel ditemukan.
+                  {t('noArticlesFound')}
                 </p>
               ) : (
                 results.map((post) => (

@@ -9,6 +9,7 @@ import { CartBadge } from '../../cart-badge';
 import { NotificationBell } from '../../notification-bell';
 import { TagihanBadge } from '../../tagihan-badge';
 import { CalendarBadge } from '../../calendar-badge';
+import { useTemplateText } from '../shared/template-locale';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -61,8 +62,10 @@ export function StoreClassicHeader({
   cartHref,
   chatHref,
   websiteId,
-  cartLabel = 'Daftar Pesanan',
+  cartLabel,
 }: StoreClassicHeaderProps) {
+  const t = useTemplateText();
+  const resolvedCartLabel = cartLabel ?? t('myOrders');
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -115,7 +118,7 @@ export function StoreClassicHeader({
             type="button"
             onClick={openDrawer}
             className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80 sm:hidden"
-            aria-label="Buka menu"
+            aria-label={t('openMenu')}
           >
             <HamburgerIcon />
             {brand}
@@ -140,7 +143,7 @@ export function StoreClassicHeader({
 
         <div className="flex shrink-0 items-center gap-3">
           {cartHref && auth?.isLoggedIn && (
-            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} label={cartLabel} />
+            <CartBadge href={cartHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} label={resolvedCartLabel} />
           )}
           {auth?.tagihanHref && auth?.isLoggedIn && (
             <TagihanBadge href={auth.tagihanHref} isLoggedIn={auth.isLoggedIn} websiteId={websiteId} />
@@ -159,7 +162,7 @@ export function StoreClassicHeader({
               className="hidden rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 sm:inline-flex"
               style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
-              Hubungi Kami
+              {t('contactUs')}
             </a>
           )}
           {auth &&
@@ -201,12 +204,12 @@ export function StoreClassicHeader({
                     style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
                   >
                     {[
-                      { href: auth.cartHref, label: cartLabel },
-                      { href: auth.ordersHref, label: 'Transaction' },
-                      { href: auth.tagihanHref, label: 'Tagihan' },
-                      { href: auth.calendarHref, label: 'Kalender' },
-                      { href: auth.chatHref, label: 'Inbox' },
-                      { href: auth.profileHref, label: 'Profile' },
+                      { href: auth.cartHref, label: resolvedCartLabel },
+                      { href: auth.ordersHref, label: t('transactions') },
+                      { href: auth.tagihanHref, label: t('bills') },
+                      { href: auth.calendarHref, label: t('calendar') },
+                      { href: auth.chatHref, label: t('inbox') },
+                      { href: auth.profileHref, label: t('profile') },
                     ].map(
                       (item) =>
                         item.href && (
@@ -230,7 +233,7 @@ export function StoreClassicHeader({
                         className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
                         style={{ color: 'var(--brand-text)' }}
                       >
-                        Logout
+                        {t('logout')}
                       </a>
                     )}
                   </div>
@@ -243,7 +246,7 @@ export function StoreClassicHeader({
                   className="rounded-full px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105"
                   style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                 >
-                  Masuk
+                  {t('login')}
                 </a>
               )
             ))}
@@ -260,7 +263,7 @@ export function StoreClassicHeader({
             className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${
               drawerVisible ? 'opacity-100' : 'opacity-0'
             }`}
-            aria-label="Tutup menu"
+            aria-label={t('closeMenu')}
             onClick={closeDrawer}
           />
           <div
@@ -275,7 +278,7 @@ export function StoreClassicHeader({
                 className="rounded-lg p-1 transition-colors hover:opacity-80"
                 style={{ color: 'var(--brand-text)' }}
                 onClick={closeDrawer}
-                aria-label="Tutup menu"
+                aria-label={t('closeMenu')}
               >
                 <CloseIcon />
               </button>
@@ -303,7 +306,7 @@ export function StoreClassicHeader({
                 className="mx-6 mb-4 rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
                 style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
               >
-                Hubungi Kami
+                {t('contactUs')}
               </a>
             )}
 

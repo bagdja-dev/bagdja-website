@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 
 import { getWebsiteBySlug } from '../../lib/api-client';
+import { TemplateLocaleProvider, resolveTemplateLocale } from '../../components/templates/shared/template-locale';
 import { getAuthViewState } from '../../lib/auth-view';
 import { toNavPage } from '../../lib/template-data';
 import { renderTemplateShell } from '../../lib/template-runtime-route';
@@ -41,11 +43,16 @@ export async function generateMetadata({ params }: TenantLayoutProps): Promise<M
  * dipasang ulang saat berpindah halaman, jadi hanya isi di outlet yang berganti (tanpa glitch).
  */
 export default async function TenantLayout({ params, children }: TenantLayoutProps) {
+  const locale = resolveTemplateLocale((await headers()).get('accept-language'));
   const publicWebsite = await getWebsiteBySlug(params.website_slug);
-  if (!publicWebsite?.template_runtime && !publicWebsite?.template_trial_active) return children;
+  if (!publicWebsite?.template_runtime && !publicWebsite?.template_trial_active) {
+    return <TemplateLocaleProvider locale={locale}>{children}</TemplateLocaleProvider>;
+  }
   const website = await applyViewerTemplateTrial(publicWebsite);
   const runtime = tenantRuntime(website);
-  if (!runtime?.pageOverrides.includes('shell')) return children;
+  if (!runtime?.pageOverrides.includes('shell')) {
+    return <TemplateLocaleProvider locale={locale}>{children}</TemplateLocaleProvider>;
+  }
 
   const linkBase = resolveTenantLinkBase(website.slug);
   // Shell tetap terpasang lintas halaman → login/logout kembali ke beranda tenant (bukan halaman saat shell dibuat).
@@ -78,5 +85,5 @@ export default async function TenantLayout({ params, children }: TenantLayoutPro
     },
     children,
   });
-  return shell ?? children;
+  return <TemplateLocaleProvider locale={locale}>{shell ?? children}</TemplateLocaleProvider>;
 }

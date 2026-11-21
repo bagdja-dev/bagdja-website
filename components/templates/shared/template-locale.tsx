@@ -1,0 +1,201 @@
+'use client';
+
+import { createContext, useCallback, useContext, type ReactNode } from 'react';
+
+const TEMPLATE_COPY = {
+  aboutCategory: { id: 'Tentang kategori', en: 'About this category' },
+  all: { id: 'Semua', en: 'All' },
+  availableOptions: { id: 'Pilihan yang tersedia', en: 'Available options' },
+  backToCart: { id: 'Kembali ke keranjang', en: 'Back to cart' },
+  bookViaWhatsApp: { id: 'Booking via WhatsApp', en: 'Book via WhatsApp' },
+  browseMap: { id: 'Lihat Peta', en: 'View map' },
+  calendar: { id: 'Kalender', en: 'Calendar' },
+  cart: { id: 'Keranjang', en: 'Cart' },
+  category: { id: 'Kategori', en: 'Category' },
+  categoryFilter: { id: 'Filter kategori portofolio', en: 'Filter portfolio categories' },
+  close: { id: 'Tutup', en: 'Close' },
+  closePreview: { id: 'Tutup preview', en: 'Close preview' },
+  closeSearch: { id: 'Tutup pencarian', en: 'Close search' },
+  client: { id: 'Klien', en: 'Client' },
+  consultation: { id: 'Konsultasi', en: 'Consultation' },
+  consultationViaWhatsApp: { id: 'Konsultasi via WhatsApp', en: 'Consult via WhatsApp' },
+  contactUs: { id: 'Hubungi Kami', en: 'Contact Us' },
+  customerChat: { id: 'Chat Pelanggan', en: 'Customer Chat' },
+  depositPerAttendee: { id: 'DP booking per peserta', en: 'Booking deposit per attendee' },
+  depositTotalNote: { id: 'Nominal total DP menyesuaikan jumlah peserta.', en: 'The total deposit depends on the number of attendees.' },
+  bookDepositPerAttendee: { id: 'DP booking per peserta', en: 'Booking deposit per attendee' },
+  minAttendees: { id: 'Minimum peserta', en: 'Minimum attendees' },
+  maxAttendeesLabel: { id: 'Maksimum peserta', en: 'Maximum attendees' },
+  totalDepositNote: { id: 'Nominal total DP menyesuaikan jumlah peserta.', en: 'Total deposit depends on the number of attendees.' },
+  detail: { id: 'Detail', en: 'Details' },
+  detailGathering: { id: 'Detail Gathering', en: 'Gathering Details' },
+  detailProduct: { id: 'Detail Produk', en: 'Product Details' },
+  estimate: { id: 'Estimasi', en: 'Estimate' },
+  faqs: { id: 'Pertanyaan Umum', en: 'Frequently Asked Questions' },
+  featuredArticles: { id: 'Artikel Pilihan', en: 'Featured Articles' },
+  featuredProjects: { id: 'Proyek Pilihan', en: 'Featured Projects' },
+  productsElsewhere: { id: 'Produk Lainnya', en: 'More Products' },
+  fullscreen: { id: 'Layar penuh', en: 'Fullscreen' },
+  enlargeImage: { id: 'Perbesar gambar', en: 'Enlarge image' },
+  previousSlide: { id: 'Slide sebelumnya', en: 'Previous slide' },
+  nextSlide: { id: 'Slide berikutnya', en: 'Next slide' },
+  goToSlide: { id: 'Ke slide', en: 'Go to slide' },
+  home: { id: 'Beranda', en: 'Home' },
+  inbox: { id: 'Inbox', en: 'Inbox' },
+  login: { id: 'Masuk', en: 'Sign in' },
+  logout: { id: 'Keluar', en: 'Sign out' },
+  bills: { id: 'Tagihan', en: 'Bills' },
+  accountProfile: { id: 'Profil Saya', en: 'My Profile' },
+  articles: { id: 'artikel', en: 'articles' },
+  myOrders: { id: 'Daftar Pesanan', en: 'My Orders' },
+  myTransactions: { id: 'Daftar Transaksi', en: 'My Transactions' },
+  latestArticles: { id: 'Artikel Terbaru', en: 'Latest Articles' },
+  latestTransactions: { id: 'Daftar Transaksi', en: 'Transactions' },
+  latestOrders: { id: 'Daftar Pesanan', en: 'Orders' },
+  listProducts: { id: 'List Produk', en: 'Product List' },
+  location: { id: 'Lokasi', en: 'Location' },
+  maxCapacity: { id: 'Maksimum', en: 'Maximum' },
+  minimum: { id: 'Minimum', en: 'Minimum' },
+  noArticlesFound: { id: 'Tidak ada artikel ditemukan.', en: 'No articles found.' },
+  noMatchingArticles: { id: 'Tidak ada artikel yang cocok.', en: 'No matching articles.' },
+  noMatchingClients: {
+    id: 'Belum ada klien publik yang cocok. Aktifkan status Publik pada data Partner, lalu pastikan kategori yang dipilih juga publik dan aktif.',
+    en: 'No matching public clients yet. Enable Public status for the partner, and make sure the selected category is also public and active.',
+  },
+  noProductsInCategory: { id: 'Belum ada produk di kategori ini.', en: 'There are no products in this category yet.' },
+  noServicesInCategory: { id: 'Belum ada item di kategori ini.', en: 'There are no items in this category yet.' },
+  numberOfAttendees: { id: 'peserta', en: 'attendees' },
+  openMenu: { id: 'Buka menu', en: 'Open menu' },
+  primaryLocation: { id: 'Utama', en: 'Primary' },
+  photoCount: { id: 'foto', en: 'photos' },
+  playVideo: { id: 'Putar video', en: 'Play video' },
+  profile: { id: 'Profil', en: 'Profile' },
+  projectSteps: { id: 'Langkah proyek', en: 'Project steps' },
+  products: { id: 'Produk', en: 'Products' },
+  product: { id: 'Produk', en: 'Product' },
+  productsByCategory: { id: 'Produk Kami', en: 'Our Products' },
+  quantity: { id: 'Jumlah', en: 'Quantity' },
+  readArticle: { id: 'Baca artikel', en: 'Read article' },
+  cancellationPolicy: { id: 'Kebijakan pembatalan', en: 'Cancellation policy' },
+  cancellationRefundPolicy: { id: 'Kebijakan cancel & refund', en: 'Cancellation and refund policy' },
+  available: { id: 'Ketersediaan', en: 'Availability' },
+  benefits: { id: 'Benefit', en: 'Benefits' },
+  optionDetails: { id: 'Detail Option', en: 'Option Details' },
+  optionGroupDescription: { id: 'Kelompok pilihan yang tersedia untuk gathering ini.', en: 'Options available for this gathering.' },
+  noProductDetails: { id: 'Belum ada detail produk.', en: 'No product details yet.' },
+  priceEstimate: { id: 'Estimasi Harga', en: 'Price Estimate' },
+  categoryChoices: { id: 'Kategori Pilihan', en: 'Featured Categories' },
+  testimonials: { id: 'Apa Kata Mereka', en: 'Testimonials' },
+  enterArticleSearch: { id: 'Ketik untuk mencari artikel…', en: 'Type to search articles…' },
+  capacity: { id: 'kapasitas', en: 'capacity' },
+  beforeRsvp: { id: 'Sebelum RSVP', en: 'Before RSVP' },
+  resultsOrderStatus: { id: 'Status Pesanan', en: 'Order Status' },
+  searchArticles: { id: 'Cari artikel...', en: 'Search articles...' },
+  searchBlogTitle: { id: 'Cari Artikel', en: 'Search Articles' },
+  schedule: { id: 'Jadwal', en: 'Schedule' },
+  time: { id: 'Waktu', en: 'Time' },
+  searchHint: { id: 'Ketik untuk mencari artikel…', en: 'Type to search articles…' },
+  seeServices: { id: 'Lihat Layanan', en: 'View Services' },
+  viewCategory: { id: 'LIHAT KATEGORI →', en: 'VIEW CATEGORY →' },
+  serviceDetails: { id: 'DETAIL LAYANAN →', en: 'SERVICE DETAILS →' },
+  showAll: { id: 'LIHAT SEMUA', en: 'VIEW ALL' },
+  consultant: { id: 'KONSULTASI', en: 'CONSULTATION' },
+  description: { id: 'DESKRIPSI', en: 'DESCRIPTION' },
+  estimatePrice: { id: 'ESTIMASI HARGA', en: 'PRICE ESTIMATE' },
+  itemCount: { id: 'item', en: 'items' },
+  productCount: { id: 'produk', en: 'products' },
+  noImage: { id: 'Gambar tidak tersedia', en: 'No image available' },
+  sendProjectRequirements: { id: 'KIRIM KEBUTUHAN PROYEK →', en: 'SEND YOUR PROJECT REQUIREMENTS →' },
+  orderViaWhatsApp: { id: 'Pesan via WhatsApp', en: 'Order via WhatsApp' },
+  specificationsUpper: { id: 'SPESIFIKASI', en: 'SPECIFICATIONS' },
+  workshopServiceUpper: { id: 'LAYANAN WORKSHOP', en: 'WORKSHOP SERVICE' },
+  productAndServices: { id: 'PRODUK & LAYANAN', en: 'PRODUCTS & SERVICES' },
+  noItemsInCategory: { id: 'Belum ada item di kategori ini.', en: 'There are no items in this category yet.' },
+  workshopService: { id: 'LAYANAN WORKSHOP', en: 'WORKSHOP SERVICE' },
+  nextImage: { id: 'Gambar berikutnya', en: 'Next image' },
+  previousImage: { id: 'Gambar sebelumnya', en: 'Previous image' },
+  aboutUs: { id: 'Tentang Kami', en: 'About Us' },
+  shopName: { id: 'Nama Toko Anda', en: 'Your Store Name' },
+  shopTagline: { id: 'Belanja produk pilihan dengan kualitas terbaik.', en: 'Shop a curated selection of quality products.' },
+  workshopName: { id: 'Workshop Anda', en: 'Your Workshop' },
+  workshopTagline: { id: 'Solusi konstruksi dan fabrikasi custom.', en: 'Custom construction and fabrication solutions.' },
+  workshopSubtitle: { id: 'KONSTRUKSI BAJA · WELDING · ALUMINIUM', en: 'STEEL CONSTRUCTION · WELDING · ALUMINUM' },
+  workshopHeadline: { id: 'Dibangun untuk bertahan.', en: 'Built to last.' },
+  workshopLead: { id: 'Jasa kanopi dan atap Indonesia.', en: 'Canopy and roofing services in Indonesia.' },
+  serviceDescription: { id: 'Layanan dengan spesifikasi yang sesuai kebutuhan proyek Anda.', en: 'Services tailored to your project requirements.' },
+  priceLowest: { id: 'Harga Terendah', en: 'Lowest Price' },
+  priceHighest: { id: 'Harga Tertinggi', en: 'Highest Price' },
+  nameAscending: { id: 'Nama A-Z', en: 'Name A-Z' },
+  cartCheckout: { id: 'Checkout', en: 'Checkout' },
+  services: { id: 'Layanan Kami', en: 'Our Services' },
+  servicesElsewhere: { id: 'Layanan lainnya', en: 'Other Services' },
+  sort: { id: 'Urutkan:', en: 'Sort by:' },
+  specifications: { id: 'Spesifikasi', en: 'Specifications' },
+  startConsultation: { id: 'Mulai Konsultasi', en: 'Start a Consultation' },
+  closeMenu: { id: 'Tutup menu', en: 'Close menu' },
+  transactions: { id: 'Transaksi', en: 'Transactions' },
+  trustedBy: { id: 'Dipercaya oleh', en: 'Trusted by' },
+  typeToSearchArticles: { id: 'Cari artikel...', en: 'Search articles...' },
+  view3dModel: { id: 'Lihat model 3D', en: 'View 3D model' },
+  viewImage: { id: 'Lihat gambar', en: 'View image' },
+  visitUs: { id: 'Kunjungi Kami', en: 'Visit Us' },
+  waitBeforeRsvp: { id: 'Sebelum RSVP', en: 'Before RSVP' },
+  availableVariant: { id: 'Pilihan varian', en: 'Available variants' },
+  readMore: { id: 'Lihat Detail', en: 'View Details' },
+  askProduct: { id: 'Tanya Produk', en: 'Ask about this product' },
+  bookingGathering: { id: 'Rencanakan Gathering', en: 'Plan a Gathering' },
+  bookingStatus: { id: 'Checkout', en: 'Checkout' },
+  closeSearchDialog: { id: 'Tutup', en: 'Close' },
+  loadMore: { id: 'Muat Lebih Banyak', en: 'Load More' },
+  loading: { id: 'Memuat...', en: 'Loading...' },
+  maximumCapacity: { id: 'kapasitas', en: 'capacity' },
+  minimumPrice: { id: 'Harga Terendah', en: 'Lowest Price' },
+  maximumPrice: { id: 'Harga Tertinggi', en: 'Highest Price' },
+  nameAZ: { id: 'Nama A-Z', en: 'Name A-Z' },
+  searchCategory: { id: 'Tentang kategori', en: 'About this category' },
+  noMatchingBlogArticles: { id: 'Tidak ada artikel yang cocok.', en: 'No matching articles.' },
+  portfolioClient: { id: 'Klien:', en: 'Client:' },
+  cartOrders: { id: 'Pesanan', en: 'Orders' },
+  selectAvailable: { id: 'Pilihan yang tersedia', en: 'Available options' },
+  photo: { id: 'foto', en: 'photos' },
+  defaultBarbershopName: { id: 'Nama Barbershop Anda', en: 'Your Barbershop Name' },
+  defaultBarbershopTagline: {
+    id: 'Barbershop terpercaya dengan layanan potong rambut, cukur, dan grooming premium.',
+    en: 'A trusted barbershop for premium haircuts, shaves, and grooming.',
+  },
+} as const;
+
+export type RendererLocale = 'en' | 'id';
+export type TemplateCopyKey = keyof typeof TEMPLATE_COPY;
+
+const TemplateLocaleContext = createContext<RendererLocale>('id');
+
+export function resolveTemplateLocale(acceptLanguage?: string | null): RendererLocale {
+  const candidates = (acceptLanguage ?? '')
+    .split(',')
+    .map((part, index) => {
+      const [tag, ...parameters] = part.trim().split(';');
+      const qualityParameter = parameters.find((parameter) => parameter.trim().startsWith('q='));
+      const quality = qualityParameter ? Number(qualityParameter.trim().slice(2)) : 1;
+      return { tag: tag.trim().toLowerCase().split('-')[0], quality, index };
+    })
+    .filter(({ tag, quality }) => (tag === 'en' || tag === 'id') && Number.isFinite(quality) && quality > 0)
+    .sort((a, b) => b.quality - a.quality || a.index - b.index);
+
+  return candidates[0]?.tag === 'en' ? 'en' : 'id';
+}
+
+export function TemplateLocaleProvider({
+  locale,
+  children,
+}: {
+  locale: RendererLocale;
+  children: ReactNode;
+}) {
+  return <TemplateLocaleContext.Provider value={locale}>{children}</TemplateLocaleContext.Provider>;
+}
+
+export function useTemplateText() {
+  const locale = useContext(TemplateLocaleContext);
+  return useCallback((key: TemplateCopyKey) => TEMPLATE_COPY[key][locale], [locale]);
+}
