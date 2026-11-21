@@ -72,10 +72,6 @@ export async function loadTenant(
     getBlogPosts(slug, options),
   ]);
 
-  const hasPortfolioSection = page?.sections?.some((section) => section.type === 'portfolio_projects') ?? false;
-  const [portfolioProjects, portfolioCategories] = hasPortfolioSection
-    ? await Promise.all([getPortfolioProjects(slug, options), getPortfolioCategories(slug, options)])
-    : [[], []];
   const configuredSections = resolveSections(page, website.template, !pageSlug);
   const hasProjectSection = viewOptions.preloadPortfolioForDraft
     || configuredSections.some((section) => section.type === 'portfolio_projects');
