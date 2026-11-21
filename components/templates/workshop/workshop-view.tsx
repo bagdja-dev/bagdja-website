@@ -294,11 +294,11 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
           {heroImage ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={heroImage} alt={heroImageAlt} className="h-full w-full object-cover" />
+              <img src={heroImage} alt={heroImageAlt} className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 bg-black/20" />
             </>
           ) : (
-            <div className="h-full w-full bg-[linear-gradient(120deg,#4a5259_25%,#454d53_25%,#454d53_50%,#4a5259_50%,#4a5259_75%,#454d53_75%)] bg-[length:52px_52px]" />
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,#4a5259_25%,#454d53_25%,#454d53_50%,#4a5259_50%,#4a5259_75%,#454d53_75%)] bg-[length:52px_52px]" />
           )}
           <span className="absolute bottom-5 right-5 font-mono text-xs text-white/70">BUILT TO LAST</span>
         </div>
