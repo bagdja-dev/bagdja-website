@@ -71,6 +71,7 @@ import { PurchaseControls } from '../../purchase-controls';
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
+import { StoreClassicPortfolio } from './store-classic-portfolio';
 import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 
 export interface StoreClassicProfile {
@@ -1461,6 +1462,7 @@ export function StoreClassicView({
               }
               case 'portfolio_projects':
                 return (
+                  <StoreClassicPortfolio
                   <PortfolioProjectsSection
                     key={key}
                     content={section.content}
