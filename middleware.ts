@@ -33,6 +33,7 @@ const PLATFORM_HOST = (() => {
 })();
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
+const SEARCH_CONSOLE_FILE_PATTERN = /^\/(google[a-zA-Z0-9_-]+\.html)$/;
 
 // Top-level static routes under web/app/ that are NOT tenant slugs (e.g. the
 // dev template-preview route at /templates/...) — must not be redirected to
@@ -74,6 +75,40 @@ async function resolveSlugForDomain(host: string): Promise<string | null> {
   }
 }
 
+async function serveSearchConsoleFile(slug: string, pathname: string): Promise<NextResponse | null> {
+  const match = SEARCH_CONSOLE_FILE_PATTERN.exec(pathname);
+  if (!match) return null;
+
+  try {
+    const filename = match[1];
+    const response = await fetch(
+      `${API_URL}/api/public/sites/${encodeURIComponent(slug)}/search-console-verification/${encodeURIComponent(filename)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) {
+      if (response.status !== 404) {
+        console.error(`[search-console] verification lookup failed for ${slug}: API returned ${response.status}`);
+      }
+      return null;
+    }
+    const file = (await response.json()) as { filename?: string; content?: string };
+    if (file.filename !== filename || file.content !== `google-site-verification: ${filename}`) return null;
+
+    return new NextResponse(file.content, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[search-console] verification lookup failed for ${slug}:`,
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const hostHeader = request.headers.get('host') ?? '';
   const hostname = hostHeader.split(':')[0];
@@ -104,6 +139,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!hostname || LOCAL_HOSTS.has(hostname)) {
+    const localTenantFile = /^\/([a-z0-9-]+)(\/google[a-zA-Z0-9_-]+\.html)$/.exec(request.nextUrl.pathname);
+    if (localTenantFile) {
+      const fileResponse = await serveSearchConsoleFile(localTenantFile[1], localTenantFile[2]);
+      if (fileResponse) return fileResponse;
+    }
     return NextResponse.next();
   }
 
@@ -126,6 +166,9 @@ export async function middleware(request: NextRequest) {
   // Case 2: wildcard subdomain -> rewrite using the slug parsed straight from the hostname
   const subdomainSlug = resolvePlatformSubdomain(hostname);
   if (subdomainSlug) {
+    const fileResponse = await serveSearchConsoleFile(subdomainSlug, request.nextUrl.pathname);
+    if (fileResponse) return fileResponse;
+
     const url = request.nextUrl.clone();
     url.pathname = `/${subdomainSlug}${request.nextUrl.pathname}`;
     // W1: setelah rewrite ke `/{slug}/cart|checkout|order`, cek session
@@ -141,6 +184,9 @@ export async function middleware(request: NextRequest) {
   // Case 3: candidate custom domain -> ask the API
   const slug = await resolveSlugForDomain(hostname);
   if (slug) {
+    const fileResponse = await serveSearchConsoleFile(slug, request.nextUrl.pathname);
+    if (fileResponse) return fileResponse;
+
     const url = request.nextUrl.clone();
     url.pathname = `/${slug}${request.nextUrl.pathname}`;
     // W1: setelah rewrite, cek session untuk route protected

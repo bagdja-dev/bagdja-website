@@ -85,7 +85,7 @@ export function StoreClassicBlogSidebar({
               >
                 {post.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={post.coverImage} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                  <img src={post.coverImage} alt={post.title} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
                 ) : (
                   <span
                     className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-lg"

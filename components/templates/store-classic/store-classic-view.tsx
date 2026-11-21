@@ -31,14 +31,18 @@ import {
   parseFeatureItems,
   type FeatureItem,
   type PortfolioCategoryItem,
+  type PortfolioClientItem,
   type PortfolioProjectItem,
 } from '../../../lib/template-data';
 import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { ProductDescription } from '../shared/product-description';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
+  getContrastTextColor,
   getGoogleFontsUrl,
+  isHexColor,
   resolveTheme,
   themeToCssVariables,
   type WebsiteTheme,
@@ -68,6 +72,7 @@ import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 import { StoreClassicPortfolio } from './store-classic-portfolio';
+import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -98,6 +103,7 @@ export interface StoreClassicViewProps {
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
   portfolioCategories?: PortfolioCategoryItem[];
+  portfolioClients?: PortfolioClientItem[];
   hideHeader?: boolean;
   cartDesign?: 'store-classic';
   checkoutDesign?: 'store-classic';
@@ -139,20 +145,32 @@ function HeroSection({
   tagline,
   subtitle,
   imageUrl,
+  imageAlt,
   waHref,
   chatHref,
   showWhatsappCta,
+  backgroundColor,
 }: {
   title: string;
   tagline: string;
   subtitle?: string;
   imageUrl?: string;
+  imageAlt?: string;
   waHref?: string;
   chatHref?: string;
   showWhatsappCta: boolean;
+  backgroundColor?: string;
 }) {
+  const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : undefined;
+  const mutedTextColor = textColor === '#ffffff' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(17, 24, 39, 0.72)';
   return (
-    <section className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+    <section
+      className="border-b"
+      style={{
+        borderColor: 'var(--brand-border)',
+        ...(backgroundColor ? { backgroundColor, color: textColor } : {}),
+      }}
+    >
       <div
         className={`mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 sm:py-24 ${
           imageUrl ? 'sm:grid-cols-2 sm:items-center' : 'text-center'
@@ -170,7 +188,10 @@ function HeroSection({
           >
             {title}
           </h1>
-          <p className="mt-5 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
+          <p
+            className="mt-5 text-sm leading-relaxed sm:text-base"
+            style={{ color: textColor ? mutedTextColor : 'var(--brand-muted)' }}
+          >
             {tagline}
           </p>
           {showWhatsappCta && (chatHref || waHref) && (
@@ -188,7 +209,7 @@ function HeroSection({
         {imageUrl && (
           <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: 'var(--brand-surface)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" className="aspect-[4/3] w-full object-cover" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title} className="aspect-[4/3] w-full object-cover" />
           </div>
         )}
       </div>
@@ -392,11 +413,13 @@ export function ProductCard({
         <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
           {item.name}
         </p>
-        {item.description && (
-          <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-            {item.description}
-          </p>
-        )}
+        {item.description || item.descriptionHtml ? (
+          <ProductDescription
+            description={item.description}
+            descriptionHtml={item.descriptionHtml}
+            className="mt-1 line-clamp-2 text-sm [&_p]:mb-1 [&_p:last-child]:mb-0"
+          />
+        ) : null}
         {item.priceLabel && (
           <p className="mt-2 text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
             {item.priceLabel}
@@ -481,11 +504,13 @@ function FeaturedProductSection({
           <h2 className="mt-3 text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
             {title || product.name}
           </h2>
-          {product.description && (
-            <p className="mt-3 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-              {product.description}
-            </p>
-          )}
+          {product.description || product.descriptionHtml ? (
+            <ProductDescription
+              description={product.description}
+              descriptionHtml={product.descriptionHtml}
+              className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base [&_p]:mb-2 [&_p:last-child]:mb-0"
+            />
+          ) : null}
           {product.priceLabel && (
             <p className="mt-4 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
               {product.priceLabel}
@@ -646,7 +671,7 @@ function TextBlockSection({ title, body, align }: { title?: string; body: string
   );
 }
 
-function AboutSection({ title, body, imageUrl }: { title?: string; body: string; imageUrl?: string }) {
+function AboutSection({ title, body, imageUrl, imageAlt }: { title?: string; body: string; imageUrl?: string; imageAlt?: string }) {
   if (!body.trim() && !imageUrl) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -654,7 +679,7 @@ function AboutSection({ title, body, imageUrl }: { title?: string; body: string;
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || 'Tentang Kami'} className="h-full w-full object-cover" loading="lazy" />
           </div>
         )}
         <div>
@@ -763,7 +788,7 @@ function BlogPostCard({ post, websiteSlug }: { post: BlogPostItem; websiteSlug?:
       {post.coverImage ? (
         <div className="relative aspect-[16/9] w-full overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={post.coverImage} alt={post.title} className="h-full w-full object-cover" loading="lazy" />
         </div>
       ) : null}
       <div className="p-5">
@@ -841,7 +866,7 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
           {post.coverImage && (
             <div className="mt-8 overflow-hidden rounded-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+              <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
             </div>
           )}
           <div
@@ -1095,11 +1120,13 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {(item.description || item.detail || specificationEntries.length > 0 || estimationEntries.length > 0) && (
               <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
                 <h2 className="mb-4 text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Produk</h2>
-                {item.description && (
-                  <p className="mb-5 max-w-4xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-                    {item.description}
-                  </p>
-                )}
+                {item.description || item.descriptionHtml ? (
+                  <ProductDescription
+                    description={item.description}
+                    descriptionHtml={item.descriptionHtml}
+                    className="mb-5 max-w-4xl text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  />
+                ) : null}
                 {specificationEntries.length > 0 && (
                   <div className="mb-6">
                     <h3 className="mb-3 text-base font-semibold">Spesifikasi</h3>
@@ -1241,6 +1268,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
 }
 
 export function StoreClassicView({
+  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1256,6 +1284,7 @@ export function StoreClassicView({
   blogPosts = [],
   portfolioProjects = [],
   portfolioCategories = [],
+  portfolioClients = [],
   auth,
   hideHeader = false,
   cartDesign,
@@ -1277,6 +1306,8 @@ export function StoreClassicView({
   const heroContent = sections.find((s) => s.type === 'hero')?.content ?? {};
   const heroSubtitle = typeof heroContent.subtitle === 'string' ? heroContent.subtitle : undefined;
   const heroImageUrl = typeof heroContent.image_url === 'string' ? heroContent.image_url : undefined;
+  const heroImageAlt = typeof heroContent.image_url_alt === 'string' ? heroContent.image_url_alt : undefined;
+  const heroBackgroundColor = isHexColor(heroContent.background_color) ? heroContent.background_color : undefined;
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
   const categoryListingContent = sections.find((s) => s.type === 'category_listing')?.content;
@@ -1384,9 +1415,11 @@ export function StoreClassicView({
               tagline={tagline}
               subtitle={heroSubtitle}
               imageUrl={heroImageUrl}
+              imageAlt={heroImageAlt}
               waHref={waHref}
               chatHref={chatHref}
               showWhatsappCta={showWhatsappCta}
+              backgroundColor={heroBackgroundColor}
             />
           </SectionFrame>
         )}
@@ -1430,12 +1463,15 @@ export function StoreClassicView({
               case 'portfolio_projects':
                 return (
                   <StoreClassicPortfolio
+                  <PortfolioProjectsSection
                     key={key}
                     content={section.content}
                     projects={portfolioProjects}
                     categories={portfolioCategories}
                   />
                 );
+              case 'portfolio_clients':
+                return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : 'Kategori Pilihan';
                 return (
@@ -1512,7 +1548,8 @@ export function StoreClassicView({
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 const body = typeof section.content.body === 'string' ? section.content.body : '';
                 const imageUrl = typeof section.content.image_url === 'string' ? section.content.image_url : undefined;
-                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} />;
+                const imageAlt = typeof section.content.image_url_alt === 'string' ? section.content.image_url_alt : undefined;
+                return <AboutSection key={key} title={heading} body={body} imageUrl={imageUrl} imageAlt={imageAlt} />;
               }
               case 'gallery': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
