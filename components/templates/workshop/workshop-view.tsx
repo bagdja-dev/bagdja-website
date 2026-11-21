@@ -46,7 +46,9 @@ import { ModelViewerElement } from '../../model-viewer-element';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
 import { TemplateFooter } from '../shared/template-footer';
 import {
+  getContrastTextColor,
   getGoogleFontsUrl,
+  isHexColor,
   resolveTheme,
   themeToCssVariables,
   type WebsiteTheme,
@@ -229,6 +231,14 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
   const subtitle = getString(content, 'subtitle') ?? 'KONSTRUKSI BAJA · WELDING · ALUMINIUM';
   const headline = getString(content, 'headline') ?? 'Dibangun untuk bertahan.';
   const lede = getString(content, 'lede') ?? tagline;
+  const backgroundColor = isHexColor(content.background_color) ? content.background_color : undefined;
+  const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : 'var(--brand-bg)';
+  const mutedTextColor = backgroundColor
+    ? textColor === '#ffffff' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(17, 24, 39, 0.72)'
+    : 'rgba(255, 255, 255, 0.7)';
+  const subtleBorderColor = backgroundColor
+    ? `${textColor === '#ffffff' ? '#ffffff' : '#111827'}40`
+    : 'rgba(255, 255, 255, 0.2)';
   const heroImage = typeof content.image_url === 'string' && content.image_url.trim()
     ? content.image_url.trim()
     : Array.isArray(content.images)
@@ -240,14 +250,17 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
     : [];
 
   return (
-    <section className="relative overflow-hidden bg-[var(--brand-text)] text-[var(--brand-bg)]">
+    <section
+      className="relative overflow-hidden bg-[var(--brand-text)] text-[var(--brand-bg)]"
+      style={backgroundColor ? { backgroundColor, color: textColor } : undefined}
+    >
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-0 pt-16 sm:px-6 sm:pt-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
         <div className="pb-12">
           <p className="font-mono text-xs font-bold tracking-[0.18em] text-[var(--brand-warning)]">{subtitle}</p>
           <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-[1.02] tracking-tight sm:text-6xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
             {headline}
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg">{lede}</p>
+          <p className="mt-6 max-w-xl text-base leading-relaxed sm:text-lg" style={{ color: mutedTextColor }}>{lede}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
               href={chatHref || waHref || '#'}
@@ -258,14 +271,20 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
             >
               Hubungi Kami
             </a>
-            <a href="#layanan" className="border-2 border-white/40 px-5 py-3 text-center text-sm font-bold text-white hover:border-white">Lihat Layanan</a>
+            <a
+              href="#layanan"
+              className="border-2 px-5 py-3 text-center text-sm font-bold hover:border-white"
+              style={{ borderColor: subtleBorderColor, color: textColor }}
+            >
+              Lihat Layanan
+            </a>
           </div>
           {stats.length > 0 ? (
-            <div className="mt-12 grid max-w-xl grid-cols-3 border-t border-white/20 pt-5">
+            <div className="mt-12 grid max-w-xl grid-cols-3 border-t pt-5" style={{ borderColor: subtleBorderColor }}>
               {stats.slice(0, 3).map((stat, index) => (
-                <div key={index} className="border-r border-white/20 pr-3 last:border-0">
+                <div key={index} className="border-r pr-3 last:border-0" style={{ borderColor: subtleBorderColor }}>
                   <strong className="block text-2xl text-[var(--brand-warning)]">{typeof stat.value === 'string' ? stat.value : '-'}</strong>
-                  <span className="mt-1 block text-xs text-white/60">{typeof stat.label === 'string' ? stat.label : ''}</span>
+                  <span className="mt-1 block text-xs" style={{ color: mutedTextColor }}>{typeof stat.label === 'string' ? stat.label : ''}</span>
                 </div>
               ))}
             </div>

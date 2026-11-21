@@ -37,7 +37,9 @@ import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
+  getContrastTextColor,
   getGoogleFontsUrl,
+  isHexColor,
   resolveTheme,
   themeToCssVariables,
   type WebsiteTheme,
@@ -142,6 +144,7 @@ function HeroSection({
   waHref,
   chatHref,
   showWhatsappCta,
+  backgroundColor,
 }: {
   title: string;
   tagline: string;
@@ -151,9 +154,18 @@ function HeroSection({
   waHref?: string;
   chatHref?: string;
   showWhatsappCta: boolean;
+  backgroundColor?: string;
 }) {
+  const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : undefined;
+  const mutedTextColor = textColor === '#ffffff' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(17, 24, 39, 0.72)';
   return (
-    <section className="border-b" style={{ borderColor: 'var(--brand-border)' }}>
+    <section
+      className="border-b"
+      style={{
+        borderColor: 'var(--brand-border)',
+        ...(backgroundColor ? { backgroundColor, color: textColor } : {}),
+      }}
+    >
       <div
         className={`mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 sm:py-24 ${
           imageUrl ? 'sm:grid-cols-2 sm:items-center' : 'text-center'
@@ -171,7 +183,10 @@ function HeroSection({
           >
             {title}
           </h1>
-          <p className="mt-5 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
+          <p
+            className="mt-5 text-sm leading-relaxed sm:text-base"
+            style={{ color: textColor ? mutedTextColor : 'var(--brand-muted)' }}
+          >
             {tagline}
           </p>
           {showWhatsappCta && (chatHref || waHref) && (
@@ -1279,6 +1294,7 @@ export function StoreClassicView({
   const heroSubtitle = typeof heroContent.subtitle === 'string' ? heroContent.subtitle : undefined;
   const heroImageUrl = typeof heroContent.image_url === 'string' ? heroContent.image_url : undefined;
   const heroImageAlt = typeof heroContent.image_url_alt === 'string' ? heroContent.image_url_alt : undefined;
+  const heroBackgroundColor = isHexColor(heroContent.background_color) ? heroContent.background_color : undefined;
   const showWhatsappCta = heroContent.show_whatsapp_cta !== false;
 
   const categoryListingContent = sections.find((s) => s.type === 'category_listing')?.content;
@@ -1390,6 +1406,7 @@ export function StoreClassicView({
               waHref={waHref}
               chatHref={chatHref}
               showWhatsappCta={showWhatsappCta}
+              backgroundColor={heroBackgroundColor}
             />
           </SectionFrame>
         )}
