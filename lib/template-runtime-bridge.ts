@@ -46,6 +46,11 @@ export interface TemplateRuntimeOrderActionMessage extends TemplateRuntimeIdenti
   type: typeof TEMPLATE_RUNTIME_ORDER_ACTION;
   requestId: string;
   action: TemplateRuntimeOrderAction;
+  /**
+   * Template sudah menampilkan popup konfirmasinya sendiri (`data-bagdja-confirmed="true"` pada tombol,
+   * divalidasi bootstrap) → host tidak memakai window.confirm.
+   */
+  confirmed?: true;
 }
 
 export interface TemplateRuntimeOrderActionResultMessage extends TemplateRuntimeIdentity {
@@ -71,7 +76,10 @@ export interface TemplateRuntimeNavigationMessage extends TemplateRuntimeIdentit
 }
 
 export type TemplateRuntimeActionHandler = (action: AddToCartAction) => Promise<{ orderId: string }>;
-export type TemplateRuntimeOrderActionHandler = (action: TemplateRuntimeOrderAction) => Promise<void>;
+export type TemplateRuntimeOrderActionHandler = (
+  action: TemplateRuntimeOrderAction,
+  options?: { confirmed: boolean },
+) => Promise<void>;
 
 export class TemplateRuntimeActionError extends Error {
   constructor(
@@ -193,6 +201,7 @@ export function parseTemplateRuntimeOrderActionMessage(value: unknown): Template
     digest: value.digest,
     requestId: value.requestId,
     action: value.action as TemplateRuntimeOrderAction,
+    ...(value.confirmed === true ? { confirmed: true as const } : {}),
   };
 }
 
@@ -470,7 +479,7 @@ export function createTemplateRuntimeOrderActionBridge({
       result: { ok: false, message: 'Aksi transaksi gagal diproses.' },
     };
     try {
-      await onAction(message.action);
+      await onAction(message.action, { confirmed: message.confirmed === true });
       response.result = { ok: true };
     } catch (error) {
       response.result = {

@@ -60,7 +60,7 @@ export function FulfillmentFieldInput({
     );
   };
 
-  const mediaType = ['pdf', 'foto', 'video'].includes(field.type) ? field.type : null;
+  const mediaType = ['pdf', 'archive', 'foto', 'video'].includes(field.type) ? field.type : null;
   const uploadFiles = async (files: FileList | null) => {
     if (!files || !orderId || !mediaType) return;
     const selectedFiles = Array.from(files).slice(0, maxFiles - mediaValues.length);
@@ -70,6 +70,9 @@ export function FulfillmentFieldInput({
     try {
       const uploaded: string[] = [];
       for (const file of selectedFiles) {
+        if (mediaType === 'archive' && file.size > 50 * 1024 * 1024) {
+          throw new Error('Ukuran arsip ZIP maksimal 50 MB.');
+        }
         const form = new FormData();
         form.append('file', file);
         const response = await fetch(`/api/orders/${orderId}`, { method: 'POST', body: form });
@@ -124,7 +127,13 @@ export function FulfillmentFieldInput({
         <input
           id={`fulfillment-upload-${field.key}`}
           type="file"
-          accept={mediaType === 'pdf' ? 'application/pdf' : mediaType === 'foto' ? 'image/*' : 'video/*'}
+          accept={mediaType === 'pdf'
+            ? 'application/pdf'
+            : mediaType === 'archive'
+              ? '.zip,application/zip,application/x-zip-compressed'
+              : mediaType === 'foto'
+                ? 'image/*'
+                : 'video/*'}
           multiple
           disabled={uploading || !orderId || mediaValues.length >= maxFiles}
           onChange={(event) => void uploadFiles(event.target.files)}
@@ -138,7 +147,7 @@ export function FulfillmentFieldInput({
         <label htmlFor={`fulfillment-upload-${field.key}`} className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
           <div className="relative flex flex-col items-center gap-1">
             <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}>
-              {uploading ? '...' : mediaType === 'pdf' ? 'PDF' : '+'}
+              {uploading ? '...' : mediaType === 'pdf' ? 'PDF' : mediaType === 'archive' ? 'ZIP' : '+'}
             </span>
             <span className="max-w-full truncate text-xs font-semibold">{uploading ? 'Mengunggah file...' : mediaValues.length >= maxFiles ? 'Batas file tercapai' : `Pilih ${mediaType}`}</span>
             <span style={{ color: 'var(--brand-muted)' }}>{mediaValues.length}/{maxFiles} file</span>

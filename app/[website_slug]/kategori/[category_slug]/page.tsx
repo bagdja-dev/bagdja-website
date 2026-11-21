@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { CartProvider } from '../../../../lib/cart';
@@ -28,7 +29,8 @@ interface CategoryPageProps {
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   const category = tenant?.categories.find((c) => slugifyLabel(c.label) === params.category_slug);
   if (!tenant || !category) return {};
 
@@ -40,7 +42,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 /** Halaman listing kategori tersendiri — dituju saat klik tile di section `category_grid` (lihat store-classic-catalog.tsx / barber-classic-catalog.tsx). */
 export default async function CategoryPage({ params }: CategoryPageProps) {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(

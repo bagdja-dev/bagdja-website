@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 
+import { contentMetadata, jsonLd, tenantCanonicalUrl } from '../../../../lib/content-seo';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { CartProvider } from '../../../../lib/cart';
 import { loadTenant } from '../../../../lib/tenant-loader';
@@ -27,18 +29,25 @@ interface ProductDetailPageProps {
 }
 
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   const product = tenant?.products.find((p) => p.slug === params.product_slug || p.id === params.product_slug);
-  if (!product) return {};
+  if (!tenant || !product) return { robots: { index: false, follow: false } };
 
-  return {
-    title: product.name,
-    description: product.description ?? undefined,
-  };
+  return contentMetadata({
+    slug: params.website_slug,
+    path: `/products/${product.slug}`,
+    title: product.seo_title?.trim() || product.name,
+    description: product.seo_description?.trim() || product.description,
+    image: product.seo_image?.trim() || product.images?.find(Boolean) || tenant.website.logo_url,
+    noIndex: product.seo_no_index || product.is_active === false,
+    website: tenant.website,
+  });
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(
@@ -88,6 +97,28 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     blogPosts: blogPosts.map(toBlogPostItem),
     auth,
   };
+  const productCanonicalUrl = tenantCanonicalUrl(
+    params.website_slug,
+    `/products/${product.slug}`,
+    website,
+  );
+  const productStructuredData = product.type === 'product' && product.price > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        description: product.seo_description?.trim() || product.description || undefined,
+        image: product.seo_image?.trim() || product.images?.filter(Boolean) || undefined,
+        sku: typeof product.metadata?.sku === 'string' ? product.metadata.sku : undefined,
+        offers: {
+          '@type': 'Offer',
+          url: productCanonicalUrl,
+          priceCurrency: 'IDR',
+          price: String(product.price),
+          availability: 'https://schema.org/InStock',
+        },
+      }
+    : null;
   const runtime = tenantRuntime(website);
   // Detail produk gathering milik template package (template-owned-system-pages-plan.md §8.6).
   // Produk lain, atau bila render template gagal, tetap tampilan Bagdja di bawah.
@@ -111,7 +142,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       tenantSlug: website.slug,
       props: { ...props, sections: [], page },
     });
-    if (templatePage) return templatePage;
+    if (templatePage) {
+      return (
+        <>
+          {productStructuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(productStructuredData) }} />}
+          {templatePage}
+        </>
+      );
+    }
   }
   const designerHeader = runtime && templateOwnsPage(website, 'header')
     ? await renderPinnedTenantHeader({
@@ -128,6 +166,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   return (
     <>
+      {productStructuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(productStructuredData) }} />}
       {designerHeader.node}
       <CartProvider slug={params.website_slug}>
         <Renderer {...props} hideHeader={designerHeader.active} />
