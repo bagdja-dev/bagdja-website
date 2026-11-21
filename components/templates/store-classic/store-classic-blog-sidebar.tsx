@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { buildBlogPostHref, type BlogPostItem } from '../../../lib/template-data';
 import { SearchIcon } from './store-classic-icons';
+import { useTemplateText } from '../shared/template-locale';
 
 /**
  * Sidebar blog (layout 2 kolom ala toko). Widget "Artikel Terbaru" + pencarian
@@ -20,6 +21,7 @@ export function StoreClassicBlogSidebar({
   websiteSlug?: string;
   excludeId?: string;
 }) {
+  const t = useTemplateText();
   const [query, setQuery] = useState('');
 
   const latest = useMemo(() => posts.filter((p) => p.id !== excludeId).slice(0, 3), [posts, excludeId]);
@@ -41,7 +43,7 @@ export function StoreClassicBlogSidebar({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari artikel..."
+            placeholder={t('searchArticles')}
             className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none"
             style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
           />
@@ -50,7 +52,7 @@ export function StoreClassicBlogSidebar({
           <div className="mt-3 flex flex-col gap-2">
             {results.length === 0 ? (
               <p className="text-sm" style={{ color: 'var(--brand-muted)' }}>
-                Tidak ada artikel yang cocok.
+                {t('noMatchingArticles')}
               </p>
             ) : (
               results.map((post) => (
@@ -74,7 +76,7 @@ export function StoreClassicBlogSidebar({
             className="mb-3 text-xs font-semibold uppercase tracking-wider"
             style={{ color: 'var(--brand-accent-muted)' }}
           >
-            Artikel Terbaru
+            {t('latestArticles')}
           </h3>
           <div className="flex flex-col gap-3">
             {latest.map((post) => (

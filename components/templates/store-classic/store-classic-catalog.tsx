@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getProducts } from '../../../lib/api-client';
 import { buildProductHref, toCatalogItem, type CatalogItem, type CategoryItem } from '../../../lib/template-data';
 import { matchesProductGridFilter } from '../../../lib/product-grid-filter';
+import { useTemplateText } from '../shared/template-locale';
 import { ProductCard, SectionHeading } from './store-classic-view';
 
 const PAGE_SIZE = 8;
@@ -128,6 +129,7 @@ export function ProductGridSection({
   tenantSlug?: string;
   websiteSlug?: string;
 }) {
+  const t = useTemplateText();
   const gridFilter = { type: filterType && filterType !== 'all' ? filterType : undefined, categoryIds };
   const initialFiltered = initialProducts.filter((p) => matchesProductGridFilter(p, gridFilter));
   const [items, setItems] = useState<CatalogItem[]>(initialFiltered.slice(0, PAGE_SIZE));
@@ -174,7 +176,7 @@ export function ProductGridSection({
             className="rounded-full px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
             style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
           >
-            {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
+            {loading ? t('loading') : t('loadMore')}
           </button>
         </div>
       )}
@@ -183,12 +185,6 @@ export function ProductGridSection({
 }
 
 type SortValue = 'name:asc' | 'price:asc' | 'price:desc';
-
-const SORT_OPTIONS: { value: SortValue; label: string }[] = [
-  { value: 'name:asc', label: 'Nama A-Z' },
-  { value: 'price:asc', label: 'Harga Terendah' },
-  { value: 'price:desc', label: 'Harga Tertinggi' },
-];
 
 export function CategoryListingSection({
   categoryId,
@@ -208,7 +204,13 @@ export function CategoryListingSection({
   websiteSlug?: string;
   homeHref: string;
 }) {
+  const t = useTemplateText();
   const [sort, setSort] = useState<SortValue>('name:asc');
+  const sortOptions: { value: SortValue; label: string }[] = [
+    { value: 'name:asc', label: t('nameAscending') },
+    { value: 'price:asc', label: t('priceLowest') },
+    { value: 'price:desc', label: t('priceHighest') },
+  ];
   const [items, setItems] = useState<CatalogItem[]>(initialProducts.slice(0, PAGE_SIZE));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialProducts.length > PAGE_SIZE);
@@ -266,7 +268,7 @@ export function CategoryListingSection({
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <nav className="mb-4 flex items-center gap-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
         <a href={homeHref} className="hover:underline">
-          Home
+          {t('home')}
         </a>
         <span>/</span>
         <span style={{ color: 'var(--brand-text)' }}>{categoryLabel}</span>
@@ -278,7 +280,7 @@ export function CategoryListingSection({
             {description ? (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand-accent)' }}>
-                  Tentang kategori
+                  {t('aboutCategory')}
                 </p>
                 <h1 className="mt-3 text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
                   {categoryLabel}
@@ -288,7 +290,7 @@ export function CategoryListingSection({
             ) : (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand-accent)' }}>
-                  Kategori
+                  {t('category')}
                 </p>
                 <h1 className="mt-3 text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
                   {categoryLabel}
@@ -299,7 +301,7 @@ export function CategoryListingSection({
             <div className="space-y-4">
               {specificationEntries.length > 0 && (
                 <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Spesifikasi</h2>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">{t('specifications')}</h2>
                   <dl className="space-y-2 text-sm">
                     {specificationEntries.map(([key, value]) => (
                       <div key={key} className="flex items-start justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0" style={{ borderColor: 'var(--brand-border)' }}>
@@ -313,7 +315,7 @@ export function CategoryListingSection({
 
               {estimationEntries.length > 0 && (
                 <div className="rounded-xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}>
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Estimasi</h2>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">{t('estimate')}</h2>
                   <div className="space-y-2 text-sm">
                     {estimationEntries.map((entry, index) => {
                       const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
@@ -334,13 +336,13 @@ export function CategoryListingSection({
 
       <div className="mb-6 flex items-center justify-end">
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-          <span>Urutkan:</span>
-          <CustomSelect value={sort} options={SORT_OPTIONS} onChange={setSort} />
+          <span>{t('sort')}</span>
+          <CustomSelect value={sort} options={sortOptions} onChange={setSort} />
         </div>
       </div>
 
       {items.length === 0 && !loading ? (
-        <p style={{ color: 'var(--brand-muted)' }}>Belum ada produk di kategori ini.</p>
+        <p style={{ color: 'var(--brand-muted)' }}>{t('noProductsInCategory')}</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => (
@@ -358,7 +360,7 @@ export function CategoryListingSection({
             className="rounded-full px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
             style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
           >
-            {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
+            {loading ? t('loading') : t('loadMore')}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import type { PortfolioCategoryItem, PortfolioProjectItem } from '../../../lib/template-data';
+import { useTemplateText } from '../shared/template-locale';
 
 type PortfolioContent = Record<string, unknown>;
 
@@ -23,8 +24,9 @@ export function StoreClassicPortfolio({
   projects: PortfolioProjectItem[];
   categories: PortfolioCategoryItem[];
 }) {
+  const t = useTemplateText();
   const [activeCategory, setActiveCategory] = useState('');
-  const title = stringValue(content.title, 'Proyek Pilihan');
+  const title = stringValue(content.title, t('featuredProjects'));
   const subtitle = stringValue(content.subtitle);
   const mode = stringValue(content.source_mode, 'latest');
   const selectedProjectIds = stringIds(content.project_ids);
@@ -70,14 +72,14 @@ export function StoreClassicPortfolio({
         </div>
       ) : null}
       {showCategoryFilter && visibleCategories.length ? (
-        <div className="mb-6 flex flex-wrap gap-2" aria-label="Filter kategori portofolio">
+        <div className="mb-6 flex flex-wrap gap-2" aria-label={t('categoryFilter')}>
           <button
             type="button"
             onClick={() => setActiveCategory('')}
             aria-pressed={!activeCategory}
             className={`rounded-full border px-4 py-2 text-sm transition-colors ${!activeCategory ? 'border-primary bg-primary text-white' : 'border-default-300 text-default-700 hover:border-primary'}`}
           >
-            Semua
+            {t('all')}
           </button>
           {visibleCategories.map((category) => (
             <button

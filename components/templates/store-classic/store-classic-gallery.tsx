@@ -15,6 +15,7 @@ import {
   SearchIcon,
 } from './store-classic-icons';
 import { ModelViewerElement } from '../../model-viewer-element';
+import { useTemplateText } from '../shared/template-locale';
 
 interface Slide {
   type: 'image' | 'video' | 'model';
@@ -48,6 +49,7 @@ export function StoreClassicProductGallery({
   videoUrls?: string[];
   model3dUrl?: string;
 }) {
+  const t = useTemplateText();
   const videos = videoUrls?.length ? videoUrls : videoUrl ? [videoUrl] : [];
   const slides: Slide[] = [
     ...images.map((url): Slide => ({ type: 'image', url })),
@@ -220,7 +222,7 @@ export function StoreClassicProductGallery({
             e.stopPropagation();
             setIsLightboxOpen(true);
           }}
-          aria-label={current.type === 'image' ? 'Perbesar gambar' : 'Fullscreen'}
+          aria-label={current.type === 'image' ? t('enlargeImage') : t('fullscreen')}
           className="pointer-events-auto absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-opacity duration-150"
           style={{
             backgroundColor: 'var(--brand-bg)',
@@ -239,7 +241,7 @@ export function StoreClassicProductGallery({
                 e.stopPropagation();
                 goPrev();
               }}
-              aria-label="Slide sebelumnya"
+              aria-label={t('previousSlide')}
               className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
               style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
             >
@@ -251,7 +253,7 @@ export function StoreClassicProductGallery({
                 e.stopPropagation();
                 goNext();
               }}
-              aria-label="Slide berikutnya"
+              aria-label={t('nextSlide')}
               className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
               style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
             >
@@ -269,7 +271,7 @@ export function StoreClassicProductGallery({
           <button
             type="button"
             onClick={() => setIsLightboxOpen(false)}
-            aria-label="Tutup preview"
+            aria-label={t('closePreview')}
             // z-10: wadah konten di bawah (relative, selebar layar di HP) dirender setelah tombol ini dan
             // sebelumnya menutupinya, sehingga tap X tertelan oleh stopPropagation wadah.
             className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
@@ -329,7 +331,7 @@ export function StoreClassicProductGallery({
                 <button
                   type="button"
                   onClick={goPrev}
-                  aria-label="Slide sebelumnya"
+                  aria-label={t('previousSlide')}
                   className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:-left-14"
                 >
                   <ChevronLeftIcon />
@@ -337,7 +339,7 @@ export function StoreClassicProductGallery({
                 <button
                   type="button"
                   onClick={goNext}
-                  aria-label="Slide berikutnya"
+                  aria-label={t('nextSlide')}
                   className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:-right-14"
                 >
                   <ChevronRightIcon />

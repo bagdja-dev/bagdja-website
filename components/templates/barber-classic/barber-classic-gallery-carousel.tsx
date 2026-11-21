@@ -4,6 +4,7 @@ import { useRef, useState, type TouchEvent } from 'react';
 
 import type { GalleryImageItem } from '../../../lib/template-data';
 import { ModelViewerElement } from '../../model-viewer-element';
+import { useTemplateText } from '../shared/template-locale';
 
 const SWIPE_THRESHOLD_PX = 40;
 
@@ -60,6 +61,7 @@ export function BarberClassicGalleryCarousel({
   videoUrls?: string[];
   model3dUrl?: string;
 }) {
+  const t = useTemplateText();
   const videos = videoUrls?.length ? videoUrls : videoUrl ? [videoUrl] : [];
   const [index, setIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
@@ -120,7 +122,7 @@ export function BarberClassicGalleryCarousel({
                   <button
                     type="button"
                     onClick={() => videoRef.current?.requestFullscreen?.()}
-                    aria-label="Fullscreen video"
+                    aria-label={`${t('fullscreen')} video`}
                     className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
                     style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
                   >
@@ -134,7 +136,7 @@ export function BarberClassicGalleryCarousel({
                   <button
                     type="button"
                     onClick={() => modelWrapperRef.current?.requestFullscreen?.()}
-                    aria-label="Fullscreen model 3D"
+                    aria-label={`${t('fullscreen')} model 3D`}
                     className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
                     style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
                   >
@@ -168,7 +170,7 @@ export function BarberClassicGalleryCarousel({
           <button
             type="button"
             onClick={goPrev}
-            aria-label="Slide sebelumnya"
+            aria-label={t('previousSlide')}
             className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
             style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
           >
@@ -177,7 +179,7 @@ export function BarberClassicGalleryCarousel({
           <button
             type="button"
             onClick={goNext}
-            aria-label="Slide berikutnya"
+            aria-label={t('nextSlide')}
             className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
             style={{ backgroundColor: 'var(--brand-bg)', color: 'var(--brand-text)' }}
           >
@@ -190,7 +192,7 @@ export function BarberClassicGalleryCarousel({
                 key={i}
                 type="button"
                 onClick={() => goTo(i)}
-                aria-label={`Ke slide ${i + 1}`}
+                aria-label={`${t('goToSlide')} ${i + 1}`}
                 className="h-2 rounded-full transition-all"
                 style={{
                   width: i === index ? '1.25rem' : '0.5rem',

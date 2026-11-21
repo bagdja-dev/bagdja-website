@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import type { PortfolioCategoryItem, PortfolioClientItem, PortfolioProjectItem } from '../../../lib/template-data';
+import { useTemplateText } from './template-locale';
 
 type PortfolioContent = Record<string, unknown>;
 
@@ -28,8 +29,9 @@ export function PortfolioProjectsSection({
   projects: PortfolioProjectItem[];
   categories: PortfolioCategoryItem[];
 }) {
+  const t = useTemplateText();
   const [activeCategory, setActiveCategory] = useState('');
-  const title = stringValue(content.title, 'Proyek Pilihan');
+  const title = stringValue(content.title, t('featuredProjects'));
   const subtitle = stringValue(content.subtitle);
   const mode = stringValue(content.source_mode, 'latest');
   const selectedProjectIds = stringIds(content.project_ids);
@@ -75,9 +77,9 @@ export function PortfolioProjectsSection({
         </div>
       ) : null}
       {showCategoryFilter && visibleCategories.length ? (
-        <div className="mb-6 flex flex-wrap gap-2" aria-label="Filter kategori portofolio">
+        <div className="mb-6 flex flex-wrap gap-2" aria-label={t('categoryFilter')}>
           <button type="button" onClick={() => setActiveCategory('')} aria-pressed={!activeCategory} className="rounded-full border px-4 py-2 text-sm">
-            Semua
+            {t('all')}
           </button>
           {visibleCategories.map((category) => (
             <button key={category.id} type="button" onClick={() => setActiveCategory((current) => current === category.id ? '' : category.id)} aria-pressed={activeCategory === category.id} className="rounded-full border px-4 py-2 text-sm">
@@ -96,7 +98,7 @@ export function PortfolioProjectsSection({
               <div className="flex flex-1 flex-col p-5">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--brand-muted)]">
                   {showYear && project.year ? <span>{project.year}</span> : null}
-                  {showClient && project.clientName ? <span>Klien: {project.clientName}</span> : null}
+                  {showClient && project.clientName ? <span>{t('portfolioClient')} {project.clientName}</span> : null}
                 </div>
                 <h3 className="text-lg font-semibold">{project.title}</h3>
                 {showExcerpt && project.excerpt ? <p className="mt-2 line-clamp-3 text-sm text-[var(--brand-muted)]">{project.excerpt}</p> : null}
@@ -129,7 +131,8 @@ export function PortfolioClientsSection({
   clients: PortfolioClientItem[];
   isPreview?: boolean;
 }) {
-  const title = stringValue(content.title, 'Dipercaya oleh');
+  const t = useTemplateText();
+  const title = stringValue(content.title, t('trustedBy'));
   const subtitle = stringValue(content.subtitle);
   const layout = stringValue(content.layout, 'grid');
   const showName = content.show_name !== false;
@@ -149,7 +152,7 @@ export function PortfolioClientsSection({
           </div>
         ) : null}
         <p className="rounded-xl border border-dashed border-[var(--brand-border)] px-4 py-8 text-center text-sm text-[var(--brand-muted)]">
-          Belum ada klien publik yang cocok. Aktifkan status Publik pada data Partner, lalu pastikan kategori yang dipilih juga publik dan aktif.
+          {t('noMatchingClients')}
         </p>
       </section>
     );

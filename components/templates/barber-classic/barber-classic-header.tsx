@@ -8,6 +8,7 @@ import { CartBadge } from '../../cart-badge';
 import { NotificationBell } from '../../notification-bell';
 import { TagihanBadge } from '../../tagihan-badge';
 import { CalendarBadge } from '../../calendar-badge';
+import { useTemplateText } from '../shared/template-locale';
 
 const DRAWER_TRANSITION_MS = 300;
 
@@ -78,6 +79,7 @@ export function BarberClassicHeader({
   chatHref,
   websiteId,
 }: BarberClassicHeaderProps) {
+  const t = useTemplateText();
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -116,7 +118,7 @@ export function BarberClassicHeader({
               className="shrink-0 rounded-lg p-1 transition-colors hover:opacity-80"
               style={{ color: 'var(--brand-text)' }}
               onClick={openDrawer}
-              aria-label="Buka menu"
+              aria-label={t('openMenu')}
             >
               <HamburgerIcon />
             </button>
@@ -216,12 +218,12 @@ export function BarberClassicHeader({
                     style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-text)' }}
                   >
                     {[
-                      { href: auth.cartHref, label: 'Keranjang' },
-                      { href: auth.ordersHref, label: 'Transaksi' },
-                      { href: auth.tagihanHref, label: 'Tagihan' },
-                      { href: auth.calendarHref, label: 'Kalender' },
-                      { href: auth.chatHref, label: 'Inbox' },
-                      { href: auth.profileHref, label: 'Profil' },
+                      { href: auth.cartHref, label: t('cart') },
+                      { href: auth.ordersHref, label: t('transactions') },
+                      { href: auth.tagihanHref, label: t('bills') },
+                      { href: auth.calendarHref, label: t('calendar') },
+                      { href: auth.chatHref, label: t('inbox') },
+                      { href: auth.profileHref, label: t('profile') },
                     ].map(
                       (item) =>
                         item.href && (
@@ -244,7 +246,7 @@ export function BarberClassicHeader({
                         onClick={() => setAccountOpen(false)}
                         className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
                       >
-                        Keluar
+                        {t('logout')}
                       </a>
                     )}
                   </div>
@@ -257,7 +259,7 @@ export function BarberClassicHeader({
                   className="hidden rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-transform hover:scale-105 sm:inline-flex"
                   style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                 >
-                  Masuk
+                  {t('login')}
                 </a>
               )
             ))}
@@ -271,7 +273,7 @@ export function BarberClassicHeader({
             className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${
               drawerVisible ? 'opacity-100' : 'opacity-0'
             }`}
-            aria-label="Tutup menu"
+            aria-label={t('closeMenu')}
             onClick={closeDrawer}
           />
           <div
@@ -286,7 +288,7 @@ export function BarberClassicHeader({
                 className="rounded-lg p-1 transition-colors hover:opacity-80"
                 style={{ color: 'var(--brand-text)' }}
                 onClick={closeDrawer}
-                aria-label="Tutup menu"
+                aria-label={t('closeMenu')}
               >
                 <CloseIcon />
               </button>
@@ -327,11 +329,11 @@ export function BarberClassicHeader({
                     </span>
                   </div>
                   {[
-                    { href: auth.cartHref, label: 'Keranjang' },
-                    { href: auth.ordersHref, label: 'Transaksi' },
-                    { href: auth.tagihanHref, label: 'Tagihan' },
-                    { href: auth.calendarHref, label: 'Kalender' },
-                    { href: auth.profileHref, label: 'Profil' },
+                    { href: auth.cartHref, label: t('cart') },
+                    { href: auth.ordersHref, label: t('transactions') },
+                    { href: auth.tagihanHref, label: t('bills') },
+                    { href: auth.calendarHref, label: t('calendar') },
+                    { href: auth.profileHref, label: t('profile') },
                   ].map(
                     (item) =>
                       item.href && (
@@ -353,7 +355,7 @@ export function BarberClassicHeader({
                       className="block px-4 py-3 text-xs font-semibold uppercase tracking-wide transition-colors hover:opacity-70"
                       style={{ color: 'var(--brand-text)' }}
                     >
-                      Keluar
+                      {t('logout')}
                     </a>
                   )}
                 </div>
@@ -365,7 +367,7 @@ export function BarberClassicHeader({
                     className="mx-6 mb-4 block rounded-full py-3 text-center text-xs font-semibold uppercase tracking-wide"
                     style={{ backgroundColor: 'var(--brand-accent)', color: 'var(--brand-on-accent)' }}
                   >
-                    Masuk
+                    {t('login')}
                   </a>
                 )
               ))}

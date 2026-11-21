@@ -72,6 +72,7 @@ import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
 import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { useTemplateText } from '../shared/template-locale';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -160,6 +161,7 @@ function HeroSection({
   showWhatsappCta: boolean;
   backgroundColor?: string;
 }) {
+  const t = useTemplateText();
   const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : undefined;
   const mutedTextColor = textColor === '#ffffff' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(17, 24, 39, 0.72)';
   return (
@@ -201,7 +203,7 @@ function HeroSection({
               className="mt-8 inline-flex rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
               style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
-              Hubungi Kami
+              {t('contactUs')}
             </a>
           )}
         </div>
@@ -292,6 +294,7 @@ export function CategoryTile({
   className?: string;
   href: string;
 }) {
+  const t = useTemplateText();
   return (
     <a
       href={href}
@@ -314,7 +317,7 @@ export function CategoryTile({
         >
           {category}
         </p>
-        {featured && <p className="mt-1 text-sm text-white/80">{entry.count} produk</p>}
+        {featured && <p className="mt-1 text-sm text-white/80">{entry.count} {t('productCount')}</p>}
       </div>
     </a>
   );
@@ -483,6 +486,7 @@ function FeaturedProductSection({
   buttonText?: string;
   websiteSlug?: string;
 }) {
+  const t = useTemplateText();
   if (!product) return null;
   const href = websiteSlug !== undefined ? buildProductHref(websiteSlug, product.slug) : undefined;
   return (
@@ -521,7 +525,7 @@ function FeaturedProductSection({
               className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
               style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
             >
-              {buttonText?.trim() || 'Lihat Detail'}
+              {buttonText?.trim() || t('readMore')}
             </a>
           )}
         </div>
@@ -554,6 +558,7 @@ function LogoWallSection({ title, layout, logos }: { title?: string; layout?: st
 }
 
 function LocationCard({ location }: { location: LocationItem }) {
+  const t = useTemplateText();
   const waHref = buildWhatsAppHref(location.whatsapp);
   return (
     <div className="rounded-xl border p-5 text-left" style={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)' }}>
@@ -579,7 +584,7 @@ function LocationCard({ location }: { location: LocationItem }) {
         )}
         {location.mapsUrl && (
           <a href={location.mapsUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--brand-accent-muted)' }}>
-            Lihat Peta
+            {t('browseMap')}
           </a>
         )}
       </div>
@@ -671,6 +676,7 @@ function TextBlockSection({ title, body, align }: { title?: string; body: string
 }
 
 function AboutSection({ title, body, imageUrl, imageAlt }: { title?: string; body: string; imageUrl?: string; imageAlt?: string }) {
+  const t = useTemplateText();
   if (!body.trim() && !imageUrl) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -678,7 +684,7 @@ function AboutSection({ title, body, imageUrl, imageAlt }: { title?: string; bod
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || 'Tentang Kami'} className="h-full w-full object-cover" loading="lazy" />
+            <img src={imageUrl} alt={imageAlt?.trim() || title?.trim() || t('aboutUs')} className="h-full w-full object-cover" loading="lazy" />
           </div>
         )}
         <div>
@@ -723,6 +729,7 @@ function GallerySection({ title, layout, images }: { title?: string; layout?: st
 }
 
 function CtaSection({ title, subtitle, buttonText, cta }: { title?: string; subtitle?: string; buttonText?: string; cta: CtaHref | null }) {
+  const t = useTemplateText();
   if (!title && !subtitle && !cta) return null;
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 text-center sm:px-6">
@@ -743,7 +750,7 @@ function CtaSection({ title, subtitle, buttonText, cta }: { title?: string; subt
           className="mt-6 inline-flex rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
         >
-          {buttonText?.trim() || 'Hubungi Kami'}
+          {buttonText?.trim() || t('contactUs')}
         </a>
       )}
     </section>
@@ -885,6 +892,7 @@ function BlogArticleSection({ post, allPosts, websiteSlug }: { post: BlogPostIte
 const PRODUCT_CTA_ID = 'product-cta';
 
 function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlug, tenantSlug, websiteId, isLoggedIn, loginHref }: { item: CatalogItem; allProducts: CatalogItem[]; locations: LocationItem[]; waHref?: string; websiteSlug?: string; tenantSlug?: string; websiteId?: string; isLoggedIn?: boolean; loginHref?: string }) {
+  const t = useTemplateText();
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
   const familyId = item.parentProductId ?? item.id;
@@ -969,7 +977,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                       loginHref={loginHref}
                       className="inline-flex w-full justify-center rounded-full bg-[var(--c-btn-primary-bg)] px-7 py-3 text-sm font-semibold uppercase tracking-wide text-[var(--c-btn-primary-text)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     >
-                      Rencanakan Gathering
+                      {t('bookingGathering')}
                     </GatheringPlanButton>
                   </div>
                 )}
@@ -981,7 +989,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
-                    Konsultasi via WhatsApp
+                    {t('consultationViaWhatsApp')}
                   </a>
                 )}
                 {websiteId && (
@@ -994,7 +1002,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     className="inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
-                    Tanya Produk
+                    {t('askProduct')}
                   </ChatReferenceButton>
                 )}
               </div>
@@ -1009,7 +1017,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     className="mt-6 inline-flex w-full justify-center rounded-full px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ backgroundColor: 'var(--c-btn-primary-bg)', color: 'var(--c-btn-primary-text)' }}
                   >
-                    Pesan via WhatsApp
+                    {t('orderViaWhatsApp')}
                   </a>
                 )}
                 {websiteId && (
@@ -1022,7 +1030,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     className="mt-3 inline-flex w-full justify-center rounded-full border px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-transform hover:scale-[1.01] active:scale-[0.99]"
                     style={{ borderColor: 'var(--c-btn-secondary-border)', color: 'var(--c-btn-secondary-text)' }}
                   >
-                    Tanya Produk
+                    {t('askProduct')}
                   </ChatReferenceButton>
                 )}
               </>
@@ -1035,7 +1043,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             secondaryActions={
               <>
                 {waHref && hasInternalPrimary && (
-                  <a href={waHref} target="_blank" rel="noopener noreferrer" aria-label="Konsultasi via WhatsApp" className={iconButtonClass} style={iconButtonStyle}>
+                  <a href={waHref} target="_blank" rel="noopener noreferrer" aria-label={t('consultationViaWhatsApp')} className={iconButtonClass} style={iconButtonStyle}>
                     <WhatsAppIcon />
                   </a>
                 )}
@@ -1051,7 +1059,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                     style={iconButtonStyle}
                   >
                     <ChatBubbleIcon />
-                    <span className="sr-only">Tanya Produk</span>
+                    <span className="sr-only">{t('askProduct')}</span>
                   </ChatReferenceButton>
                 )}
               </>
@@ -1063,53 +1071,53 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {item.type === 'gathering' && item.gatheringMeta && (
               <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Gathering</h2>
+                  <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{t('detailGathering')}</h2>
                   <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-muted)' }}>
-                    Sebelum RSVP
+                    {t('beforeRsvp')}
                   </span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {item.gatheringMeta.depositAmountPerSeat != null && (
                     <div className="border-l-2 pl-3 sm:col-span-2">
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>DP booking per peserta</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('bookDepositPerAttendee')}</p>
                       <p className="mt-1 font-semibold" style={{ color: 'var(--brand-accent-muted)' }}>{formatIDR(item.gatheringMeta.depositAmountPerSeat)}</p>
-                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>Nominal total DP menyesuaikan jumlah peserta.</p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--brand-muted)' }}>{t('totalDepositNote')}</p>
                     </div>
                   )}
                   {item.gatheringMeta.minAttendees != null && item.gatheringMeta.minAttendees > 0 && (
                     <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Minimum peserta</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('minAttendees')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.minAttendees}</p>
                     </div>
                   )}
                   {item.gatheringMeta.maxAttendees != null && item.gatheringMeta.maxAttendees > 0 && (
                     <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Maksimum peserta</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('maxAttendeesLabel')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.maxAttendees}</p>
                     </div>
                   )}
                   {item.gatheringMeta.eventDate && (
                     <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Jadwal</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('schedule')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.eventDate}</p>
                     </div>
                   )}
                   {item.gatheringMeta.eventTime && (
                     <div className="border-l-2 pl-3" style={{ borderColor: 'var(--brand-accent)' }}>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Waktu</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('time')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.eventTime}</p>
                     </div>
                   )}
                   {item.gatheringMeta.location && (
                     <div className="border-l-2 pl-3 sm:col-span-2" style={{ borderColor: 'var(--brand-accent)' }}>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Lokasi</p>
+                      <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('location')}</p>
                       <p className="mt-1 font-medium">{item.gatheringMeta.location}</p>
                     </div>
                   )}
                 </div>
                 {item.gatheringMeta.cancellationPolicy && (
                   <div className="mt-6 max-w-4xl">
-                    <h3 className="font-semibold">Kebijakan pembatalan</h3>
+                    <h3 className="font-semibold">{t('cancellationPolicy')}</h3>
                     <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--brand-muted)' }}>{item.gatheringMeta.cancellationPolicy}</p>
                   </div>
                 )}
@@ -1118,7 +1126,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
 
             {(item.description || item.detail || specificationEntries.length > 0 || estimationEntries.length > 0) && (
               <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
-                <h2 className="mb-4 text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Produk</h2>
+                <h2 className="mb-4 text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{t('detailProduct')}</h2>
                 {item.description || item.descriptionHtml ? (
                   <ProductDescription
                     description={item.description}
@@ -1128,7 +1136,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 ) : null}
                 {specificationEntries.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="mb-3 text-base font-semibold">Spesifikasi</h3>
+                    <h3 className="mb-3 text-base font-semibold">{t('specifications')}</h3>
                     <dl className="grid gap-4 border-y py-4 sm:grid-cols-2 lg:grid-cols-3" style={{ borderColor: 'var(--brand-border)' }}>
                       {specificationEntries.map(([key, value]) => (
                         <div key={key}>
@@ -1141,7 +1149,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                 )}
                 {estimationEntries.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="mb-3 text-base font-semibold">Estimasi Harga</h3>
+                    <h3 className="mb-3 text-base font-semibold">{t('priceEstimate')}</h3>
                     <div className="border-y" style={{ borderColor: 'var(--brand-border)' }}>
                       {estimationEntries.map((entry, index) => {
                         const numericPrice = typeof entry.price === 'number' ? entry.price : Number(String(entry.price).replace(/[^\d.-]/g, '')) || 0;
@@ -1169,8 +1177,8 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
               <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
                 <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
                   <div>
-                    <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Option</h2>
-                    <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>Kelompok pilihan yang tersedia untuk gathering ini.</p>
+                    <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{t('optionDetails')}</h2>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--brand-muted)' }}>{t('optionGroupDescription')}</p>
                   </div>
                   <span className="text-xs font-medium" style={{ color: 'var(--brand-muted)' }}>
                     {item.gatheringMeta.optionGroups.length} kelompok pilihan
@@ -1200,7 +1208,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                                 // eslint-disable-next-line @next/next/no-img-element -- tenant option image URL
                                 <img key={`${src}-${imageIndex}`} src={src} alt="" className="h-12 w-16 rounded object-cover" />
                               ))}
-                              {option.images.length > 3 ? <span className="text-center text-[10px]" style={{ color: 'var(--brand-muted)' }}>+{option.images.length - 3} foto</span> : null}
+                              {option.images.length > 3 ? <span className="text-center text-[10px]" style={{ color: 'var(--brand-muted)' }}>+{option.images.length - 3} {t('photoCount')}</span> : null}
                             </div>
                           ) : null}
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-semibold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)' }}>
@@ -1215,13 +1223,13 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                                 <dl className="mt-3 grid gap-2">
                                   {option.venueLocation && (
                                     <div>
-                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Lokasi</dt>
+                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('location')}</dt>
                                       <dd className="mt-0.5 text-xs" style={{ color: 'var(--brand-text)' }}>{option.venueLocation}</dd>
                                     </div>
                                   )}
                                   {option.availabilityNote && (
                                     <div>
-                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Ketersediaan</dt>
+                                      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('available')}</dt>
                                       <dd className="mt-0.5 text-xs" style={{ color: 'var(--brand-text)' }}>{option.availabilityNote}</dd>
                                     </div>
                                   )}
@@ -1229,7 +1237,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
                               )}
                               {option.benefits?.length ? (
                                 <div className="mt-3">
-                                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>Benefit</p>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>{t('benefits')}</p>
                                   <ul className="mt-1 space-y-1 text-xs" style={{ color: 'var(--brand-muted)' }}>
                                     {option.benefits.map((benefit, benefitIndex) => (
                                       <li key={`${option.id}-benefit-${benefitIndex}`} className="flex gap-2">
@@ -1254,7 +1262,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
       </section>
       {related.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <SectionHeading title="Produk Lainnya" />
+          <SectionHeading title={t('productsElsewhere')} />
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {related.map((item) => (
               <ProductCard key={item.id} item={item} websiteSlug={websiteSlug} />
@@ -1293,8 +1301,9 @@ export function StoreClassicView({
   calendarDesign,
   orderDetailDesign,
 }: StoreClassicViewProps) {
-  const title = profile.name?.trim() || 'Nama Toko Anda';
-  const tagline = profile.tagline?.trim() || 'Belanja produk pilihan dengan kualitas terbaik.';
+  const t = useTemplateText();
+  const title = profile.name?.trim() || t('shopName');
+  const tagline = profile.tagline?.trim() || t('shopTagline');
   const waHref = buildWhatsAppHref(profile.whatsapp);
   const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
 
@@ -1321,7 +1330,7 @@ export function StoreClassicView({
   const productPageTitle = resolvePageHeadingLabel({
     productName: productDetailItem?.name,
     platformName: title,
-    fallbackTitle: 'Produk',
+    fallbackTitle: t('products'),
   });
 
   const cartSection = sections.find((s) => s.type === 'cart');
@@ -1334,19 +1343,19 @@ export function StoreClassicView({
   const chatSection = sections.find((s) => s.type === 'chat');
   const isChatPage = Boolean(chatSection);
   const pageBannerLabel = checkoutSection
-    ? 'Checkout'
+    ? t('cartCheckout')
     : cartSection
-      ? 'Daftar Pesanan'
+      ? t('myOrders')
       : ordersSection
-        ? 'Daftar Transaksi'
+        ? t('myTransactions')
         : tagihanSection
-          ? 'Tagihan'
+          ? t('bills')
         : orderDetailSection
-          ? 'Status Pesanan'
+          ? t('resultsOrderStatus')
           : profileSection
-            ? 'Profil Saya'
+            ? t('accountProfile')
             : chatSection
-              ? 'Chat Pelanggan'
+              ? t('customerChat')
               : undefined;
 
   const toLink = (page: NavPage): HeaderNavLink => ({
@@ -1471,7 +1480,7 @@ export function StoreClassicView({
               case 'portfolio_clients':
                 return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Kategori Pilihan';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('categoryChoices');
                 return (
                   <CategoryGridSection
                     key={key}
@@ -1485,7 +1494,7 @@ export function StoreClassicView({
               case 'services_grid':
               case 'products_grid': {
                 const gridFilter = productGridFilter(section.content);
-                const defaultTitle = section.type === 'services_grid' ? 'Layanan Kami' : 'Produk Kami';
+                const defaultTitle = section.type === 'services_grid' ? t('services') : t('productsByCategory');
                 const heading = typeof section.content.title === 'string' ? section.content.title : defaultTitle;
                 return (
                   <ProductGridSection
@@ -1522,13 +1531,13 @@ export function StoreClassicView({
                   ? (section.content.filter_types as unknown[]).filter((t): t is string => typeof t === 'string')
                   : undefined;
                 const items = locations.filter((l) => !filterTypes || filterTypes.includes(l.type));
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Kunjungi Kami';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('visitUs');
                 return <LocationsSection key={key} title={heading} items={items} />;
               }
               case 'faq_list': {
                 const category = typeof section.content.filter_category === 'string' ? section.content.filter_category : undefined;
                 const items = faqs.filter((f) => !category || f.category === category);
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Pertanyaan Umum';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('faqs');
                 return <FaqSection key={key} title={heading} items={items} />;
               }
               case 'rich_text': {
@@ -1562,22 +1571,22 @@ export function StoreClassicView({
                 return <CtaSection key={key} title={heading} subtitle={subtitle} buttonText={buttonText} cta={resolveCtaHref(section.content, profile)} />;
               }
               case 'testimonial': {
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Apa Kata Mereka';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('testimonials');
                 return <TestimonialSection key={key} title={heading} />;
               }
               case 'contact': {
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Hubungi Kami';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('contactUs');
                 return <ContactSection key={key} title={heading} profile={profile} />;
               }
               case 'blog_list': {
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Artikel Terbaru';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('latestArticles');
                 const limitRaw = section.content.limit;
                 const limit = typeof limitRaw === 'string' && limitRaw.trim() ? parseInt(limitRaw, 10) : undefined;
                 const items = Number.isFinite(limit) ? blogPosts.slice(0, limit) : blogPosts;
                 return <BlogTwoColumnLayout key={key} title={heading} items={items} allPosts={blogPosts} websiteSlug={websiteSlug} />;
               }
               case 'blog_collection': {
-                const heading = typeof section.content.title === 'string' ? section.content.title : 'Artikel Pilihan';
+                const heading = typeof section.content.title === 'string' ? section.content.title : t('featuredArticles');
                 const postIds = Array.isArray(section.content.post_ids)
                   ? (section.content.post_ids as unknown[]).filter((id): id is string => typeof id === 'string')
                   : [];
