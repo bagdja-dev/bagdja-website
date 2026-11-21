@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 
 import { getWebsiteBySlug } from '../../lib/api-client';
-import { TemplateLocaleProvider, resolveTemplateLocale } from '../../components/templates/shared/template-locale';
+import { TemplateLocaleProvider } from '../../components/templates/shared/template-locale';
+import { resolveTemplateLocale } from '../../components/templates/shared/template-locale-core';
 import { getAuthViewState } from '../../lib/auth-view';
 import { toNavPage } from '../../lib/template-data';
 import { renderTemplateShell } from '../../lib/template-runtime-route';
