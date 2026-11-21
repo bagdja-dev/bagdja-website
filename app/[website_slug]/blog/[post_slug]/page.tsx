@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getBlogPostBySlug } from '../../../../lib/api-client';
+import { getBlogPostBySlug, getWebsiteBySlug } from '../../../../lib/api-client';
+import { contentMetadata, jsonLd, tenantCanonicalUrl } from '../../../../lib/content-seo';
 import { CartProvider } from '../../../../lib/cart';
 import { getAuthViewState } from '../../../../lib/auth-view';
 import { loadTenant } from '../../../../lib/tenant-loader';
@@ -27,13 +28,21 @@ interface BlogArticlePageProps {
 }
 
 export async function generateMetadata({ params }: BlogArticlePageProps): Promise<Metadata> {
-  const post = await getBlogPostBySlug(params.website_slug, params.post_slug);
-  if (!post) return {};
+  const [post, website] = await Promise.all([
+    getBlogPostBySlug(params.website_slug, params.post_slug),
+    getWebsiteBySlug(params.website_slug),
+  ]);
+  if (!post || !website) return { robots: { index: false, follow: false } };
 
-  return {
-    title: post.title,
-    description: post.excerpt ?? undefined,
-  };
+  return contentMetadata({
+    slug: params.website_slug,
+    path: `/blog/${post.slug}`,
+    title: post.seo_title?.trim() || post.title,
+    description: post.seo_description?.trim() || post.excerpt,
+    image: post.seo_image?.trim() || post.cover_image || website.logo_url,
+    noIndex: post.seo_no_index || !post.is_published,
+    website,
+  });
 }
 
 export default async function BlogArticlePage({ params }: BlogArticlePageProps) {
@@ -57,6 +66,28 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   if (!Renderer) notFound();
 
   const sections: SectionEntry[] = [{ type: 'blog_article', content: { post: toBlogPostItem(post) } }];
+  const articleStructuredData = post.is_published
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.seo_title?.trim() || post.title,
+        description: post.seo_description?.trim() || post.excerpt || undefined,
+        image: post.seo_image?.trim() || post.cover_image || undefined,
+        datePublished: post.published_at || undefined,
+        dateModified: post.updated_at || undefined,
+        author: { '@type': 'Organization', name: website.name },
+        publisher: {
+          '@type': 'Organization',
+          name: website.name,
+          ...(website.logo_url ? { logo: { '@type': 'ImageObject', url: website.logo_url } } : {}),
+        },
+        mainEntityOfPage: tenantCanonicalUrl(
+          params.website_slug,
+          `/blog/${post.slug}`,
+          website,
+        ),
+      }
+    : null;
 
   const props: TemplateRenderProps = {
     isPreview: false,
@@ -98,6 +129,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
 
   return (
     <>
+      {articleStructuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(articleStructuredData) }} />}
       {designerHeader.node}
       <CartProvider slug={params.website_slug}>
         <Renderer {...props} hideHeader={designerHeader.active} />

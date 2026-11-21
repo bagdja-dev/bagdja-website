@@ -25,7 +25,6 @@ import { notFound } from 'next/navigation';
 import { getWebsiteBySlug } from '../../../lib/api-client';
 import { CartProvider } from '../../../lib/cart';
 import { getAllowedAdminOrigins } from '../../../lib/preview-protocol';
-import { resolveSections } from '../../../lib/template-data';
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import { loadTenantPageView } from '../../../lib/tenant-page-view';
 import { PreviewShell } from '../../../components/preview/preview-shell';
@@ -72,7 +71,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
   if (pageRef && !target) notFound();
 
   const pageSlug = target && !target.is_home ? target.slug : undefined;
-  const view = await loadTenantPageView(params.website_slug, pageSlug, FRESH);
+  const view = await loadTenantPageView(params.website_slug, pageSlug, FRESH, { preloadPortfolioForDraft: true });
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
   if (!view.templateSlug) notFound();
@@ -93,9 +92,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
         ...view.props,
         isPreview: true,
       });
-      const isHome = !pageSlug;
       const previewPageSlug = view.tenant.page?.slug ?? target?.slug ?? '';
-      const draftFallbackSections = isHome ? resolveSections(null, view.tenant.website.template) : [];
       // Versi dengan browser.js → render di browser (template-client-rendering-plan fase 3): tanpa runtime,
       // perubahan draft dirender lokal seketika (juga di production). Versi lama → runtime seperti sebelumnya.
       const previewBundle = getTemplateStudioPreviewBundle(view.templateSlug, runtimeVersion, runtime?.browserBundle);
@@ -111,8 +108,6 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
             allowDemoImageHost={process.env.NODE_ENV !== 'production'}
             renderBundle={previewBundle}
             initialProps={runtimeProps}
-            draftIsHome={isHome}
-            draftFallbackSections={draftFallbackSections}
           />
         );
       }
@@ -141,10 +136,6 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
               ? {
                   draftEndpoint: '/api/template-runtime/studio-preview',
                   initialProps: runtimeProps,
-                  draftIsHome: isHome,
-                  draftFallbackSections: isHome
-                    ? resolveSections(null, view.tenant.website.template)
-                    : [],
                 }
               : {}
           )}
@@ -176,9 +167,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
       <PreviewShell
         templateSlug={view.templateSlug}
         pageSlug={tenant.page?.slug ?? target?.slug ?? ''}
-        isHome={!pageSlug}
-        viewProps={view.props}
-        fallbackSections={pageSlug ? [] : resolveSections(null, tenant.website.template)}
+        viewProps={{ ...view.props, isPreview: true }}
         flowStepsByFlowId={flowStepsByFlowId}
         allowedOrigins={getAllowedAdminOrigins()}
       />

@@ -25,12 +25,16 @@ import {
   type FaqItem,
   type LocationItem,
   type NavPage,
+  type PortfolioCategoryItem,
+  type PortfolioClientItem,
+  type PortfolioProjectItem,
   type SectionEntry,
 } from '../../../lib/template-data';
 import { matchesProductGridFilter, productGridFilter } from '../../../lib/product-grid-filter';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { ProductDescription } from '../shared/product-description';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
 import { CheckoutContent } from '../../checkout-content';
@@ -47,7 +51,9 @@ import { ModelViewerElement } from '../../model-viewer-element';
 import { StoreClassicHeader, type HeaderNavLink } from '../store-classic/store-classic-header';
 import { TemplateFooter } from '../shared/template-footer';
 import {
+  getContrastTextColor,
   getGoogleFontsUrl,
+  isHexColor,
   resolveTheme,
   themeToCssVariables,
   type WebsiteTheme,
@@ -56,6 +62,7 @@ import { resolvePageHeadingLabel } from '../../../lib/page-title';
 import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { BlogRelatedProducts } from '../../blog-related-products';
+import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 
 export interface WorkshopViewProps {
   isPreview: boolean;
@@ -82,6 +89,9 @@ export interface WorkshopViewProps {
   tenantSlug?: string;
   websiteId?: string;
   pages?: NavPage[];
+  portfolioProjects?: PortfolioProjectItem[];
+  portfolioCategories?: PortfolioCategoryItem[];
+  portfolioClients?: PortfolioClientItem[];
   auth?: {
     isLoggedIn: boolean;
     username?: string;
@@ -147,7 +157,7 @@ function WorkshopBlogGrid({ posts, websiteSlug }: { posts: BlogPostItem[]; websi
         >
           {post.coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+            <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
           ) : <div className="aspect-[16/9] bg-[var(--brand-accent)]/10" />}
           <div className="p-4 sm:p-5">
             {post.publishedAtLabel && <p className="text-[10px] font-semibold uppercase text-[var(--brand-muted)]">{post.publishedAtLabel}</p>}
@@ -187,7 +197,7 @@ function WorkshopBlogArticle({ post, websiteSlug }: { post: BlogPostItem; websit
       {post.coverImage && (
         <div className="mt-7 overflow-hidden border" style={{ borderColor: 'var(--brand-border)' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.coverImage} alt="" className="aspect-[16/9] w-full object-cover" />
+          <img src={post.coverImage} alt={post.title} className="aspect-[16/9] w-full object-cover" />
         </div>
       )}
       <div
@@ -230,24 +240,36 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
   const subtitle = getString(content, 'subtitle') ?? 'KONSTRUKSI BAJA · WELDING · ALUMINIUM';
   const headline = getString(content, 'headline') ?? 'Dibangun untuk bertahan.';
   const lede = getString(content, 'lede') ?? tagline;
+  const backgroundColor = isHexColor(content.background_color) ? content.background_color : undefined;
+  const textColor = backgroundColor ? getContrastTextColor(backgroundColor) : 'var(--brand-bg)';
+  const mutedTextColor = backgroundColor
+    ? textColor === '#ffffff' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(17, 24, 39, 0.72)'
+    : 'rgba(255, 255, 255, 0.7)';
+  const subtleBorderColor = backgroundColor
+    ? `${textColor === '#ffffff' ? '#ffffff' : '#111827'}40`
+    : 'rgba(255, 255, 255, 0.2)';
   const heroImage = typeof content.image_url === 'string' && content.image_url.trim()
     ? content.image_url.trim()
     : Array.isArray(content.images)
       ? parseGalleryImages(content.images)[0]?.url
       : undefined;
+  const heroImageAlt = getString(content, 'image_url_alt')?.trim() || headline;
   const stats = Array.isArray(content.stats)
     ? content.stats.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
     : [];
 
   return (
-    <section className="relative overflow-hidden bg-[var(--brand-text)] text-[var(--brand-bg)]">
+    <section
+      className="relative overflow-hidden bg-[var(--brand-text)] text-[var(--brand-bg)]"
+      style={backgroundColor ? { backgroundColor, color: textColor } : undefined}
+    >
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-0 pt-16 sm:px-6 sm:pt-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
         <div className="pb-12">
           <p className="font-mono text-xs font-bold tracking-[0.18em] text-[var(--brand-warning)]">{subtitle}</p>
           <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-[1.02] tracking-tight sm:text-6xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>
             {headline}
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg">{lede}</p>
+          <p className="mt-6 max-w-xl text-base leading-relaxed sm:text-lg" style={{ color: mutedTextColor }}>{lede}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
               href={chatHref || waHref || '#'}
@@ -258,14 +280,27 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
             >
               Hubungi Kami
             </a>
-            <a href="#layanan" className="border-2 border-white/40 px-5 py-3 text-center text-sm font-bold text-white hover:border-white">Lihat Layanan</a>
+            <a
+              href="#layanan"
+              className="border-2 px-5 py-3 text-center text-sm font-bold hover:border-white"
+              style={{ borderColor: subtleBorderColor, color: textColor }}
+            >
+              Lihat Layanan
+            </a>
           </div>
           {stats.length > 0 ? (
-            <div className="mt-12 grid max-w-xl grid-cols-3 border-t border-white/20 pt-5">
-              {stats.slice(0, 3).map((stat, index) => (
-                <div key={index} className="border-r border-white/20 pr-3 last:border-0">
-                  <strong className="block text-2xl text-[var(--brand-warning)]">{typeof stat.value === 'string' ? stat.value : '-'}</strong>
-                  <span className="mt-1 block text-xs text-white/60">{typeof stat.label === 'string' ? stat.label : ''}</span>
+            <div
+              className="mt-12 grid max-w-xl grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-x-4 gap-y-5 border-t pt-5"
+              style={{ borderColor: subtleBorderColor }}
+            >
+              {stats.slice(0, 5).map((stat, index) => (
+                <div key={index} className="min-w-0 border-l pl-3 first:border-l-0 first:pl-0" style={{ borderColor: subtleBorderColor }}>
+                  <strong className="block break-words text-xl font-bold leading-tight text-[var(--brand-warning)] sm:text-2xl">
+                    {typeof stat.value === 'string' ? stat.value : '-'}
+                  </strong>
+                  <span className="mt-1 block break-words text-[11px] leading-relaxed sm:text-xs" style={{ color: mutedTextColor }}>
+                    {typeof stat.label === 'string' ? stat.label : ''}
+                  </span>
                 </div>
               ))}
             </div>
@@ -275,13 +310,12 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
           {heroImage ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={heroImage} alt={headline} className="h-full w-full object-cover" />
+              <img src={heroImage} alt={heroImageAlt} className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 bg-black/20" />
             </>
           ) : (
-            <div className="h-full w-full bg-[linear-gradient(120deg,#4a5259_25%,#454d53_25%,#454d53_50%,#4a5259_50%,#4a5259_75%,#454d53_75%)] bg-[length:52px_52px]" />
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,#4a5259_25%,#454d53_25%,#454d53_50%,#4a5259_50%,#4a5259_75%,#454d53_75%)] bg-[length:52px_52px]" />
           )}
-          <span className="absolute bottom-5 right-5 font-mono text-xs text-white/70">BUILT TO LAST</span>
         </div>
       </div>
     </section>
@@ -303,8 +337,27 @@ function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
   const features = parseFeatureItems(content)
     .map((item) => ({ ...item, icon: item.icon || '⭐' }))
     .filter((item) => item.title.trim());
+  const visualMode = content.visual_mode === 'image' ? 'image' : 'icon';
   if (!features.length) return null;
-  return <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6"><SectionHeading title={title} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{features.map((item) => <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}><span className="font-mono text-sm font-bold text-[var(--brand-accent)]">{item.icon}</span><h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>{item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}</article>)}</div></section>;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+      <SectionHeading title={title} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {features.map((item) => (
+          <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+            {visualMode === 'image' && item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="h-12 w-12 object-contain" />
+            ) : (
+              <span className="font-mono text-sm font-bold text-[var(--brand-accent)]">{item.icon}</span>
+            )}
+            <h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>
+            {item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function WorkshopCta({ content, cta }: { content: Record<string, unknown>; cta: CtaHref | null }) {
@@ -416,7 +469,13 @@ function WorkshopServices({ products, websiteSlug, content }: { products: Catalo
                   </div>
                   <span className="font-mono text-xs text-[var(--brand-accent)]">{item.priceLabel || 'KONSULTASI'}</span>
                 </div>
-                {item.description ? <p className="mt-3 text-sm text-[var(--brand-muted)]">{item.description}</p> : null}
+                {item.description || item.descriptionHtml ? (
+                  <ProductDescription
+                    description={item.description}
+                    descriptionHtml={item.descriptionHtml}
+                    className="mt-3 text-sm text-[var(--brand-muted)] [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  />
+                ) : null}
                 <span className="mt-5 block font-mono text-xs text-[var(--brand-accent)] opacity-0 transition-opacity group-hover:opacity-100">DETAIL LAYANAN →</span>
               </div>
             </a>
@@ -493,10 +552,6 @@ function WorkshopCategoryListing({
             ) : (
               <div className="h-full w-full bg-[linear-gradient(120deg,#4a5259_25%,#454d53_25%,#454d53_50%,#4a5259_50%,#4a5259_75%,#454d53_75%)] bg-[length:52px_52px]" />
             )}
-
-            <span className="absolute bottom-4 right-4 font-mono text-[10px] uppercase tracking-[0.3em] text-white/75 sm:text-xs">
-              BUILT TO LAST
-            </span>
           </div>
         </div>
       </div>
@@ -592,7 +647,13 @@ function WorkshopCategoryListing({
                     <div className="min-w-0 flex-1 py-1">
                       <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--brand-accent)]">{item.type}</p>
                       <h3 className="mt-1 text-base font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.name}</h3>
-                      <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[var(--brand-muted)]">{shortDescription}</p>
+                      <ProductDescription
+                        description={item.description}
+                        descriptionHtml={item.descriptionHtml}
+                        className="mt-1 line-clamp-3 text-xs leading-relaxed text-[var(--brand-muted)] [&_p]:mb-1 [&_p:last-child]:mb-0"
+                      >
+                        {shortDescription}
+                      </ProductDescription>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span className="text-xs font-semibold text-[var(--brand-accent)]">{item.priceLabel || 'Konsultasi'}</span>
                         <span className="font-mono text-[10px] uppercase tracking-wide opacity-60">Detail →</span>
@@ -659,6 +720,36 @@ function WorkshopFaq({ faqs, content }: { faqs: FaqItem[]; content: Record<strin
   return <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-3xl px-4 sm:px-6"><SectionHeading title={getString(content, 'title')} />{items.map((faq) => <details key={faq.id} className="border-t py-4" style={{ borderColor: 'var(--brand-border)' }}><summary className="cursor-pointer font-bold">{faq.question}</summary><p className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)]">{faq.answer}</p></details>)}</div></section>;
 }
 
+function WorkshopTextBlock({ content }: { content: Record<string, unknown> }) {
+  const title = getString(content, 'title');
+  const body = getString(content, 'body');
+  if (!body) return null;
+  const align = content.align === 'center' ? 'text-center' : 'text-left';
+  return (
+    <section className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+      <div className={align}>
+        {title ? <SectionHeading title={title} /> : null}
+        <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base">{body}</p>
+      </div>
+    </section>
+  );
+}
+
+function WorkshopRichText({ content }: { content: Record<string, unknown> }) {
+  const title = getString(content, 'title');
+  const html = getString(content, 'html');
+  if (!html) return null;
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+      {title ? <SectionHeading title={title} /> : null}
+      <div
+        className="prose prose-neutral max-w-none text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base [&_a]:text-[var(--brand-accent)] [&_a]:underline [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_img]:my-3 [&_img]:max-w-full [&_li]:ml-5 [&_ol]:list-decimal [&_p]:mb-3 [&_ul]:list-disc"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </section>
+  );
+}
+
 function WorkshopContact({ content, chatHref, locations }: { content: Record<string, unknown>; chatHref?: string; locations: LocationItem[] }) {
   const location = locations.find((item) => item.isPrimary) ?? locations[0];
   return <section className="bg-[var(--brand-accent)] py-14 text-[var(--brand-on-accent)]"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-end md:justify-between"><div><SectionHeading title={getString(content, 'title')} subtitle={getString(content, 'subtitle')} />{location ? <p className="text-sm opacity-80">{[location.addressLine, location.city].filter(Boolean).join(', ')}</p> : null}</div>{chatHref ? <a href={chatHref} className="flex w-full flex-1 justify-center rounded-full border-2 border-current px-5 py-3 text-center text-sm font-bold">KIRIM KEBUTUHAN PROYEK →</a> : null}</div></section>;
@@ -693,18 +784,18 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
   return (
     <>
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div>
-            <div className="relative overflow-hidden border" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
+          <div className="flex h-full flex-col">
+            <div className="relative flex min-h-[320px] flex-1 flex-col overflow-hidden border" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
               {activeSlide ? (
                 activeSlide.type === 'image' ? (
-                  <button type="button" onClick={() => setIsPreviewOpen(true)} className="block w-full">
+                  <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute inset-0 block h-full w-full">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={activeSlide.url} alt={item.name} className="aspect-square w-full object-cover" />
+                    <img src={activeSlide.url} alt={item.name} className="h-full w-full object-cover" />
                   </button>
                 ) : activeSlide.type === 'video' ? (
-                  <div className="relative">
-                    <video src={activeSlide.url} controls className="aspect-square w-full object-cover" playsInline autoPlay muted loop>
+                  <div className="relative h-full min-h-[320px] flex-1">
+                    <video src={activeSlide.url} controls className="absolute inset-0 h-full w-full object-cover" playsInline autoPlay muted loop>
                       <track kind="captions" />
                     </video>
                     <button type="button" onClick={() => setIsPreviewOpen(true)} className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
@@ -712,7 +803,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                     </button>
                   </div>
                 ) : (
-                  <div className="relative aspect-square w-full">
+                  <div className="relative min-h-[320px] flex-1">
                     <ModelViewerElement
                       src={activeSlide.url}
                       className="absolute inset-0 h-full w-full"
@@ -724,7 +815,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                     </button>
                   </div>
                 )
-              ) : <div className="flex aspect-square items-center justify-center font-mono text-sm text-[var(--brand-muted)]">NO IMAGE</div>}
+              ) : <div className="flex min-h-[320px] flex-1 items-center justify-center font-mono text-sm text-[var(--brand-muted)]">NO IMAGE</div>}
 
               {slides.length > 1 ? (
                 <>
@@ -780,7 +871,13 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brand-accent)]">{item.category ?? 'LAYANAN WORKSHOP'}</p>
               <h1 className="mt-3 text-3xl font-bold sm:text-5xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{item.name}</h1>
               {item.priceLabel ? <p className="mt-5 text-xl font-bold text-[var(--brand-accent)]">{item.priceLabel}</p> : null}
-              {item.description ? <p className="mt-5 leading-relaxed text-[var(--brand-muted)]">{item.description}</p> : null}
+              {item.description || item.descriptionHtml ? (
+                <ProductDescription
+                  description={item.description}
+                  descriptionHtml={item.descriptionHtml}
+                  className="mt-5 leading-relaxed text-[var(--brand-muted)] [&_p]:mb-2 [&_p:last-child]:mb-0"
+                />
+              ) : null}
             </div>
 
             {item.type === 'gathering' && item.gatheringMeta && (
@@ -990,6 +1087,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
 }
 
 export function WorkshopView({
+  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1003,6 +1101,9 @@ export function WorkshopView({
   tenantSlug,
   websiteId,
   pages = [],
+  portfolioProjects = [],
+  portfolioCategories = [],
+  portfolioClients = [],
   auth,
 }: WorkshopViewProps) {
   const name = profile.name?.trim() || 'Workshop Anda';
@@ -1046,6 +1147,7 @@ export function WorkshopView({
       >
         <StoreClassicHeader
           title={name}
+          logoUrl={profile.logoUrl}
           homeHref={homeHref}
           waHref={waHref}
           showWhatsappCta
@@ -1067,10 +1169,14 @@ export function WorkshopView({
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
             <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
-        ) : utilityPage || isCategoryListingPage ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection?.content ?? {}} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
+        ) : utilityPage || isCategoryListingPage || !heroSection ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection.content} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map(withSectionFrame((section, index) => {
           const key = `${section.type}-${index}`;
           switch (section.type) {
+            case 'portfolio_projects':
+              return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} />;
+            case 'portfolio_clients':
+              return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
             case 'features_grid': return <WorkshopFeatures key={key} content={section.content} />;
             case 'category_grid': return <WorkshopCategories key={key} categories={categories} websiteSlug={websiteSlug} content={section.content} />;
             case 'category_listing': {
@@ -1086,6 +1192,8 @@ export function WorkshopView({
             case 'about': return <WorkshopAbout key={key} content={section.content} />;
             case 'testimonial': return <WorkshopTestimonials key={key} content={section.content} />;
             case 'faq_list': return <WorkshopFaq key={key} faqs={faqs} content={section.content} />;
+            case 'text_block': return <WorkshopTextBlock key={key} content={section.content} />;
+            case 'rich_text': return <WorkshopRichText key={key} content={section.content} />;
             case 'blog_list': {
               const title = getString(section.content, 'title') ?? 'Artikel Terbaru';
               const limit = Number(section.content.limit);

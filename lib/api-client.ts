@@ -20,6 +20,7 @@ export interface ApiWebsite {
   name: string;
   slug: string;
   domain: string | null;
+  domain_verified_at?: string | null;
   template_id: string | null;
   /** Salinan versi package terpasang; null untuk template bawaan. Gunakan `template_runtime`. */
   template_runtime_version: string | null;
@@ -50,6 +51,7 @@ export interface ApiWebsite {
   template: ApiWebsiteTemplate | null;
   tagline: string | null;
   logo_url: string | null;
+  login_background_url?: string | null;
   whatsapp: string | null;
   phone: string | null;
   email: string | null;
@@ -71,13 +73,18 @@ export interface ApiWebsiteSection {
   order: number;
 }
 
-export type ApiPagePlacement = 'regular' | 'header' | 'footer';
+export type ApiPagePlacement = 'regular' | 'header' | 'footer' | 'hidden';
 
 export interface ApiWebsitePage {
   id: string;
   website_id: string;
+  name: string;
   title: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   content: Record<string, unknown>;
   is_home: boolean;
   placement: ApiPagePlacement;
@@ -112,6 +119,10 @@ export interface ApiWebsiteProduct {
   website_id: string;
   name: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   type: string;
   category: string | null;
   /** Id kategori (kolom entity, ikut di respons publik) — dipakai filter section Daftar Produk. */
@@ -132,6 +143,7 @@ export interface ApiWebsiteProduct {
   video_urls?: string[] | null;
   model3d_url?: string | null;
   metadata: Record<string, unknown>;
+  is_active?: boolean;
   gathering_options?: Array<{
     id: string;
     option_group_key: string;
@@ -195,6 +207,7 @@ export interface GridResult<T> {
 export interface ApiWebsiteCategory {
   id: string;
   website_id: string;
+  identity_name: string;
   label: string;
   description?: string | null;
   images: string[];
@@ -226,6 +239,47 @@ export interface ApiWebsiteLocation {
   shipping_enabled: boolean;
 }
 
+export interface ApiWebsitePortfolioCategory {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface ApiWebsitePortfolioProject {
+  id: string;
+  slug: string;
+  name: string;
+  tags: string[];
+  cover_image: string | null;
+  photos: Array<{ url: string; alt: string; caption: string }>;
+  project_url: string | null;
+  project_type: string | null;
+  year: number | null;
+  created_at: string;
+  categories: ApiWebsitePortfolioCategory[];
+  client: { id: string; name: string; logo_url: string | null } | null;
+  translation: {
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    detail: string | null;
+  } | null;
+}
+
+export interface ApiWebsiteClient {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  website_url: string | null;
+  translation: {
+    name: string;
+    description: string | null;
+  } | null;
+  categories: Array<{ id: string; slug: string; name: string }>;
+}
+
 export interface ApiWebsiteFaq {
   id: string;
   website_id: string;
@@ -240,6 +294,10 @@ export interface ApiWebsiteBlogPost {
   website_id: string;
   title: string;
   slug: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_image?: string | null;
+  seo_no_index?: boolean;
   excerpt: string | null;
   content: string | null;
   cover_image: string | null;
@@ -253,6 +311,7 @@ export interface ApiWebsiteBlogPost {
   is_published: boolean;
   published_at: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 /**
@@ -261,11 +320,21 @@ export interface ApiWebsiteBlogPost {
  */
 export interface PublicFetchOptions {
   fresh?: boolean;
+  locale?: string;
+  acceptLanguage?: string;
 }
 
 async function fetchPublic<T>(path: string, options: PublicFetchOptions = {}): Promise<T | null> {
-  const init: RequestInit = options.fresh ? { cache: 'no-store' } : { next: { revalidate: 60 } };
-  const res = await fetch(`${API_URL}${path}`, init);
+  const init: RequestInit & { next?: { revalidate: number } } = options.fresh
+    ? { cache: 'no-store' }
+    : { next: { revalidate: 60 } };
+  const acceptLanguage = options.acceptLanguage
+    ?? (typeof navigator !== 'undefined' ? navigator.languages.join(',') || navigator.language : undefined);
+  if (acceptLanguage) init.headers = { 'Accept-Language': acceptLanguage };
+  const localizedPath = options.locale
+    ? `${path}${path.includes('?') ? '&' : '?'}locale=${encodeURIComponent(options.locale)}`
+    : path;
+  const res = await fetch(`${API_URL}${localizedPath}`, init);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Bagdja API ${res.status} on ${path}`);
@@ -341,6 +410,30 @@ export async function getProducts(
 export async function getCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsiteCategory[]> {
   const result = await fetchPublic<ApiWebsiteCategory[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/categories`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getPortfolioProjects(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioProject[]> {
+  const result = await fetchPublic<ApiWebsitePortfolioProject[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/portfolio-projects`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getPortfolioCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioCategory[]> {
+  const result = await fetchPublic<ApiWebsitePortfolioCategory[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/portfolio-categories`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getWebsiteClients(slug: string, options?: PublicFetchOptions): Promise<ApiWebsiteClient[]> {
+  const result = await fetchPublic<ApiWebsiteClient[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/clients`,
     options,
   );
   return result ?? [];

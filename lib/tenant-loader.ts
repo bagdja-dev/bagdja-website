@@ -8,18 +8,30 @@ import {
   getHomePage,
   getLocations,
   getPageBySlug,
+  getPortfolioCategories,
+  getPortfolioProjects,
+  getWebsiteClients,
   getProducts,
   getWebsiteBySlug,
   type PublicFetchOptions,
   type ApiWebsite,
   type ApiWebsiteBlogPost,
   type ApiWebsiteCategory,
+  type ApiWebsiteClient,
   type ApiWebsiteFaq,
   type ApiWebsiteLocation,
   type ApiWebsitePage,
   type ApiWebsiteProduct,
+  type ApiWebsitePortfolioCategory,
+  type ApiWebsitePortfolioProject,
 } from './api-client';
 import { applyViewerTemplateTrial } from './template-trial';
+import { resolveSections } from './template-data';
+
+export interface TenantLoadOptions {
+  /** Preload portfolio data so unsaved sections can render in the Studio iframe. */
+  preloadPortfolioForDraft?: boolean;
+}
 
 export interface TenantData {
   website: ApiWebsite;
@@ -29,6 +41,9 @@ export interface TenantData {
   locations: ApiWebsiteLocation[];
   faqs: ApiWebsiteFaq[];
   blogPosts: ApiWebsiteBlogPost[];
+  portfolioProjects: ApiWebsitePortfolioProject[];
+  portfolioCategories: ApiWebsitePortfolioCategory[];
+  portfolioClients: ApiWebsiteClient[];
   /** Fase 5 paywall: true kalau subscription owner tidak aktif. */
   subscription_inactive: boolean;
 }
@@ -38,6 +53,7 @@ export async function loadTenant(
   slug: string,
   pageSlug?: string,
   options?: PublicFetchOptions,
+  viewOptions: TenantLoadOptions = {},
 ): Promise<TenantData | null> {
   const publicWebsite = await getWebsiteBySlug(slug, options);
   if (!publicWebsite) return null;
@@ -54,6 +70,17 @@ export async function loadTenant(
     getLocations(slug, undefined, options),
     getFaqs(slug, undefined, options),
     getBlogPosts(slug, options),
+  ]);
+
+  const configuredSections = resolveSections(page, website.template, !pageSlug);
+  const hasProjectSection = viewOptions.preloadPortfolioForDraft
+    || configuredSections.some((section) => section.type === 'portfolio_projects');
+  const hasClientSection = viewOptions.preloadPortfolioForDraft
+    || configuredSections.some((section) => section.type === 'portfolio_clients');
+  const [portfolioProjects, portfolioCategories, portfolioClients] = await Promise.all([
+    hasProjectSection ? getPortfolioProjects(slug, options) : Promise.resolve([]),
+    hasProjectSection ? getPortfolioCategories(slug, options) : Promise.resolve([]),
+    hasClientSection ? getWebsiteClients(slug, options) : Promise.resolve([]),
   ]);
 
   if (page?.sections) {
@@ -91,6 +118,9 @@ export async function loadTenant(
     locations,
     faqs,
     blogPosts,
+    portfolioProjects,
+    portfolioCategories,
+    portfolioClients,
     subscription_inactive: website.subscription_inactive ?? false,
   };
 }

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
-import { getWebsiteBySlug } from '../../lib/api-client';
+import { getHomePage, getWebsiteBySlug } from '../../lib/api-client';
 import { CartProvider } from '../../lib/cart';
+import { contentMetadata } from '../../lib/content-seo';
 import { loadTenantPageView } from '../../lib/tenant-page-view';
 import WebsiteInactiveNotice from '../../components/website-inactive-notice';
 import { getTemplateRenderer } from '../../lib/template-registry';
@@ -15,17 +17,27 @@ interface TenantPageProps {
 }
 
 export async function generateMetadata({ params }: TenantPageProps): Promise<Metadata> {
-  const website = await getWebsiteBySlug(params.website_slug);
-  if (!website) return {};
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const [website, page] = await Promise.all([
+    getWebsiteBySlug(params.website_slug),
+    getHomePage(params.website_slug, { acceptLanguage }),
+  ]);
+  if (!website) return { robots: { index: false, follow: false } };
 
-  return {
-    title: website.name,
-    description: website.tagline ?? undefined,
-  };
+  return contentMetadata({
+    slug: params.website_slug,
+    path: '/',
+    title: page?.seo_title?.trim() || website.name,
+    description: page?.seo_description?.trim() || website.tagline,
+    image: page?.seo_image?.trim() || website.logo_url,
+    noIndex: page?.seo_no_index,
+    website,
+  });
 }
 
 export default async function TenantPage({ params }: TenantPageProps) {
-  const view = await loadTenantPageView(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const view = await loadTenantPageView(params.website_slug, undefined, { acceptLanguage });
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
 

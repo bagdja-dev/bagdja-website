@@ -3,13 +3,16 @@
 import type {
   ApiWebsiteBlogPost,
   ApiWebsiteCategory,
+  ApiWebsiteClient,
   ApiWebsiteFaq,
   ApiWebsiteLocation,
   ApiWebsitePage,
   ApiWebsiteProduct,
+  ApiWebsitePortfolioCategory,
+  ApiWebsitePortfolioProject,
   ApiWebsiteTemplate,
 } from './api-client';
-import { richTextHtml, richTextToPlainText } from './rich-text';
+import { PRODUCT_HTML_MAX_LENGTH, richTextHtml, richTextToPlainText } from './rich-text';
 
 export interface GatheringOptionGroup {
   key: string;
@@ -43,6 +46,7 @@ export interface CatalogItem {
   slug: string;
   price?: number;
   description?: string;
+  descriptionHtml?: string;
   detail?: string;
   gatheringMeta?: {
     eventDate?: string;
@@ -87,6 +91,78 @@ export interface CategoryItem {
   images: string[];
   specifications?: Record<string, string>;
   estimation?: Array<{ label: string; price: number | string }>;
+}
+
+export interface PortfolioCategoryItem {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  sortOrder: number;
+}
+
+export interface PortfolioProjectItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt?: string;
+  image?: string;
+  tags: string[];
+  year?: number;
+  createdAt: string;
+  projectUrl?: string;
+  clientName?: string;
+  categories: PortfolioCategoryItem[];
+}
+
+export interface PortfolioClientItem {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  categories: Array<{ id: string; slug: string; name: string }>;
+}
+
+export function toPortfolioClientItem(client: ApiWebsiteClient): PortfolioClientItem {
+  return {
+    id: client.id,
+    name: client.translation?.name ?? client.name,
+    logoUrl: client.logo_url ?? undefined,
+    websiteUrl: client.website_url ?? undefined,
+    categories: client.categories ?? [],
+  };
+}
+
+export function toPortfolioCategoryItem(category: ApiWebsitePortfolioCategory): PortfolioCategoryItem {
+  return {
+    id: category.id,
+    slug: category.slug,
+    name: category.name,
+    description: category.description ?? undefined,
+    sortOrder: category.sort_order,
+  };
+}
+
+export function toPortfolioProjectItem(project: ApiWebsitePortfolioProject): PortfolioProjectItem {
+  return {
+    id: project.id,
+    slug: project.translation?.slug ?? project.slug,
+    title: project.translation?.title ?? project.name,
+    excerpt: project.translation?.excerpt ?? undefined,
+    image: project.cover_image ?? project.photos?.[0]?.url ?? undefined,
+    tags: project.tags ?? [],
+    year: project.year ?? undefined,
+    createdAt: project.created_at,
+    projectUrl: project.project_url ?? undefined,
+    clientName: project.client?.name ?? undefined,
+    categories: (project.categories ?? []).map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      description: category.description ?? undefined,
+      sortOrder: category.sort_order,
+    })),
+  };
 }
 
 function normalizeCategorySpecifications(raw: unknown): Record<string, string> | undefined {
@@ -216,6 +292,8 @@ export interface GalleryImageItem {
 
 export interface FeatureItem {
   icon: string;
+  image: string;
+  imageAlt: string;
   title: string;
   desc: string;
 }
@@ -226,6 +304,8 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
       .map((item) => ({
         icon: typeof item.icon === 'string' ? item.icon : '',
+        image: typeof item.image === 'string' ? item.image : '',
+        imageAlt: typeof item.image_alt === 'string' ? item.image_alt : '',
         title: typeof item.title === 'string' ? item.title : '',
         desc: typeof item.desc === 'string' ? item.desc : '',
       }));
@@ -233,6 +313,8 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
 
   return [1, 2, 3, 4].map((index) => ({
     icon: typeof content[`feature_${index}_icon`] === 'string' ? content[`feature_${index}_icon`] as string : '',
+    image: '',
+    imageAlt: '',
     title: typeof content[`feature_${index}_title`] === 'string' ? content[`feature_${index}_title`] as string : '',
     desc: typeof content[`feature_${index}_desc`] === 'string' ? content[`feature_${index}_desc`] as string : '',
   }));
@@ -481,7 +563,8 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     name: product.name,
     slug: product.slug,
     price: Number(product.price),
-    description: product.description ?? undefined,
+    description: richTextToPlainText(product.description) || undefined,
+    descriptionHtml: richTextHtml(product.description, PRODUCT_HTML_MAX_LENGTH),
     detail: product.detail ?? undefined,
     gatheringMeta: normalizeGatheringMeta(product.metadata, product.gathering_options),
     specifications: normalizeProductSpecifications(product.specifications),
@@ -795,18 +878,17 @@ const DEFAULT_SECTIONS: SectionEntry[] = [
 /**
  * Urutan & konfigurasi section untuk sebuah halaman.
  * `allowTemplateFallback` (default true, dipakai untuk halaman home) fallback ke
- * `template.structure.sections` (lalu default hardcoded) supaya renderer tetap
- * tampil wajar meski website belum punya home page/sections (seharusnya jarang
- * terjadi karena WebsitesService.create() auto-seed). Untuk halaman non-home,
- * caller mengirim `false` — halaman baru yang belum diisi section memang wajar
- * tampil kosong, bukan ikut-ikutan tampilan default template (hero+grid home).
+ * `template.structure.sections` (lalu default hardcoded) hanya saat halaman home
+ * belum ditemukan atau responsnya tidak menyertakan daftar sections. Daftar
+ * sections kosong pada halaman yang ada adalah konfigurasi eksplisit dan harus
+ * tetap kosong. Untuk halaman non-home, caller mengirim `false`.
  */
 export function resolveSections(
   page: ApiWebsitePage | null,
   template: ApiWebsiteTemplate | null | undefined,
   allowTemplateFallback = true,
 ): SectionEntry[] {
-  if (page?.sections?.length) {
+  if (page && Array.isArray(page.sections)) {
     return [...page.sections]
       .sort((a, b) => a.order - b.order)
       .map((s) => ({ id: s.id, type: s.type, content: s.content ?? {} }));

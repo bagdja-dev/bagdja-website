@@ -7,7 +7,7 @@
  */
 import { getAuthViewState } from './auth-view';
 import type { PublicFetchOptions } from './api-client';
-import { loadTenant, type TenantData } from './tenant-loader';
+import { loadTenant, type TenantData, type TenantLoadOptions } from './tenant-loader';
 import {
   resolveSections,
   toBlogPostItem,
@@ -16,6 +16,9 @@ import {
   toFaqItem,
   toLocationItem,
   toNavPage,
+  toPortfolioCategoryItem,
+  toPortfolioClientItem,
+  toPortfolioProjectItem,
 } from './template-data';
 import type { TemplateRenderProps } from './template-registry';
 import { resolveTenantLinkBase } from './tenant-link-base';
@@ -41,8 +44,9 @@ export async function loadTenantPageView(
   websiteSlug: string,
   pageSlug?: string,
   options?: PublicFetchOptions,
+  viewOptions: TenantLoadOptions = {},
 ): Promise<TenantPageViewResult> {
-  const tenant = await loadTenant(websiteSlug, pageSlug, options);
+  const tenant = await loadTenant(websiteSlug, pageSlug, options, viewOptions);
   if (!tenant) return { status: 'not_found' };
   if (pageSlug && !tenant.page) return { status: 'not_found' };
   if (tenant.subscription_inactive) return { status: 'inactive' };
@@ -50,7 +54,7 @@ export async function loadTenantPageView(
   const linkBase = resolveTenantLinkBase(websiteSlug);
   const auth = await getAuthViewState(pageSlug ? `${linkBase}/${pageSlug}` : linkBase || '/', linkBase);
 
-  const { website, page, products, categories, locations, faqs, blogPosts } = tenant;
+  const { website, page, products, categories, locations, faqs, blogPosts, portfolioProjects, portfolioCategories, portfolioClients } = tenant;
 
   return {
     status: 'ok',
@@ -80,6 +84,9 @@ export async function loadTenantPageView(
       tenantSlug: website.slug,
       pages: website.pages.map(toNavPage),
       blogPosts: blogPosts.map(toBlogPostItem),
+      portfolioProjects: portfolioProjects.map(toPortfolioProjectItem),
+      portfolioCategories: portfolioCategories.map(toPortfolioCategoryItem),
+      portfolioClients: portfolioClients.map(toPortfolioClientItem),
       auth,
     },
   };

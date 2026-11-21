@@ -14,6 +14,19 @@ export type HeadingWeight = (typeof HEADING_WEIGHTS)[number];
 export type BodyWeight = (typeof BODY_WEIGHTS)[number];
 export type HeadingScale = (typeof HEADING_SCALES)[number];
 
+export function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+export function getContrastTextColor(backgroundColor: string): '#111827' | '#ffffff' {
+  const channels = [1, 3, 5].map((offset) => parseInt(backgroundColor.slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => (
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  ));
+  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  return luminance > 0.179 ? '#111827' : '#ffffff';
+}
+
 export interface ThemeColors {
   background?: string;
   surface?: string;

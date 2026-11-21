@@ -10,6 +10,7 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 
 /** Batas panjang HTML yang diteruskan ke template — sama dengan DTO opsi (5000). */
 export const RICH_TEXT_MAX_LENGTH = 5000;
+export const PRODUCT_HTML_MAX_LENGTH = 20000;
 
 export function richTextToPlainText(value: unknown): string {
   if (typeof value !== 'string' || !value) return '';
@@ -33,9 +34,9 @@ export function richTextToPlainText(value: unknown): string {
  * HTML untuk template: hanya keluaran editor (diawali tag) yang sudah melewati sanitasi API.
  * Teks polos lama tidak dikirim sebagai HTML — template memakai `description`.
  */
-export function richTextHtml(value: unknown): string | undefined {
+export function richTextHtml(value: unknown, maxLength = RICH_TEXT_MAX_LENGTH): string | undefined {
   if (typeof value !== 'string') return undefined;
   const html = value.trim();
-  if (!html.startsWith('<') || html.length > RICH_TEXT_MAX_LENGTH || !richTextToPlainText(html)) return undefined;
+  if (!html.startsWith('<') || html.length > maxLength || !richTextToPlainText(html)) return undefined;
   return html;
 }
