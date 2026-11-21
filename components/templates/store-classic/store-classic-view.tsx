@@ -31,10 +31,12 @@ import {
   parseFeatureItems,
   type FeatureItem,
   type PortfolioCategoryItem,
+  type PortfolioClientItem,
   type PortfolioProjectItem,
 } from '../../../lib/template-data';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { ProductDescription } from '../shared/product-description';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
   getContrastTextColor,
@@ -68,7 +70,7 @@ import { PurchaseControls } from '../../purchase-controls';
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
-import { StoreClassicPortfolio } from './store-classic-portfolio';
+import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 
 export interface StoreClassicProfile {
   name?: string;
@@ -99,6 +101,7 @@ export interface StoreClassicViewProps {
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
   portfolioCategories?: PortfolioCategoryItem[];
+  portfolioClients?: PortfolioClientItem[];
   hideHeader?: boolean;
   cartDesign?: 'store-classic';
   checkoutDesign?: 'store-classic';
@@ -408,11 +411,13 @@ export function ProductCard({
         <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
           {item.name}
         </p>
-        {item.description && (
-          <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-            {item.description}
-          </p>
-        )}
+        {item.description || item.descriptionHtml ? (
+          <ProductDescription
+            description={item.description}
+            descriptionHtml={item.descriptionHtml}
+            className="mt-1 line-clamp-2 text-sm [&_p]:mb-1 [&_p:last-child]:mb-0"
+          />
+        ) : null}
         {item.priceLabel && (
           <p className="mt-2 text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
             {item.priceLabel}
@@ -497,11 +502,13 @@ function FeaturedProductSection({
           <h2 className="mt-3 text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>
             {title || product.name}
           </h2>
-          {product.description && (
-            <p className="mt-3 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-              {product.description}
-            </p>
-          )}
+          {product.description || product.descriptionHtml ? (
+            <ProductDescription
+              description={product.description}
+              descriptionHtml={product.descriptionHtml}
+              className="mt-3 text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base [&_p]:mb-2 [&_p:last-child]:mb-0"
+            />
+          ) : null}
           {product.priceLabel && (
             <p className="mt-4 text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
               {product.priceLabel}
@@ -1111,11 +1118,13 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
             {(item.description || item.detail || specificationEntries.length > 0 || estimationEntries.length > 0) && (
               <section className="w-full border-y py-6" style={{ borderColor: 'var(--brand-border)' }}>
                 <h2 className="mb-4 text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Detail Produk</h2>
-                {item.description && (
-                  <p className="mb-5 max-w-4xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-                    {item.description}
-                  </p>
-                )}
+                {item.description || item.descriptionHtml ? (
+                  <ProductDescription
+                    description={item.description}
+                    descriptionHtml={item.descriptionHtml}
+                    className="mb-5 max-w-4xl text-sm leading-relaxed text-[var(--brand-muted)] sm:text-base [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  />
+                ) : null}
                 {specificationEntries.length > 0 && (
                   <div className="mb-6">
                     <h3 className="mb-3 text-base font-semibold">Spesifikasi</h3>
@@ -1257,6 +1266,7 @@ function ProductDetailSection({ item, allProducts, locations, waHref, websiteSlu
 }
 
 export function StoreClassicView({
+  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1272,6 +1282,7 @@ export function StoreClassicView({
   blogPosts = [],
   portfolioProjects = [],
   portfolioCategories = [],
+  portfolioClients = [],
   auth,
   hideHeader = false,
   cartDesign,
@@ -1449,13 +1460,15 @@ export function StoreClassicView({
               }
               case 'portfolio_projects':
                 return (
-                  <StoreClassicPortfolio
+                  <PortfolioProjectsSection
                     key={key}
                     content={section.content}
                     projects={portfolioProjects}
                     categories={portfolioCategories}
                   />
                 );
+              case 'portfolio_clients':
+                return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : 'Kategori Pilihan';
                 return (

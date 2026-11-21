@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 
 import { contentMetadata, jsonLd, tenantCanonicalUrl } from '../../../../lib/content-seo';
@@ -28,7 +29,8 @@ interface ProductDetailPageProps {
 }
 
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   const product = tenant?.products.find((p) => p.slug === params.product_slug || p.id === params.product_slug);
   if (!tenant || !product) return { robots: { index: false, follow: false } };
 
@@ -44,7 +46,8 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const tenant = await loadTenant(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const tenant = await loadTenant(params.website_slug, undefined, { acceptLanguage });
   if (!tenant) notFound();
   if (tenant.subscription_inactive) return <WebsiteInactiveNotice />;
   const auth = await getAuthViewState(

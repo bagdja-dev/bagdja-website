@@ -3,6 +3,7 @@
 import type {
   ApiWebsiteBlogPost,
   ApiWebsiteCategory,
+  ApiWebsiteClient,
   ApiWebsiteFaq,
   ApiWebsiteLocation,
   ApiWebsitePage,
@@ -11,7 +12,7 @@ import type {
   ApiWebsitePortfolioProject,
   ApiWebsiteTemplate,
 } from './api-client';
-import { richTextHtml, richTextToPlainText } from './rich-text';
+import { PRODUCT_HTML_MAX_LENGTH, richTextHtml, richTextToPlainText } from './rich-text';
 
 export interface GatheringOptionGroup {
   key: string;
@@ -43,6 +44,7 @@ export interface CatalogItem {
   slug: string;
   price?: number;
   description?: string;
+  descriptionHtml?: string;
   detail?: string;
   gatheringMeta?: {
     eventDate?: string;
@@ -107,6 +109,24 @@ export interface PortfolioProjectItem {
   projectUrl?: string;
   clientName?: string;
   categories: PortfolioCategoryItem[];
+}
+
+export interface PortfolioClientItem {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  categories: Array<{ id: string; slug: string; name: string }>;
+}
+
+export function toPortfolioClientItem(client: ApiWebsiteClient): PortfolioClientItem {
+  return {
+    id: client.id,
+    name: client.translation?.name ?? client.name,
+    logoUrl: client.logo_url ?? undefined,
+    websiteUrl: client.website_url ?? undefined,
+    categories: client.categories ?? [],
+  };
 }
 
 export function toPortfolioCategoryItem(category: ApiWebsitePortfolioCategory): PortfolioCategoryItem {
@@ -538,7 +558,8 @@ export function toCatalogItem(product: ApiWebsiteProduct): CatalogItem {
     name: product.name,
     slug: product.slug,
     price: Number(product.price),
-    description: product.description ?? undefined,
+    description: richTextToPlainText(product.description) || undefined,
+    descriptionHtml: richTextHtml(product.description, PRODUCT_HTML_MAX_LENGTH),
     detail: product.detail ?? undefined,
     gatheringMeta: normalizeGatheringMeta(product.metadata, product.gathering_options),
     specifications: normalizeProductSpecifications(product.specifications),

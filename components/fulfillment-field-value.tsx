@@ -43,6 +43,12 @@ export function FulfillmentFieldValue({
     );
   }
 
+  if (field.type === 'archive') {
+    return (
+      <div className="mt-1 flex flex-col gap-2">{values.map((item, index) => <div key={`${item.url}-${index}`} className="flex items-center gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border text-xs font-bold" style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-accent-muted)', backgroundColor: 'var(--brand-surface)' }}>ZIP {index + 1}</a>{item.description && <span className="text-xs">{item.description}</span>}</div>)}</div>
+    );
+  }
+
   if (field.type === 'lokasi') {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
     return <a href={mapUrl} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--brand-accent-muted)' }}>{text} · Buka peta</a>;

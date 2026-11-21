@@ -71,7 +71,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
   if (pageRef && !target) notFound();
 
   const pageSlug = target && !target.is_home ? target.slug : undefined;
-  const view = await loadTenantPageView(params.website_slug, pageSlug, FRESH);
+  const view = await loadTenantPageView(params.website_slug, pageSlug, FRESH, { preloadPortfolioForDraft: true });
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
   if (!view.templateSlug) notFound();
@@ -167,7 +167,7 @@ export default async function TenantPreviewPage({ params, searchParams }: Previe
       <PreviewShell
         templateSlug={view.templateSlug}
         pageSlug={tenant.page?.slug ?? target?.slug ?? ''}
-        viewProps={view.props}
+        viewProps={{ ...view.props, isPreview: true }}
         flowStepsByFlowId={flowStepsByFlowId}
         allowedOrigins={getAllowedAdminOrigins()}
       />

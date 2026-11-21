@@ -51,6 +51,7 @@ export interface ApiWebsite {
   template: ApiWebsiteTemplate | null;
   tagline: string | null;
   logo_url: string | null;
+  login_background_url?: string | null;
   whatsapp: string | null;
   phone: string | null;
   email: string | null;
@@ -77,6 +78,7 @@ export type ApiPagePlacement = 'regular' | 'header' | 'footer' | 'hidden';
 export interface ApiWebsitePage {
   id: string;
   website_id: string;
+  name: string;
   title: string;
   slug: string;
   seo_title?: string | null;
@@ -203,6 +205,7 @@ export interface GridResult<T> {
 export interface ApiWebsiteCategory {
   id: string;
   website_id: string;
+  identity_name: string;
   label: string;
   description?: string | null;
   images: string[];
@@ -263,6 +266,18 @@ export interface ApiWebsitePortfolioProject {
   } | null;
 }
 
+export interface ApiWebsiteClient {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  website_url: string | null;
+  translation: {
+    name: string;
+    description: string | null;
+  } | null;
+  categories: Array<{ id: string; slug: string; name: string }>;
+}
+
 export interface ApiWebsiteFaq {
   id: string;
   website_id: string;
@@ -303,11 +318,21 @@ export interface ApiWebsiteBlogPost {
  */
 export interface PublicFetchOptions {
   fresh?: boolean;
+  locale?: string;
+  acceptLanguage?: string;
 }
 
 async function fetchPublic<T>(path: string, options: PublicFetchOptions = {}): Promise<T | null> {
-  const init: RequestInit = options.fresh ? { cache: 'no-store' } : { next: { revalidate: 60 } };
-  const res = await fetch(`${API_URL}${path}`, init);
+  const init: RequestInit & { next?: { revalidate: number } } = options.fresh
+    ? { cache: 'no-store' }
+    : { next: { revalidate: 60 } };
+  const acceptLanguage = options.acceptLanguage
+    ?? (typeof navigator !== 'undefined' ? navigator.languages.join(',') || navigator.language : undefined);
+  if (acceptLanguage) init.headers = { 'Accept-Language': acceptLanguage };
+  const localizedPath = options.locale
+    ? `${path}${path.includes('?') ? '&' : '?'}locale=${encodeURIComponent(options.locale)}`
+    : path;
+  const res = await fetch(`${API_URL}${localizedPath}`, init);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Bagdja API ${res.status} on ${path}`);
@@ -396,6 +421,14 @@ export async function getPortfolioProjects(slug: string, options?: PublicFetchOp
 export async function getPortfolioCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioCategory[]> {
   const result = await fetchPublic<ApiWebsitePortfolioCategory[]>(
     `/api/public/sites/${encodeURIComponent(slug)}/portfolio-categories`,
+    options,
+  );
+  return result ?? [];
+}
+
+export async function getWebsiteClients(slug: string, options?: PublicFetchOptions): Promise<ApiWebsiteClient[]> {
+  const result = await fetchPublic<ApiWebsiteClient[]>(
+    `/api/public/sites/${encodeURIComponent(slug)}/clients`,
     options,
   );
   return result ?? [];

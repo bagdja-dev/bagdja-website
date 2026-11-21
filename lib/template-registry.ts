@@ -12,6 +12,7 @@ import type {
   LocationItem,
   NavPage,
   PortfolioCategoryItem,
+  PortfolioClientItem,
   PortfolioProjectItem,
   SectionEntry,
 } from './template-data';
@@ -59,6 +60,7 @@ export interface TemplateRenderProps {
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
   portfolioCategories?: PortfolioCategoryItem[];
+  portfolioClients?: PortfolioClientItem[];
   /**
    * Data halaman sistem untuk template package (`props.page`, kontrak
    * bagdja-website-template-runtime/contract/page-contract.d.ts). Divalidasi

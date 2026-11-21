@@ -41,6 +41,7 @@ export function buildAuthorizeUrl(
   state: string,
   codeChallenge: string,
   forceLogin = false,
+  brand?: string | null,
 ): string {
   const url = new URL('/oauth/authorize', AUTH_URL);
   url.searchParams.set('client_id', CLIENT_ID);
@@ -55,6 +56,9 @@ export function buildAuthorizeUrl(
   url.searchParams.set('prompt', 'login');
   if (forceLogin) {
     url.searchParams.set('prompt', 'login');
+  }
+  if (brand) {
+    url.searchParams.set('brand', brand);
   }
   return url.toString();
 }

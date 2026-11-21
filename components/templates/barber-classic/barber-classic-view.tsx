@@ -23,9 +23,13 @@ import {
   type GalleryImageItem,
   type LocationItem,
   type NavPage,
+  type PortfolioCategoryItem,
+  type PortfolioClientItem,
+  type PortfolioProjectItem,
   type SectionEntry,
 } from '../../../lib/template-data';
 import { warnUnknownSection } from '../../../lib/template-manifests';
+import { ProductDescription } from '../shared/product-description';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -51,6 +55,7 @@ import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '..
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
+import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 
 export interface BarberClassicProfile {
   name?: string;
@@ -92,6 +97,9 @@ export interface BarberClassicViewProps {
   pages?: NavPage[];
   /** artikel blog terbit — dipakai section blog_list/blog_search/blog_collection */
   blogPosts?: BlogPostItem[];
+  portfolioProjects?: PortfolioProjectItem[];
+  portfolioCategories?: PortfolioCategoryItem[];
+  portfolioClients?: PortfolioClientItem[];
   /** W1 auth renderer: state login buyer (dibaca server-side dari cookie). */
   auth?: {
     isLoggedIn: boolean;
@@ -129,11 +137,13 @@ export function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteS
         <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
           {item.name}
         </p>
-        {item.description && (
-          <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-            {item.description}
-          </p>
-        )}
+        {item.description || item.descriptionHtml ? (
+          <ProductDescription
+            description={item.description}
+            descriptionHtml={item.descriptionHtml}
+            className="mt-1 line-clamp-2 text-sm text-[var(--brand-muted)] [&_p]:mb-1 [&_p:last-child]:mb-0"
+          />
+        ) : null}
         {item.priceLabel && (
           <p className="mt-2 text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
             {item.priceLabel}
@@ -845,11 +855,13 @@ function ProductDetailSection({
           {item.priceLabel}
         </p>
       )}
-      {item.description && (
-        <p className="mt-4 text-center text-sm sm:text-base" style={{ color: 'var(--brand-muted)' }}>
-          {item.description}
-        </p>
-      )}
+      {item.description || item.descriptionHtml ? (
+        <ProductDescription
+          description={item.description}
+          descriptionHtml={item.descriptionHtml}
+          className="mt-4 text-center text-sm text-[var(--brand-muted)] sm:text-base [&_p]:mb-2 [&_p:last-child]:mb-0"
+        />
+      ) : null}
 
       {item.type === 'gathering' && item.gatheringMeta && (
         <div className="mt-8 rounded-2xl border p-4" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
@@ -1060,6 +1072,7 @@ function ProductDetailSection({
 }
 
 export function BarberClassicView({
+  isPreview,
   profile,
   templateTheme = {},
   websiteTheme = {},
@@ -1073,6 +1086,9 @@ export function BarberClassicView({
   websiteId,
   pages = [],
   blogPosts = [],
+  portfolioProjects = [],
+  portfolioCategories = [],
+  portfolioClients = [],
   auth,
 }: BarberClassicViewProps) {
   const title = profile.name?.trim() || 'Nama Barbershop Anda';
@@ -1218,6 +1234,10 @@ export function BarberClassicView({
           .map(withSectionFrame((section, index) => {
             const key = `${section.type}-${index}`;
             switch (section.type) {
+              case 'portfolio_projects':
+                return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} />;
+              case 'portfolio_clients':
+                return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 return (

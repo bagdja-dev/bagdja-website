@@ -16,6 +16,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Shell persisten template (D8): footer milik template; footer bawaan Bagdja di dalam outlet disembunyikan. */
 [data-bagdja-outlet] .bagdja-host-footer {
   display: none;

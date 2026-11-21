@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { getHomePage, getWebsiteBySlug } from '../../lib/api-client';
@@ -16,9 +17,10 @@ interface TenantPageProps {
 }
 
 export async function generateMetadata({ params }: TenantPageProps): Promise<Metadata> {
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
   const [website, page] = await Promise.all([
     getWebsiteBySlug(params.website_slug),
-    getHomePage(params.website_slug),
+    getHomePage(params.website_slug, { acceptLanguage }),
   ]);
   if (!website) return { robots: { index: false, follow: false } };
 
@@ -34,7 +36,8 @@ export async function generateMetadata({ params }: TenantPageProps): Promise<Met
 }
 
 export default async function TenantPage({ params }: TenantPageProps) {
-  const view = await loadTenantPageView(params.website_slug);
+  const acceptLanguage = (await headers()).get('accept-language') ?? undefined;
+  const view = await loadTenantPageView(params.website_slug, undefined, { acceptLanguage });
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
 
