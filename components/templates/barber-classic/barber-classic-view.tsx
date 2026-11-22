@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Template: Barber Classic (shared renderer)
  * Dipakai oleh:
