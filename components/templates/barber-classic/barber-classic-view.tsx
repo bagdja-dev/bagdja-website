@@ -32,6 +32,7 @@ import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { ProductDescription } from '../shared/product-description';
 import { CustomHtmlSection } from '../shared/custom-html-section';
+import { ProductPrice } from '../shared/product-price';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -149,7 +150,7 @@ export function CatalogCard({ item, websiteSlug }: { item: CatalogItem; websiteS
         ) : null}
         {item.priceLabel && (
           <p className="mt-2 text-sm font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-            {item.priceLabel}
+            <ProductPrice priceLabel={item.priceLabel} quotable={item.quotable} />
           </p>
         )}
       </div>
@@ -860,7 +861,7 @@ function ProductDetailSection({
       </h1>
       {item.priceLabel && (
         <p className="mt-3 text-center text-lg font-bold" style={{ color: 'var(--brand-accent-muted)' }}>
-          {item.priceLabel}
+          <ProductPrice priceLabel={item.priceLabel} quotable={item.quotable} />
         </p>
       )}
       {item.description || item.descriptionHtml ? (

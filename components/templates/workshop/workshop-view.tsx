@@ -35,6 +35,7 @@ import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
 import { CustomHtmlSection } from '../shared/custom-html-section';
+import { ProductPrice } from '../shared/product-price';
 import { ProductDescription } from '../shared/product-description';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
@@ -498,7 +499,7 @@ function WorkshopServices({ products, websiteSlug, content }: { products: Catalo
                     ) : null}
                     <h3 className="mt-2 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.name}</h3>
                   </div>
-                  <span className="font-mono text-xs text-[var(--brand-accent)]">{item.priceLabel || t('consultant')}</span>
+                  <span className="font-mono text-xs text-[var(--brand-accent)]">{item.priceLabel ? <ProductPrice priceLabel={item.priceLabel} quotable={item.quotable} /> : t('consultant')}</span>
                 </div>
                 {item.description || item.descriptionHtml ? (
                   <ProductDescription
@@ -687,7 +688,7 @@ function WorkshopCategoryListing({
                         {shortDescription}
                       </ProductDescription>
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold text-[var(--brand-accent)]">{item.priceLabel || 'Konsultasi'}</span>
+                        <span className="text-xs font-semibold text-[var(--brand-accent)]">{item.priceLabel ? <ProductPrice priceLabel={item.priceLabel} quotable={item.quotable} /> : 'Konsultasi'}</span>
                         <span className="font-mono text-[10px] uppercase tracking-wide opacity-60">{t('detail')} →</span>
                       </div>
                     </div>
@@ -905,7 +906,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brand-accent)]">{item.category ?? t('workshopServiceUpper')}</p>
               <h1 className="mt-3 text-3xl font-bold sm:text-5xl" style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}>{item.name}</h1>
-              {item.priceLabel ? <p className="mt-5 text-xl font-bold text-[var(--brand-accent)]">{item.priceLabel}</p> : null}
+              {item.priceLabel ? <p className="mt-5 text-xl font-bold text-[var(--brand-accent)]"><ProductPrice priceLabel={item.priceLabel} quotable={item.quotable} /></p> : null}
               {item.description || item.descriptionHtml ? (
                 <ProductDescription
                   description={item.description}
@@ -1080,7 +1081,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">{variant.name}</span>
-                      {variant.priceLabel ? <span className="text-xs text-[var(--brand-muted)]">{variant.priceLabel}</span> : null}
+                      {variant.priceLabel ? <span className="text-xs text-[var(--brand-muted)]"><ProductPrice priceLabel={variant.priceLabel} quotable={variant.quotable} /></span> : null}
                     </div>
                   </a>
                 ))}
@@ -1116,7 +1117,7 @@ function WorkshopContact({ content, chatHref, locations }: { content: Record<str
           </div>
         </div>
       ) : null}
-      {related.length ? <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title={t('servicesElsewhere')} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{related.map((product) => <a key={product.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, product.slug) : '#'} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}><h3 className="font-bold">{product.name}</h3><p className="mt-2 text-xs text-[var(--brand-muted)]">{product.priceLabel || t('consultant')}</p></a>)}</div></div></section> : null}
+      {related.length ? <section className="bg-[var(--brand-surface)] py-14"><div className="mx-auto max-w-6xl px-4 sm:px-6"><SectionHeading title={t('servicesElsewhere')} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{related.map((product) => <a key={product.id} href={websiteSlug !== undefined ? buildProductHref(websiteSlug, product.slug) : '#'} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-bg)' }}><h3 className="font-bold">{product.name}</h3><p className="mt-2 text-xs text-[var(--brand-muted)]">{product.priceLabel ? <ProductPrice priceLabel={product.priceLabel} quotable={product.quotable} /> : t('consultant')}</p></a>)}</div></div></section> : null}
     </>
   );
 }
