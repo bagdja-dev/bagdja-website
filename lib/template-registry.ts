@@ -13,6 +13,7 @@ import type {
   NavPage,
   PortfolioCategoryItem,
   PortfolioClientItem,
+  PortfolioProjectDetailItem,
   PortfolioProjectItem,
   SectionEntry,
 } from './template-data';
@@ -59,6 +60,7 @@ export interface TemplateRenderProps {
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
+  portfolioProjectDetail?: PortfolioProjectDetailItem;
   portfolioCategories?: PortfolioCategoryItem[];
   portfolioClients?: PortfolioClientItem[];
   /**

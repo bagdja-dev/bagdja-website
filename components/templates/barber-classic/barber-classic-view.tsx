@@ -27,6 +27,7 @@ import {
   type NavPage,
   type PortfolioCategoryItem,
   type PortfolioClientItem,
+  type PortfolioProjectDetailItem,
   type PortfolioProjectItem,
   type SectionEntry,
 } from '../../../lib/template-data';
@@ -60,7 +61,7 @@ import { OrderDetailContent, type OrderDetail, type TransactionDetail } from '..
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
-import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { PortfolioClientsSection, PortfolioProjectDetailSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 import { useTemplateText } from '../shared/template-locale';
 
 export interface BarberClassicProfile {
@@ -104,6 +105,7 @@ export interface BarberClassicViewProps {
   /** artikel blog terbit — dipakai section blog_list/blog_search/blog_collection */
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
+  portfolioProjectDetail?: PortfolioProjectDetailItem;
   portfolioCategories?: PortfolioCategoryItem[];
   portfolioClients?: PortfolioClientItem[];
   /** W1 auth renderer: state login buyer (dibaca server-side dari cookie). */
@@ -1098,6 +1100,7 @@ export function BarberClassicView({
   pages = [],
   blogPosts = [],
   portfolioProjects = [],
+  portfolioProjectDetail,
   portfolioCategories = [],
   portfolioClients = [],
   auth,
@@ -1247,7 +1250,11 @@ export function BarberClassicView({
             const key = `${section.type}-${index}`;
             switch (section.type) {
               case 'portfolio_projects':
-                return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} />;
+                return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} websiteSlug={websiteSlug} />;
+              case 'portfolio_project_detail':
+                return portfolioProjectDetail
+                  ? <PortfolioProjectDetailSection key={key} project={portfolioProjectDetail} websiteSlug={websiteSlug} />
+                  : null;
               case 'portfolio_clients':
                 return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {

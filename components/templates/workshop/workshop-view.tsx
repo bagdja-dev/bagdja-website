@@ -27,6 +27,7 @@ import {
   type NavPage,
   type PortfolioCategoryItem,
   type PortfolioClientItem,
+  type PortfolioProjectDetailItem,
   type PortfolioProjectItem,
   type SectionEntry,
 } from '../../../lib/template-data';
@@ -64,7 +65,7 @@ import { resolvePageHeadingLabel } from '../../../lib/page-title';
 import { resolveCtaHref, type CtaHref } from '../../../lib/cta-href';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { BlogRelatedProducts } from '../../blog-related-products';
-import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { PortfolioClientsSection, PortfolioProjectDetailSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 import { useTemplateText } from '../shared/template-locale';
 
 export interface WorkshopViewProps {
@@ -93,6 +94,7 @@ export interface WorkshopViewProps {
   websiteId?: string;
   pages?: NavPage[];
   portfolioProjects?: PortfolioProjectItem[];
+  portfolioProjectDetail?: PortfolioProjectDetailItem;
   portfolioCategories?: PortfolioCategoryItem[];
   portfolioClients?: PortfolioClientItem[];
   auth?: {
@@ -1138,6 +1140,7 @@ export function WorkshopView({
   websiteId,
   pages = [],
   portfolioProjects = [],
+  portfolioProjectDetail,
   portfolioCategories = [],
   portfolioClients = [],
   auth,
@@ -1211,7 +1214,11 @@ export function WorkshopView({
           const key = `${section.type}-${index}`;
           switch (section.type) {
             case 'portfolio_projects':
-              return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} />;
+              return <PortfolioProjectsSection key={key} content={section.content} projects={portfolioProjects} categories={portfolioCategories} websiteSlug={websiteSlug} />;
+            case 'portfolio_project_detail':
+              return portfolioProjectDetail
+                ? <PortfolioProjectDetailSection key={key} project={portfolioProjectDetail} websiteSlug={websiteSlug} />
+                : null;
             case 'portfolio_clients':
               return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
             case 'features_grid': return <WorkshopFeatures key={key} content={section.content} />;

@@ -10,6 +10,7 @@ import type {
   ApiWebsiteProduct,
   ApiWebsitePortfolioCategory,
   ApiWebsitePortfolioProject,
+  ApiWebsitePortfolioProjectDetail,
   ApiWebsiteTemplate,
 } from './api-client';
 import { PRODUCT_HTML_MAX_LENGTH, richTextHtml, richTextToPlainText } from './rich-text';
@@ -115,6 +116,21 @@ export interface PortfolioProjectItem {
   categories: PortfolioCategoryItem[];
 }
 
+export interface PortfolioProjectDetailItem {
+  slug: string;
+  title: string;
+  excerpt?: string;
+  detailHtml?: string;
+  detailText?: string;
+  coverImage?: string;
+  photos: Array<{ url: string; alt: string; caption: string }>;
+  tags: string[];
+  year?: number;
+  projectType?: string;
+  videoUrl?: string;
+  projectUrl?: string;
+}
+
 export interface PortfolioClientItem {
   id: string;
   name: string;
@@ -162,6 +178,24 @@ export function toPortfolioProjectItem(project: ApiWebsitePortfolioProject): Por
       description: category.description ?? undefined,
       sortOrder: category.sort_order,
     })),
+  };
+}
+
+export function toPortfolioProjectDetailItem(project: ApiWebsitePortfolioProjectDetail): PortfolioProjectDetailItem {
+  const detailHtml = richTextHtml(project.translation.detail, PRODUCT_HTML_MAX_LENGTH);
+  return {
+    slug: project.translation.slug || project.slug,
+    title: project.translation.title || project.name,
+    excerpt: project.translation.excerpt ?? undefined,
+    detailHtml,
+    detailText: detailHtml ? undefined : richTextToPlainText(project.translation.detail) || undefined,
+    coverImage: project.cover_image ?? undefined,
+    photos: Array.isArray(project.photos) ? project.photos.filter((photo) => Boolean(photo.url)) : [],
+    tags: Array.isArray(project.tags) ? project.tags : [],
+    year: project.year ?? undefined,
+    projectType: project.project_type?.trim() || undefined,
+    videoUrl: project.video_url?.trim() || undefined,
+    projectUrl: project.project_url ?? undefined,
   };
 }
 

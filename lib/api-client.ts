@@ -271,6 +271,33 @@ export interface ApiWebsitePortfolioProject {
   } | null;
 }
 
+export interface ApiWebsitePortfolioProjectDetail {
+  id: string;
+  website_id: string;
+  slug: string;
+  name: string;
+  tags: string[];
+  cover_image: string | null;
+  photos: Array<{ url: string; alt: string; caption: string }>;
+  video_url: string | null;
+  model3d_url: string | null;
+  project_url: string | null;
+  project_type: string | null;
+  year: number | null;
+  created_at: string;
+  seo_no_index: boolean;
+  translation: {
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    detail: string | null;
+    seo_title: string | null;
+    seo_description: string | null;
+    seo_image: string | null;
+    seo_no_index: boolean;
+  };
+}
+
 export interface ApiWebsiteClient {
   id: string;
   name: string;
@@ -424,6 +451,17 @@ export async function getPortfolioProjects(slug: string, options?: PublicFetchOp
     options,
   );
   return result ?? [];
+}
+
+export function getPortfolioProject(
+  slug: string,
+  projectSlug: string,
+  options?: PublicFetchOptions,
+): Promise<ApiWebsitePortfolioProjectDetail | null> {
+  return fetchPublic<ApiWebsitePortfolioProjectDetail>(
+    `/api/public/sites/${encodeURIComponent(slug)}/portfolio-projects/${encodeURIComponent(projectSlug)}`,
+    options,
+  );
 }
 
 export async function getPortfolioCategories(slug: string, options?: PublicFetchOptions): Promise<ApiWebsitePortfolioCategory[]> {
