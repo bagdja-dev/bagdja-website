@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Template: Store Classic (shared renderer)
  * Fase 1 — katalog/showcase produk & layanan, TANPA keranjang/checkout
