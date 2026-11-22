@@ -64,7 +64,7 @@ export function contentMetadata({
     }
   }
   const metadata: Metadata = {
-    title,
+    title: { absolute: title },
     alternates: { canonical },
     robots: noIndex ? { index: false, follow: true } : { index: true, follow: true },
     openGraph: {

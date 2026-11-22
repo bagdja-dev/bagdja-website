@@ -23,7 +23,7 @@ interface CalendarPageProps {
 
 export async function generateMetadata({ params }: CalendarPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
-  return tenant ? { title: `Kalender Acara — ${tenant.website.name}` } : {};
+  return tenant ? { title: { absolute: `Kalender Acara — ${tenant.website.name}` } } : {};
 }
 
 export default async function CalendarPage({ params }: CalendarPageProps) {

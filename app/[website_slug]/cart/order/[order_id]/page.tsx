@@ -13,7 +13,7 @@ interface DraftOrderPageProps {
 export async function generateMetadata({ params }: DraftOrderPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Detail Pesanan Draft — ${tenant.website.name}` };
+  return { title: { absolute: `Detail Pesanan Draft — ${tenant.website.name}` } };
 }
 
 export default async function DraftOrderPage({ params }: DraftOrderPageProps) {

@@ -39,7 +39,7 @@ interface TagihanPageProps {
 export async function generateMetadata({ params }: TagihanPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Tagihan — ${tenant.website.name}` };
+  return { title: { absolute: `Tagihan — ${tenant.website.name}` } };
 }
 
 export default async function TagihanPage({ params }: TagihanPageProps) {
