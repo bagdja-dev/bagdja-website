@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   if (!tenant || !category) return {};
 
   return {
-    title: `${category.label} · ${tenant.website.name}`,
+    title: { absolute: `${category.label} · ${tenant.website.name}` },
     description: tenant.website.tagline ?? undefined,
   };
 }

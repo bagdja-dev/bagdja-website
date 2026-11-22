@@ -56,7 +56,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 const FRESH = { fresh: true } as const;
 
 export const metadata: Metadata = {
-  title: 'Pratinjau',
+  title: { absolute: 'Pratinjau' },
   robots: { index: false, follow: false, nocache: true },
 };
 

@@ -38,7 +38,7 @@ interface CheckoutPageProps {
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Checkout — ${tenant.website.name}` };
+  return { title: { absolute: `Checkout — ${tenant.website.name}` } };
 }
 
 export default async function CheckoutPage({ params, searchParams }: CheckoutPageProps) {

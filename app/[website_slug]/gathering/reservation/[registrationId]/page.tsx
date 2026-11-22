@@ -14,7 +14,7 @@ interface GatheringReservationRouteProps {
 
 export async function generateMetadata({ params }: GatheringReservationRouteProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
-  return tenant ? { title: `Detail Reservasi — ${tenant.website.name}` } : {};
+  return tenant ? { title: { absolute: `Detail Reservasi — ${tenant.website.name}` } } : {};
 }
 
 export default async function GatheringReservationRoute({ params }: GatheringReservationRouteProps) {

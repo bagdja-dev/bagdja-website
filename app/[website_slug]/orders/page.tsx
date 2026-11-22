@@ -39,7 +39,7 @@ interface OrdersPageProps {
 export async function generateMetadata({ params }: OrdersPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Daftar Transaksi — ${tenant.website.name}` };
+  return { title: { absolute: `Daftar Transaksi — ${tenant.website.name}` } };
 }
 
 export default async function OrdersPage({ params }: OrdersPageProps) {

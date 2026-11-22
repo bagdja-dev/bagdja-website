@@ -40,7 +40,7 @@ interface ChatPageProps {
 export async function generateMetadata({ params }: ChatPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Inbox Chat — ${tenant.website.name}` };
+  return { title: { absolute: `Inbox Chat — ${tenant.website.name}` } };
 }
 
 export default async function ChatPage({ params }: ChatPageProps) {

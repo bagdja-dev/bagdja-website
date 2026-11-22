@@ -165,7 +165,7 @@ interface TransactionPageProps {
 export async function generateMetadata({ params }: TransactionPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Detail Transaksi — ${tenant.website.name}` };
+  return { title: { absolute: `Detail Transaksi — ${tenant.website.name}` } };
 }
 
 export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {

@@ -37,7 +37,7 @@ interface ProfilePageProps {
 export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Profil Saya — ${tenant.website.name}` };
+  return { title: { absolute: `Profil Saya — ${tenant.website.name}` } };
 }
 
 export default async function ProfilePage({ params }: ProfilePageProps) {

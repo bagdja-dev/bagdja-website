@@ -38,7 +38,7 @@ interface CartPageProps {
 export async function generateMetadata({ params }: CartPageProps): Promise<Metadata> {
   const tenant = await loadTenant(params.website_slug);
   if (!tenant) return {};
-  return { title: `Keranjang — ${tenant.website.name}` };
+  return { title: { absolute: `Keranjang — ${tenant.website.name}` } };
 }
 
 export default async function CartPage({ params }: CartPageProps) {
