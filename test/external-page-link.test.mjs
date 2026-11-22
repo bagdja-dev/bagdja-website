@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildPageHref, navLinkTargetProps, resolveExternalPageUrl } from '../lib/page-link.ts';
+import { buildPageHref, navLinkTargetProps, resolveExternalPageUrl, resolveFeatureLink } from '../lib/page-link.ts';
 
 // Sama dengan toNavPage() di lib/template-data.ts.
 function toNavPage(page) {
@@ -46,4 +46,13 @@ test('URL eksternal dinormalisasi dan skema berbahaya ditolak', () => {
   assert.equal(resolveExternalPageUrl({ link_mode: 'external', external_url: '   ' }), undefined);
   assert.equal(resolveExternalPageUrl({ link_mode: 'external', external_url: null }), undefined);
   assert.deepEqual(navLinkTargetProps('mailto:halo@contoh.com'), {});
+});
+
+test('link kartu keunggulan menerima URL umum dan path relatif, serta menolak skema berbahaya', () => {
+  assert.equal(resolveFeatureLink('www.contoh.com/promo'), 'https://www.contoh.com/promo');
+  assert.equal(resolveFeatureLink('/layanan'), '/layanan');
+  assert.equal(resolveFeatureLink('#harga'), '#harga');
+  assert.equal(resolveFeatureLink('mailto:halo@contoh.com'), 'mailto:halo@contoh.com');
+  assert.equal(resolveFeatureLink('javascript:alert(1)'), undefined);
+  assert.equal(resolveFeatureLink('   '), undefined);
 });

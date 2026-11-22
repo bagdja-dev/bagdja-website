@@ -15,6 +15,22 @@ export interface PageLinkSource {
 }
 
 const EXTERNAL_LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+const FEATURE_LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
+/** Allows safe tenant-relative paths and common external links for section cards. */
+export function resolveFeatureLink(raw: string): string | undefined {
+  const value = raw.trim();
+  if (!value || /[\u0000-\u001f\u007f]/.test(value)) return undefined;
+  if (/^(?:\/(?!\/)|\.{1,2}\/|[?#])/.test(value)) return value;
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value.replace(/^\/\//, '')}`;
+  try {
+    const url = new URL(withScheme);
+    return FEATURE_LINK_SCHEMES.has(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * URL tujuan halaman bertipe tautan eksternal, atau `undefined` bila halaman internal /
