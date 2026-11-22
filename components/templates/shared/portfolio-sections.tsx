@@ -2,8 +2,14 @@
 
 import { useState } from 'react';
 
-import type { PortfolioCategoryItem, PortfolioClientItem, PortfolioProjectItem } from '../../../lib/template-data';
+import type {
+  PortfolioCategoryItem,
+  PortfolioClientItem,
+  PortfolioProjectItem,
+} from '../../../lib/template-data';
 import { useTemplateText } from './template-locale';
+
+export { PortfolioProjectDetailSection } from './portfolio-project-detail';
 
 type PortfolioContent = Record<string, unknown>;
 
@@ -24,10 +30,12 @@ export function PortfolioProjectsSection({
   content,
   projects,
   categories,
+  websiteSlug,
 }: {
   content: PortfolioContent;
   projects: PortfolioProjectItem[];
   categories: PortfolioCategoryItem[];
+  websiteSlug?: string;
 }) {
   const t = useTemplateText();
   const [activeCategory, setActiveCategory] = useState('');
@@ -67,9 +75,8 @@ export function PortfolioProjectsSection({
   }
   filteredProjects = filteredProjects.slice(0, limit);
   if (!filteredProjects.length) return null;
-
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+    <section id="portfolio-projects" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       {title.trim() || subtitle.trim() ? (
         <div className="mb-8">
           {title.trim() ? <h2 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>{title}</h2> : null}
@@ -107,12 +114,18 @@ export function PortfolioProjectsSection({
                     {project.tags.map((tag) => <span key={tag} className="rounded-full bg-[var(--brand-surface)] px-2.5 py-1 text-xs">{tag}</span>)}
                   </div>
                 ) : null}
+                <span className="mt-5 text-sm font-semibold text-[var(--brand-accent)]">
+                  {t('viewProject')} →
+                </span>
               </div>
             </>
           );
           const className = `flex ${layout === 'carousel' ? 'min-w-[min(85vw,360px)] snap-start' : 'min-w-0'} flex-col overflow-hidden rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-bg)] shadow-sm`;
-          return project.projectUrl ? (
-            <a key={project.id} href={project.projectUrl} target="_blank" rel="noopener noreferrer" className={`${className} text-inherit no-underline transition-shadow hover:shadow-md`}>
+          const detailHref = websiteSlug !== undefined
+            ? `${websiteSlug}/portfolio/${encodeURIComponent(project.slug)}`
+            : undefined;
+          return detailHref ? (
+            <a key={project.id} href={detailHref} className={`${className} text-inherit no-underline transition-shadow hover:shadow-md`}>
               {card}
             </a>
           ) : <article key={project.id} className={className}>{card}</article>;

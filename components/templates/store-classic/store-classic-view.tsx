@@ -34,6 +34,7 @@ import {
   type FeatureItem,
   type PortfolioCategoryItem,
   type PortfolioClientItem,
+  type PortfolioProjectDetailItem,
   type PortfolioProjectItem,
 } from '../../../lib/template-data';
 import { productGridFilter } from '../../../lib/product-grid-filter';
@@ -75,7 +76,7 @@ import { PurchaseControls } from '../../purchase-controls';
 import { ChatReferenceButton } from '../../chat-reference-button';
 import { GatheringPlanButton } from '../../gathering-plan-button';
 import { buildChatReferenceHref } from '../../chat-reference';
-import { PortfolioClientsSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
+import { PortfolioClientsSection, PortfolioProjectDetailSection, PortfolioProjectsSection } from '../shared/portfolio-sections';
 import { useTemplateText } from '../shared/template-locale';
 
 export interface StoreClassicProfile {
@@ -106,6 +107,7 @@ export interface StoreClassicViewProps {
   pages?: NavPage[];
   blogPosts?: BlogPostItem[];
   portfolioProjects?: PortfolioProjectItem[];
+  portfolioProjectDetail?: PortfolioProjectDetailItem;
   portfolioCategories?: PortfolioCategoryItem[];
   portfolioClients?: PortfolioClientItem[];
   hideHeader?: boolean;
@@ -1305,6 +1307,7 @@ export function StoreClassicView({
   pages = [],
   blogPosts = [],
   portfolioProjects = [],
+  portfolioProjectDetail,
   portfolioCategories = [],
   portfolioClients = [],
   auth,
@@ -1356,6 +1359,7 @@ export function StoreClassicView({
   const orderDetailSection = sections.find((s) => s.type === 'order_detail');
   const profileSection = sections.find((s) => s.type === 'profile');
   const chatSection = sections.find((s) => s.type === 'chat');
+  const portfolioProjectDetailSection = sections.find((s) => s.type === 'portfolio_project_detail');
   const isChatPage = Boolean(chatSection);
   const pageBannerLabel = checkoutSection
     ? t('cartCheckout')
@@ -1429,7 +1433,7 @@ export function StoreClassicView({
           <PageHeroBanner label={productPageTitle} imageUrl={productDetailItem.image} />
         ) : categoryListingLabel ? (
           <PageHeroBanner label={categoryListingLabel} imageUrl={categoryListingImage} />
-        ) : isChatPage || (hideHeader && (cartSection || checkoutSection || ordersSection || tagihanSection || calendarSection || orderDetailSection)) ? null : pageBannerLabel ? (
+        ) : isChatPage || portfolioProjectDetailSection || (hideHeader && (cartSection || checkoutSection || ordersSection || tagihanSection || calendarSection || orderDetailSection)) ? null : pageBannerLabel ? (
           <PageHeroBanner label={pageBannerLabel} />
         ) : (
           <SectionFrame section={sections.find((s) => s.type === 'hero')}>
@@ -1491,8 +1495,13 @@ export function StoreClassicView({
                     content={section.content}
                     projects={portfolioProjects}
                     categories={portfolioCategories}
+                    websiteSlug={websiteSlug}
                   />
                 );
+              case 'portfolio_project_detail':
+                return portfolioProjectDetail
+                  ? <PortfolioProjectDetailSection key={key} project={portfolioProjectDetail} websiteSlug={websiteSlug} />
+                  : null;
               case 'portfolio_clients':
                 return <PortfolioClientsSection key={key} content={section.content} clients={portfolioClients} isPreview={isPreview} />;
               case 'category_grid': {

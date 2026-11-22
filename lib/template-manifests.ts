@@ -28,6 +28,7 @@ export interface BuiltTemplateManifest {
  */
 export const SYSTEM_SECTION_TYPES = [
   'product_detail',
+  'portfolio_project_detail',
   'category_listing',
   'blog_article',
   'cart',
