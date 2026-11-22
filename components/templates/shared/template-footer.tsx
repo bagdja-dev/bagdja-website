@@ -1,4 +1,5 @@
 import type { FooterBlock, SocialLink } from '../../../lib/template-data';
+import { navLinkTargetProps } from '../../../lib/template-data';
 import { MailIcon, MapPinIcon, PhoneIcon, SocialIcon } from '../store-classic/store-classic-icons';
 
 export interface FooterLink {
@@ -134,7 +135,7 @@ export function TemplateFooter({
             {renderHeading(readString(content, 'title'))}
             <nav className="flex flex-col gap-2">
               {pageLinks.map((link) => (
-                <a key={link.href} href={link.href} className="hover:underline" style={linkStyle}>
+                <a key={link.href} href={link.href} {...navLinkTargetProps(link.href)} className="hover:underline" style={linkStyle}>
                   {link.label}
                 </a>
               ))}

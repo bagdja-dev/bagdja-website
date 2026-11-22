@@ -34,6 +34,7 @@ import { matchesProductGridFilter, productGridFilter } from '../../../lib/produc
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { CustomHtmlSection } from '../shared/custom-html-section';
 import { ProductDescription } from '../shared/product-description';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
@@ -1207,6 +1208,7 @@ export function WorkshopView({
             case 'faq_list': return <WorkshopFaq key={key} faqs={faqs} content={section.content} />;
             case 'text_block': return <WorkshopTextBlock key={key} content={section.content} />;
             case 'rich_text': return <WorkshopRichText key={key} content={section.content} />;
+            case 'custom_html': return <CustomHtmlSection key={key} html={getString(section.content, 'html') ?? ''} />;
             case 'blog_list': {
               const title = getString(section.content, 'title') ?? t('latestArticles');
               const limit = Number(section.content.limit);

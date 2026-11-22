@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { getPageBySlug, getWebsiteBySlug } from '../../../lib/api-client';
 import { CartProvider } from '../../../lib/cart';
 import { contentMetadata } from '../../../lib/content-seo';
 import { loadTenantPageView } from '../../../lib/tenant-page-view';
 import WebsiteInactiveNotice from '../../../components/website-inactive-notice';
+import { resolveExternalPageUrl } from '../../../lib/template-data';
 import { getTemplateRenderer } from '../../../lib/template-registry';
 import { renderPinnedTenantTemplate } from '../../../lib/template-runtime-route';
 
@@ -40,6 +41,9 @@ export default async function TenantSubPage({ params }: TenantSubPageProps) {
   const view = await loadTenantPageView(params.website_slug, params.page_slug, { acceptLanguage });
   if (view.status === 'not_found') notFound();
   if (view.status === 'inactive') return <WebsiteInactiveNotice />;
+  // Halaman bertipe "Tautan eksternal": link lama / bookmark ke /{slug} langsung diarahkan keluar.
+  const externalUrl = view.tenant.page ? resolveExternalPageUrl(view.tenant.page) : undefined;
+  if (externalUrl) redirect(externalUrl);
 
   const runtime = view.tenant.website.template_runtime ?? null;
   if (runtime) {

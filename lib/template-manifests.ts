@@ -48,6 +48,7 @@ export const BUILT_TEMPLATE_MANIFESTS = {
     sections: [
       'text_block',
       'rich_text',
+      'custom_html',
       'about',
       'gallery',
       'testimonial',
@@ -71,6 +72,9 @@ export const BUILT_TEMPLATE_MANIFESTS = {
     rendererApiVersion: RENDERER_API_VERSION,
     sections: [
       'hero',
+      'text_block',
+      'rich_text',
+      'custom_html',
       'about',
       'gallery',
       'features_grid',
@@ -99,6 +103,7 @@ export const BUILT_TEMPLATE_MANIFESTS = {
       'hero',
       'text_block',
       'rich_text',
+      'custom_html',
       'about',
       'gallery',
       'features_grid',

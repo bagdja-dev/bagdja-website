@@ -332,12 +332,9 @@ export function parseGalleryImages(raw: unknown): GalleryImageItem[] {
     .filter((img) => img.url);
 }
 
-export interface NavPage {
-  slug: string;
-  title: string;
-  isHome: boolean;
-  placement: string;
-}
+import { resolveExternalPageUrl, type NavPage } from './page-link';
+
+export { buildPageHref, navLinkTargetProps, resolveExternalPageUrl, type NavPage } from './page-link';
 
 export function toNavPage(page: ApiWebsitePage): NavPage {
   return {
@@ -345,18 +342,8 @@ export function toNavPage(page: ApiWebsitePage): NavPage {
     title: page.title,
     isHome: page.is_home,
     placement: page.placement,
+    externalUrl: resolveExternalPageUrl(page),
   };
-}
-
-/**
- * `basePath` sudah pre-computed oleh caller (lihat `resolveTenantLinkBase`) —
- * kosong ('') untuk subdomain/custom domain, `/{slug}` untuk path-based
- * (local dev). Jangan diisi raw slug tanpa lewat situ, supaya tidak dobel
- * slug di URL (`{slug}.sites.bagdja.com/{slug}/...`).
- */
-export function buildPageHref(basePath: string, page: NavPage): string {
-  if (page.isHome) return basePath || '/';
-  return `${basePath}/${page.slug}`;
 }
 
 export function formatIDR(value: number | string | null | undefined): string {
