@@ -89,6 +89,9 @@ export interface ApiWebsitePage {
   is_home: boolean;
   placement: ApiPagePlacement;
   order: number;
+  /** `external` = halaman hanya berupa tautan ke `external_url` (diatur di Studio). */
+  link_mode?: 'internal' | 'external';
+  external_url?: string | null;
   /** hanya terisi kalau di-fetch via getHomePage()/getPageBySlug() */
   sections?: ApiWebsiteSection[];
 }

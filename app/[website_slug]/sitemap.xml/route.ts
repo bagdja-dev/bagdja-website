@@ -1,5 +1,6 @@
 import { getBlogPosts, getProducts, getWebsiteBySlug } from '../../../lib/api-client';
 import { tenantCanonicalUrl } from '../../../lib/content-seo';
+import { resolveExternalPageUrl } from '../../../lib/template-data';
 
 export const revalidate = 300;
 
@@ -26,7 +27,8 @@ export async function GET(_request: Request, { params }: SitemapRouteContext): P
       ? [{ url: tenantCanonicalUrl(slug, '/', website) }]
       : []),
     ...website.pages
-      .filter((page) => !page.is_home && !page.seo_no_index)
+      // Halaman tautan eksternal hanya redirect keluar — bukan konten situs ini.
+      .filter((page) => !page.is_home && !page.seo_no_index && !resolveExternalPageUrl(page))
       .map((page) => ({
         url: tenantCanonicalUrl(slug, `/${page.slug}`, website),
       })),

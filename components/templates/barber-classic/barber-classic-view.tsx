@@ -31,6 +31,7 @@ import {
 import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { ProductDescription } from '../shared/product-description';
+import { CustomHtmlSection } from '../shared/custom-html-section';
 import {
   getGoogleFontsUrl,
   resolveTheme,
@@ -1320,6 +1321,8 @@ export function BarberClassicView({
                 const html = typeof section.content.html === 'string' ? section.content.html : '';
                 return <RichTextSection key={key} title={heading} html={html} />;
               }
+              case 'custom_html':
+                return <CustomHtmlSection key={key} html={typeof section.content.html === 'string' ? section.content.html : ''} />;
               case 'text_block': {
                 const heading =
                   typeof section.content.title === 'string' ? section.content.title : undefined;

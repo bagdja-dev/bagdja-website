@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { SocialLink } from '../../../lib/template-data';
+import { navLinkTargetProps } from '../../../lib/template-data';
 import { SocialIcon } from './barber-classic-icons';
 import { CartBadge } from '../../cart-badge';
 import { NotificationBell } from '../../notification-bell';
@@ -127,7 +128,7 @@ export function BarberClassicHeader({
             {leftNavLinks.map((link) => (
               <a
                 key={link.href}
-                href={link.href}
+                href={link.href} {...navLinkTargetProps(link.href)}
                 className="whitespace-nowrap text-sm font-medium transition-colors hover:opacity-80"
                 style={linkStyle}
               >
@@ -171,7 +172,7 @@ export function BarberClassicHeader({
             {rightNavLinks.map((link) => (
               <a
                 key={link.href}
-                href={link.href}
+                href={link.href} {...navLinkTargetProps(link.href)}
                 className="whitespace-nowrap text-sm font-medium transition-colors hover:opacity-80"
                 style={linkStyle}
               >
@@ -298,7 +299,7 @@ export function BarberClassicHeader({
               {drawerLinks.map((link) => (
                 <a
                   key={link.href}
-                  href={link.href}
+                  href={link.href} {...navLinkTargetProps(link.href)}
                   onClick={closeDrawer}
                   className="block border-b px-6 py-5 text-base font-medium uppercase tracking-wide transition-colors hover:opacity-80"
                   style={{ color: 'var(--brand-text)', borderColor: 'var(--brand-border)' }}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { SocialLink } from '../../../lib/template-data';
+import { navLinkTargetProps } from '../../../lib/template-data';
 import { CloseIcon, HamburgerIcon, SocialIcon } from './store-classic-icons';
 import { CartBadge } from '../../cart-badge';
 import { NotificationBell } from '../../notification-bell';
@@ -132,7 +133,7 @@ export function StoreClassicHeader({
           {navLinks.map((link) => (
             <a
               key={link.href}
-              href={link.href}
+              href={link.href} {...navLinkTargetProps(link.href)}
               className="whitespace-nowrap text-xs font-semibold uppercase tracking-wider transition-colors hover:opacity-70"
               style={{ color: 'var(--c-header-text)' }}
             >
@@ -288,7 +289,7 @@ export function StoreClassicHeader({
               {navLinks.map((link) => (
                 <a
                   key={link.href}
-                  href={link.href}
+                  href={link.href} {...navLinkTargetProps(link.href)}
                   onClick={closeDrawer}
                   className="block border-b px-6 py-5 text-sm font-semibold uppercase tracking-wide transition-colors hover:opacity-80"
                   style={{ color: 'var(--brand-text)', borderColor: 'var(--brand-border)' }}

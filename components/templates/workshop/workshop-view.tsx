@@ -34,6 +34,7 @@ import { matchesProductGridFilter, productGridFilter } from '../../../lib/produc
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import { useState, type CSSProperties } from 'react';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { CustomHtmlSection } from '../shared/custom-html-section';
 import { ProductDescription } from '../shared/product-description';
 import { PurchaseControls } from '../../purchase-controls';
 import { CartContent } from '../../cart-content';
@@ -339,6 +340,7 @@ function SectionHeading({ title, subtitle }: { title?: string; subtitle?: string
 
 function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
   const title = getString(content, 'title');
+  const subtitle = getString(content, 'subtitle');
   const features = parseFeatureItems(content)
     .map((item) => ({ ...item, icon: item.icon || '⭐' }))
     .filter((item) => item.title.trim());
@@ -346,10 +348,11 @@ function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
   if (!features.length) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-      <SectionHeading title={title} />
+      <SectionHeading title={title} subtitle={subtitle} />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {features.map((item) => (
-          <article key={item.title} className="border p-5" style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}>
+        {features.map((item, index) => {
+          const card = (
+            <>
             {visualMode === 'image' && item.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="h-12 w-12 object-contain" />
@@ -358,8 +361,28 @@ function WorkshopFeatures({ content }: { content: Record<string, unknown> }) {
             )}
             <h3 className="mt-6 font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>
             {item.desc ? <p className="mt-2 text-sm text-[var(--brand-muted)]">{item.desc}</p> : null}
-          </article>
-        ))}
+            </>
+          );
+          const className = 'block border p-5 text-inherit transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
+          return item.link ? (
+            <a
+              key={`${item.title}-${index}`}
+              href={item.link}
+              className={className}
+              style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
+            >
+              {card}
+            </a>
+          ) : (
+            <article
+              key={`${item.title}-${index}`}
+              className={className.replace('block ', '')}
+              style={{ borderColor: 'var(--brand-border)', backgroundColor: 'var(--brand-surface)' }}
+            >
+              {card}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -1207,6 +1230,7 @@ export function WorkshopView({
             case 'faq_list': return <WorkshopFaq key={key} faqs={faqs} content={section.content} />;
             case 'text_block': return <WorkshopTextBlock key={key} content={section.content} />;
             case 'rich_text': return <WorkshopRichText key={key} content={section.content} />;
+            case 'custom_html': return <CustomHtmlSection key={key} html={getString(section.content, 'html') ?? ''} />;
             case 'blog_list': {
               const title = getString(section.content, 'title') ?? t('latestArticles');
               const limit = Number(section.content.limit);

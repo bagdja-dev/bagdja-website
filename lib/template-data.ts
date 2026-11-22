@@ -296,6 +296,7 @@ export interface FeatureItem {
   imageAlt: string;
   title: string;
   desc: string;
+  link?: string;
 }
 
 export function parseFeatureItems(content: Record<string, unknown>): FeatureItem[] {
@@ -308,6 +309,7 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
         imageAlt: typeof item.image_alt === 'string' ? item.image_alt : '',
         title: typeof item.title === 'string' ? item.title : '',
         desc: typeof item.desc === 'string' ? item.desc : '',
+        link: typeof item.link === 'string' ? resolveFeatureLink(item.link) : undefined,
       }));
   }
 
@@ -317,6 +319,7 @@ export function parseFeatureItems(content: Record<string, unknown>): FeatureItem
     imageAlt: '',
     title: typeof content[`feature_${index}_title`] === 'string' ? content[`feature_${index}_title`] as string : '',
     desc: typeof content[`feature_${index}_desc`] === 'string' ? content[`feature_${index}_desc`] as string : '',
+    link: typeof content[`feature_${index}_link`] === 'string' ? resolveFeatureLink(content[`feature_${index}_link`] as string) : undefined,
   }));
 }
 
@@ -332,12 +335,9 @@ export function parseGalleryImages(raw: unknown): GalleryImageItem[] {
     .filter((img) => img.url);
 }
 
-export interface NavPage {
-  slug: string;
-  title: string;
-  isHome: boolean;
-  placement: string;
-}
+import { resolveExternalPageUrl, resolveFeatureLink, type NavPage } from './page-link';
+
+export { buildPageHref, navLinkTargetProps, resolveExternalPageUrl, resolveFeatureLink, type NavPage } from './page-link';
 
 export function toNavPage(page: ApiWebsitePage): NavPage {
   return {
@@ -345,18 +345,8 @@ export function toNavPage(page: ApiWebsitePage): NavPage {
     title: page.title,
     isHome: page.is_home,
     placement: page.placement,
+    externalUrl: resolveExternalPageUrl(page),
   };
-}
-
-/**
- * `basePath` sudah pre-computed oleh caller (lihat `resolveTenantLinkBase`) —
- * kosong ('') untuk subdomain/custom domain, `/{slug}` untuk path-based
- * (local dev). Jangan diisi raw slug tanpa lewat situ, supaya tidak dobel
- * slug di URL (`{slug}.sites.bagdja.com/{slug}/...`).
- */
-export function buildPageHref(basePath: string, page: NavPage): string {
-  if (page.isHome) return basePath || '/';
-  return `${basePath}/${page.slug}`;
 }
 
 export function formatIDR(value: number | string | null | undefined): string {

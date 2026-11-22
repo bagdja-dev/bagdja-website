@@ -37,6 +37,7 @@ import {
 import { productGridFilter } from '../../../lib/product-grid-filter';
 import { warnUnknownSection } from '../../../lib/template-manifests';
 import { SectionFrame, withSectionFrame } from '../shared/section-frame';
+import { CustomHtmlSection } from '../shared/custom-html-section';
 import { ProductDescription } from '../shared/product-description';
 import { resolveCheckoutPaymentMode } from '../../../lib/payment-mode';
 import {
@@ -128,15 +129,20 @@ export interface StoreClassicViewProps {
   };
 }
 
-export function SectionHeading({ title, align = 'left' }: { title?: string; align?: 'left' | 'center' }) {
-  if (!title?.trim()) return null;
+export function SectionHeading({ title, subtitle, align = 'left' }: { title?: string; subtitle?: string; align?: 'left' | 'center' }) {
+  if (!title?.trim() && !subtitle?.trim()) return null;
   return (
-    <h2
-      className={`mb-8 text-2xl font-bold sm:text-3xl ${align === 'center' ? 'text-center' : ''}`}
-      style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
-    >
-      {title}
-    </h2>
+    <div className={`mb-8 ${align === 'center' ? 'text-center' : ''}`}>
+      {title?.trim() ? (
+        <h2
+          className="text-2xl font-bold sm:text-3xl"
+          style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
+        >
+          {title}
+        </h2>
+      ) : null}
+      {subtitle?.trim() ? <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>{subtitle}</p> : null}
+    </div>
   );
 }
 
@@ -246,31 +252,37 @@ function PageHeroBanner({ label, imageUrl }: { label: string; imageUrl?: string 
   );
 }
 
-function FeaturesGridSection({ title, features, visualMode }: { title?: string; features: FeatureItem[]; visualMode: 'icon' | 'image' }) {
+function FeaturesGridSection({ title, subtitle, features, visualMode }: { title?: string; subtitle?: string; features: FeatureItem[]; visualMode: 'icon' | 'image' }) {
   const items = features.filter((f) => f.title.trim());
   if (!items.length) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <SectionHeading title={title} align="center" />
+      <SectionHeading title={title} subtitle={subtitle} align="center" />
       <div className={`grid gap-6 ${items.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-        {items.map((item, i) => (
-          <div key={i} className="rounded-xl p-6 text-center" style={{ backgroundColor: 'var(--brand-surface)' }}>
-            {visualMode === 'image' && item.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="mx-auto h-12 w-12 object-contain" />
-            ) : (
-              <span className="text-3xl">{item.icon || '⭐'}</span>
-            )}
-            <p className="mt-3 font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
-              {item.title}
-            </p>
-            {item.desc && (
-              <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>
-                {item.desc}
-              </p>
-            )}
-          </div>
-        ))}
+        {items.map((item, i) => {
+          const card = (
+            <>
+              {visualMode === 'image' && item.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={item.image} alt={item.imageAlt || item.title} loading="lazy" className="mx-auto h-12 w-12 object-contain" />
+              ) : (
+                <span className="text-3xl">{item.icon || '⭐'}</span>
+              )}
+              <p className="mt-3 font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</p>
+              {item.desc ? <p className="mt-2 text-sm" style={{ color: 'var(--brand-muted)' }}>{item.desc}</p> : null}
+            </>
+          );
+          const className = 'block rounded-xl p-6 text-center text-inherit transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
+          return item.link ? (
+            <a key={i} href={item.link} className={className} style={{ backgroundColor: 'var(--brand-surface)' }}>
+              {card}
+            </a>
+          ) : (
+            <div key={i} className={`rounded-xl p-6 text-center ${className.replace('block ', '')}`} style={{ backgroundColor: 'var(--brand-surface)' }}>
+              {card}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1439,9 +1451,10 @@ export function StoreClassicView({
             switch (section.type) {
               case 'features_grid': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
+                const subtitle = typeof section.content.subtitle === 'string' ? section.content.subtitle : undefined;
                 const features = parseFeatureItems(section.content);
                 const visualMode = section.content.visual_mode === 'image' ? 'image' : 'icon';
-                return <FeaturesGridSection key={key} title={heading} features={features} visualMode={visualMode} />;
+                return <FeaturesGridSection key={key} title={heading} subtitle={subtitle} features={features} visualMode={visualMode} />;
               }
               case 'featured_product': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
@@ -1545,6 +1558,8 @@ export function StoreClassicView({
                 const html = typeof section.content.html === 'string' ? section.content.html : '';
                 return <RichTextSection key={key} title={heading} html={html} />;
               }
+              case 'custom_html':
+                return <CustomHtmlSection key={key} html={typeof section.content.html === 'string' ? section.content.html : ''} />;
               case 'text_block': {
                 const heading = typeof section.content.title === 'string' ? section.content.title : undefined;
                 const body = typeof section.content.body === 'string' ? section.content.body : '';
