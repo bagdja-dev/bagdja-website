@@ -244,7 +244,13 @@ function WorkshopBlogSearch({ title, posts, websiteSlug }: { title?: string; pos
   );
 }
 
-function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string; content: Record<string, unknown>; waHref?: string; chatHref?: string }) {
+function WorkshopHero({ tagline, content, waHref, chatHref, serviceHref }: {
+  tagline: string;
+  content: Record<string, unknown>;
+  waHref?: string;
+  chatHref?: string;
+  serviceHref?: string;
+}) {
   const t = useTemplateText();
   const subtitle = getString(content, 'subtitle') ?? t('workshopSubtitle');
   const headline = getString(content, 'headline') ?? t('workshopHeadline');
@@ -266,6 +272,26 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
   const stats = Array.isArray(content.stats)
     ? content.stats.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
     : [];
+  const ctaButtons = Array.isArray(content.cta_buttons)
+    ? content.cta_buttons
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => {
+        const label = getString(item, 'label');
+        const href = resolveCtaHref({ button_action: 'link', button_url: item.url }, {});
+        if (!label || !href) return null;
+        const parsedRatio = Number(item.width_ratio);
+        const widthRatio = Number.isFinite(parsedRatio) ? Math.min(2, Math.max(1, parsedRatio)) : 1;
+        return {
+          label,
+          href,
+          widthRatio,
+          backgroundColor: isHexColor(item.background_color) ? item.background_color : undefined,
+          textColor: isHexColor(item.text_color) ? item.text_color : undefined,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+    : [];
+  const hasCustomCtas = ctaButtons.length > 0;
 
   return (
     <section
@@ -280,22 +306,41 @@ function WorkshopHero({ tagline, content, waHref, chatHref }: { tagline: string;
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed sm:text-lg" style={{ color: mutedTextColor }}>{lede}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a
-              href={chatHref || waHref || '#'}
-              target={chatHref ? undefined : '_blank'}
-              rel={chatHref ? undefined : 'noopener noreferrer'}
-              className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]"
-              style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)' }}
-            >
-              {t('contactUs')}
-            </a>
-            <a
-              href="#layanan"
-              className="border-2 px-5 py-3 text-center text-sm font-bold hover:border-white"
-              style={{ borderColor: subtleBorderColor, color: textColor }}
-            >
-              {t('seeServices')}
-            </a>
+            {hasCustomCtas ? ctaButtons.map((cta, index) => (
+              <a
+                key={`${cta.label}-${index}`}
+                href={cta.href.href}
+                {...(cta.href.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                className="flex min-w-0 flex-1 basis-full justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold sm:basis-0"
+                style={{
+                  flexGrow: cta.widthRatio,
+                  backgroundColor: cta.backgroundColor ?? 'var(--brand-accent)',
+                  borderColor: cta.backgroundColor ?? 'var(--brand-accent)',
+                  color: cta.textColor ?? 'var(--brand-on-accent)',
+                }}
+              >
+                {cta.label}
+              </a>
+            )) : (
+              <>
+                <a
+                  href={chatHref || waHref || '#'}
+                  target={chatHref ? undefined : '_blank'}
+                  rel={chatHref ? undefined : 'noopener noreferrer'}
+                  className="flex w-full flex-1 justify-center rounded-full border-2 px-5 py-3 text-center text-sm font-bold text-[var(--brand-on-accent)]"
+                  style={{ backgroundColor: 'var(--brand-accent)', borderColor: 'var(--brand-accent)' }}
+                >
+                  {t('contactUs')}
+                </a>
+                <a
+                  href={serviceHref || '#layanan'}
+                  className="border-2 px-5 py-3 text-center text-sm font-bold hover:border-white"
+                  style={{ borderColor: subtleBorderColor, color: textColor }}
+                >
+                  {t('seeServices')}
+                </a>
+              </>
+            )}
           </div>
           {stats.length > 0 ? (
             <div
@@ -1163,6 +1208,10 @@ export function WorkshopView({
   const homeHref = websiteSlug !== undefined ? websiteSlug || '/' : '#';
   const waHref = buildWhatsAppHref(profile.whatsapp);
   const chatHref = auth?.chatHref ?? (websiteSlug !== undefined ? `${websiteSlug}/chat` : '/chat');
+  const firstService = products.find((product) => product.type === 'service' && !product.parentProductId);
+  const serviceHref = firstService && websiteSlug !== undefined
+    ? buildProductHref(websiteSlug, firstService.slug)
+    : undefined;
   const primaryLocation = locations.find((location) => location.isPrimary) ?? locations[0];
   const footerAddress = primaryLocation
     ? [primaryLocation.addressLine, primaryLocation.city].filter(Boolean).join(', ')
@@ -1209,7 +1258,7 @@ export function WorkshopView({
             <WorkshopProductBanner label={productPageTitle} imageUrl={productDetailItem.image} />
             <WorkshopProductDetail item={productDetailItem} allProducts={products} locations={locations} websiteSlug={websiteSlug} tenantSlug={tenantSlug} websiteId={websiteId} waHref={waHref} auth={auth} />
           </>
-        ) : utilityPage || isCategoryListingPage || !heroSection ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection.content} waHref={waHref} chatHref={chatHref} /></SectionFrame>}
+        ) : utilityPage || isCategoryListingPage || !heroSection ? null : <SectionFrame section={heroSection}><WorkshopHero tagline={tagline} content={heroSection.content} waHref={waHref} chatHref={chatHref} serviceHref={serviceHref} /></SectionFrame>}
         {!isCatalogItem(productDetailItem) && sections.filter((section) => section.type !== 'hero').map(withSectionFrame((section, index) => {
           const key = `${section.type}-${index}`;
           switch (section.type) {
