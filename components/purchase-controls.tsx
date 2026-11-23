@@ -107,7 +107,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
           Harga belum ditentukan — kirim permintaan penawaran, tim kami akan menghubungi Anda.
         </p>
       )}
-      {!isDigital && (
+      {!isDigital && !isQuoteRequest && (
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-muted)' }}>
             Jumlah
@@ -182,7 +182,7 @@ export function PurchaseControls({ slug, basePath, isLoggedIn = false, loginHref
       />
       </div>
 
-      {isEscrow && (
+      {isEscrow && !isQuoteRequest && (
         <p className="text-xs" style={{ color: 'var(--brand-muted)' }}>
           🔒 Dana ditahan aman sampai pesanan selesai
         </p>
