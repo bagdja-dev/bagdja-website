@@ -407,6 +407,23 @@ export function TemplateRuntimeSsrFrame({
     if (!frameElement || !frame) return;
     const handleMessage = (event: MessageEvent<unknown>) => {
       if (event.source !== frame || event.origin !== messageOrigin) return;
+      if (
+        event.data !== null
+        && typeof event.data === 'object'
+        && !Array.isArray(event.data)
+        && (event.data as Record<string, unknown>).protocol === 1
+        && (event.data as Record<string, unknown>).type === 'bagdja:template:analytics-cta'
+        && (event.data as Record<string, unknown>).slug === stableIdentity.slug
+        && (event.data as Record<string, unknown>).version === stableIdentity.version
+        && (event.data as Record<string, unknown>).digest === stableIdentity.digest
+        && typeof (event.data as Record<string, unknown>).label === 'string'
+        && ((event.data as Record<string, unknown>).label as string).length <= 100
+      ) {
+        window.dispatchEvent(new CustomEvent('bagdja:analytics-cta', {
+          detail: { label: (event.data as { label: string }).label },
+        }));
+        return;
+      }
       if (stableIdentity.slug === 'kumpul' && isTemplateRuntimeNotificationAnchorMessage(event.data, stableIdentity)) {
         // Render langsung: posisi dihitung langsung dari header (efek di bawah), bukan dari pesan.
         if (inline) return;

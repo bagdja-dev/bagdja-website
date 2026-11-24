@@ -12,6 +12,7 @@ import { applyViewerTemplateTrial } from '../../lib/template-trial';
 import { tenantRuntime, tenantTemplateTheme } from '../../lib/tenant-template';
 import { resolveTenantLinkBase } from '../../lib/tenant-link-base';
 import { sanitizeWebsiteTheme } from '../../lib/website-theme';
+import { WebsiteAnalyticsTracker } from '../../components/website-analytics-tracker';
 
 interface TenantLayoutProps {
   params: { website_slug: string };
@@ -47,12 +48,22 @@ export default async function TenantLayout({ params, children }: TenantLayoutPro
   const locale = resolveTemplateLocale((await headers()).get('accept-language'));
   const publicWebsite = await getWebsiteBySlug(params.website_slug);
   if (!publicWebsite?.template_runtime && !publicWebsite?.template_trial_active) {
-    return <TemplateLocaleProvider locale={locale}>{children}</TemplateLocaleProvider>;
+    return (
+      <TemplateLocaleProvider locale={locale}>
+        <WebsiteAnalyticsTracker websiteSlug={params.website_slug} />
+        {children}
+      </TemplateLocaleProvider>
+    );
   }
   const website = await applyViewerTemplateTrial(publicWebsite);
   const runtime = tenantRuntime(website);
   if (!runtime?.pageOverrides.includes('shell')) {
-    return <TemplateLocaleProvider locale={locale}>{children}</TemplateLocaleProvider>;
+    return (
+      <TemplateLocaleProvider locale={locale}>
+        <WebsiteAnalyticsTracker websiteSlug={params.website_slug} />
+        {children}
+      </TemplateLocaleProvider>
+    );
   }
 
   const linkBase = resolveTenantLinkBase(website.slug);
@@ -86,5 +97,10 @@ export default async function TenantLayout({ params, children }: TenantLayoutPro
     },
     children,
   });
-  return <TemplateLocaleProvider locale={locale}>{shell ?? children}</TemplateLocaleProvider>;
+  return (
+    <TemplateLocaleProvider locale={locale}>
+      <WebsiteAnalyticsTracker websiteSlug={params.website_slug} />
+      {shell ?? children}
+    </TemplateLocaleProvider>
+  );
 }
