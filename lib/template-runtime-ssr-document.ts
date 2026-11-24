@@ -232,6 +232,21 @@ function createNavigationBootstrap({
     parent.postMessage({ protocol: 1, type: 'bagdja:template:pong', ...identity, requestId: message.requestId }, parentOrigin);
   });
   const tenantPathPrefix = ${scriptJson(tenantPathPrefix)};
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target.closest('a, button, [role="button"]') : null;
+    if (!target) return;
+    const explicit = target.closest('[data-analytics-cta]')?.getAttribute('data-analytics-cta');
+    const text = (explicit || target.closest('[data-primary-cta]')?.textContent || target.textContent || '').replace(/\\s+/g, ' ').trim();
+    const href = target.closest('a[href]')?.getAttribute('href') || '';
+    const label = /(?:wa\\.me|api\\.whatsapp\\.com)/i.test(href) ? 'WhatsApp'
+      : /^tel:/i.test(href) ? 'Telepon'
+        : /^mailto:/i.test(href) ? 'Email'
+          : text;
+    if (!label || !(target.closest('[data-analytics-cta], [data-primary-cta]') ||
+        /pesan|beli|booking|reservasi|penawaran|hubungi|konsultasi|whatsapp|daftar|jadwalkan|order|checkout|contact|buy|book/i.test(label))) return;
+    const cleanLabel = label.replace(/[^\\p{L}\\p{N} ._+-]/gu, '').slice(0, 100);
+    if (cleanLabel) parent.postMessage({ protocol: 1, type: 'bagdja:template:analytics-cta', ...identity, label: cleanLabel }, parentOrigin);
+  }, true);
   const isTenantPath = (pathname) => {
     const pathPrefix = tenantPathPrefix === '/' ? '/' : tenantPathPrefix.replace(/\\/$/, '');
     return pathPrefix === '/' || pathname === pathPrefix || pathname.startsWith(pathPrefix + '/');
@@ -1061,4 +1076,3 @@ export function createTemplateInlineBootstrap({
     minHeight: 0,
   });
 }
-
